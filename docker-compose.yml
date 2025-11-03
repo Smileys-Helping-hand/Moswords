@@ -1,0 +1,56 @@
+version: '3.9'
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    command: server /data --console-address :9001
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+  server:
+    build: ./server
+    command: npm run dev
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/moswords
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret
+      OPENAI_KEY: sk-test
+      S3_BUCKET: moswords-dev
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: miniosecret
+      ALLOWED_ORIGIN: http://localhost:5173
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+      - redis
+      - minio
+  client:
+    build: ./client
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+
+volumes:
+  mongo-data:
+  minio-data:
