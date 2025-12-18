@@ -69,7 +69,7 @@ export const mockMessages: Message[] = [
     {
         id: '4',
         author: mockMembers[1],
-        content: "Seamless. You can define a flow and expose it as a Cloud Function that triggers on Firestore events. Super easy.",
+        content: "Seamless. You can define a flow and expose it as a Cloud Function that triggers on a Firestore event. Super easy.",
         timestamp: '10:33 AM',
         reactions: [{ emoji: '🤯', count: 1, reacted: true }]
     },

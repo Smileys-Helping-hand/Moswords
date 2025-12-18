@@ -13,7 +13,7 @@ export interface Server {
 
 export interface Channel {
   id: string;
-  name:string;
+  name: string;
   type: 'text' | 'voice';
 }
 
