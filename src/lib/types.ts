@@ -6,6 +6,7 @@ export interface UserProfile {
     displayName?: string | null;
     photoURL?: string | null;
     createdAt: any;
+    last_seen?: any;
 }
 
 export interface Server {

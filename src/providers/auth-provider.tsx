@@ -3,14 +3,70 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, database, firestore } from '@/lib/firebase';
 import { AuthContext, useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ref, onValue, set, onDisconnect, serverTimestamp } from 'firebase/database';
+import { doc, updateDoc } from 'firebase/firestore';
+import GlobalErrorListener from '@/components/global-error-listener';
+
+function usePresence() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const uid = user.uid;
+    const userStatusDatabaseRef = ref(database, '/status/' + uid);
+    const userStatusFirestoreRef = doc(firestore, '/users/' + uid);
+
+    const isOfflineForDatabase = {
+      state: 'offline',
+      last_changed: serverTimestamp(),
+    };
+    const isOnlineForDatabase = {
+      state: 'online',
+      last_changed: serverTimestamp(),
+    };
+
+    const isOfflineForFirestore = {
+      last_seen: serverTimestamp(),
+    };
+
+    const connectedRef = ref(database, '.info/connected');
+    let unsubscribe: () => void;
+
+    const subscription = onValue(connectedRef, (snapshot) => {
+      if (snapshot.val() === false) {
+        updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+        return;
+      }
+
+      onDisconnect(userStatusDatabaseRef)
+        .set(isOfflineForDatabase)
+        .then(() => {
+          set(userStatusDatabaseRef, isOnlineForDatabase);
+          updateDoc(userStatusFirestoreRef, { last_seen: 'online' });
+        });
+    });
+
+    return () => {
+      subscription();
+      if(userStatusDatabaseRef) {
+        set(userStatusDatabaseRef, isOfflineForDatabase);
+        updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+      }
+    };
+  }, [user]);
+}
+
 
 function AuthRedirect({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  usePresence();
+
 
   useEffect(() => {
     if (loading) return;
@@ -59,7 +115,8 @@ function FirebaseAuthProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <AuthContext.Provider value={{ user, loading }}>
-        {children}
+          <GlobalErrorListener />
+          {children}
         </AuthContext.Provider>
     );
 }
