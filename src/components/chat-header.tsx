@@ -20,7 +20,7 @@ import {
 import { useState, useEffect } from 'react';
 import { summarizeThread } from '@/ai/flows/ai-summarize-thread';
 import { Skeleton } from './ui/skeleton';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, doc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import type { Message, Channel } from '@/lib/types';
 
