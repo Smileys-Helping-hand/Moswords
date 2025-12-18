@@ -29,24 +29,6 @@ import { MoswordsIcon } from './icons';
 import { FirebaseError } from 'firebase/app';
 import { emitAuthError } from '@/lib/firebase-error-handler';
 
-async function createUserDocument(user: User) {
-  const batch = writeBatch(firestore);
-  const userRef = doc(firestore, 'users', user.uid);
-  
-  batch.set(userRef, {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName || 'Anonymous',
-    photoURL: user.photoURL,
-    createdAt: new Date(),
-  });
-
-  // You can add more operations to the batch here, for example,
-  // creating a default server membership for the new user.
-
-  await batch.commit();
-}
-
 
 export default function AuthForm() {
   const [email, setEmail] = useState('');
@@ -69,26 +51,13 @@ export default function AuthForm() {
         return;
     }
     setLoading(true);
-    let user: User | null = null;
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      user = userCredential.user;
-      await createUserDocument(user);
+      await createUserWithEmailAndPassword(auth, email, password);
       toast({
         title: 'Success!',
         description: 'Your account has been created.',
       });
     } catch (error) {
-        if (user) {
-            await deleteUser(user).catch(deleteError => {
-                console.error("Failed to delete orphaned auth user:", deleteError);
-                toast({
-                    variant: 'destructive',
-                    title: 'Critical Error',
-                    description: "Could not create user profile and failed to cleanup. Please contact support.",
-                });
-            });
-        }
         handleAuthError(error);
     } finally {
       setLoading(false);
@@ -111,11 +80,7 @@ export default function AuthForm() {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      // Create user document only on first sign in
-      if (result.user.metadata.creationTime === result.user.metadata.lastSignInTime) {
-        await createUserDocument(result.user);
-      }
+      await signInWithPopup(auth, provider);
     } catch (error) {
       handleAuthError(error);
     } finally {

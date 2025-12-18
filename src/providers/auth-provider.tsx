@@ -1,14 +1,35 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, database, firestore } from '@/lib/firebase';
 import { AuthContext, useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ref, onValue, set, onDisconnect, serverTimestamp } from 'firebase/database';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import GlobalErrorListener from '@/components/global-error-listener';
+
+const createUserDocument = async (user: FirebaseUser) => {
+    if (!user) return;
+    const userRef = doc(firestore, 'users', user.uid);
+    const docSnap = await getDoc(userRef);
+
+    if (!docSnap.exists()) {
+        try {
+            await setDoc(userRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || 'Anonymous',
+                photoURL: user.photoURL,
+                createdAt: serverTimestamp(),
+                points: 0,
+            });
+        } catch (error) {
+            console.error("Error creating user document:", error);
+        }
+    }
+};
 
 function usePresence() {
   const { user } = useAuth();
@@ -16,47 +37,49 @@ function usePresence() {
   useEffect(() => {
     if (!user) return;
 
-    const uid = user.uid;
-    const userStatusDatabaseRef = ref(database, '/status/' + uid);
-    const userStatusFirestoreRef = doc(firestore, '/users/' + uid);
+    createUserDocument(user).then(() => {
+        const uid = user.uid;
+        const userStatusDatabaseRef = ref(database, '/status/' + uid);
+        const userStatusFirestoreRef = doc(firestore, '/users/' + uid);
 
-    const isOfflineForDatabase = {
-      state: 'offline',
-      last_changed: serverTimestamp(),
-    };
-    const isOnlineForDatabase = {
-      state: 'online',
-      last_changed: serverTimestamp(),
-    };
+        const isOfflineForDatabase = {
+        state: 'offline',
+        last_changed: serverTimestamp(),
+        };
+        const isOnlineForDatabase = {
+        state: 'online',
+        last_changed: serverTimestamp(),
+        };
 
-    const isOfflineForFirestore = {
-      last_seen: serverTimestamp(),
-    };
+        const isOfflineForFirestore = {
+        last_seen: serverTimestamp(),
+        };
 
-    const connectedRef = ref(database, '.info/connected');
-    let unsubscribe: () => void;
+        const connectedRef = ref(database, '.info/connected');
 
-    const subscription = onValue(connectedRef, (snapshot) => {
-      if (snapshot.val() === false) {
-        updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
-        return;
-      }
+        const subscription = onValue(connectedRef, (snapshot) => {
+        if (snapshot.val() === false) {
+            updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+            return;
+        }
 
-      onDisconnect(userStatusDatabaseRef)
-        .set(isOfflineForDatabase)
-        .then(() => {
-          set(userStatusDatabaseRef, isOnlineForDatabase);
-          updateDoc(userStatusFirestoreRef, { last_seen: 'online' });
+        onDisconnect(userStatusDatabaseRef)
+            .set(isOfflineForDatabase)
+            .then(() => {
+            set(userStatusDatabaseRef, isOnlineForDatabase);
+            updateDoc(userStatusFirestoreRef, { last_seen: 'online' });
+            });
         });
-    });
 
-    return () => {
-      subscription();
-      if(userStatusDatabaseRef) {
-        set(userStatusDatabaseRef, isOfflineForDatabase);
-        updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
-      }
-    };
+        return () => {
+            subscription();
+            if(userStatusDatabaseRef) {
+                set(userStatusDatabaseRef, isOfflineForDatabase);
+                updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+            }
+        };
+    })
+
   }, [user]);
 }
 
@@ -104,14 +127,20 @@ function FirebaseAuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<FirebaseUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setUser(user);
+    const handleUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            await createUserDocument(firebaseUser);
+            setUser(firebaseUser);
+        } else {
+            setUser(null);
+        }
         setLoading(false);
-        });
-
-        return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, handleUser);
+        return () => unsubscribe();
+    }, [handleUser]);
 
     return (
         <AuthContext.Provider value={{ user, loading }}>
