@@ -17,8 +17,14 @@ const AnalyzeMessageToxicityInputSchema = z.object({
 export type AnalyzeMessageToxicityInput = z.infer<typeof AnalyzeMessageToxicityInputSchema>;
 
 const AnalyzeMessageToxicityOutputSchema = z.object({
-  isToxic: z.boolean().describe('Whether the message is toxic or violates community guidelines.'),
-  toxicityReason: z.string().describe('The reason why the message is considered toxic.'),
+  isToxic: z
+    .boolean()
+    .describe('Whether the message is toxic, inappropriate, or violates community guidelines.'),
+  toxicityReason: z
+    .string()
+    .describe(
+      'If the message is toxic, a kind and empathetic explanation for a young person about why the message could be hurtful or inappropriate. This should be educational, not punitive.'
+    ),
 });
 export type AnalyzeMessageToxicityOutput = z.infer<typeof AnalyzeMessageToxicityOutputSchema>;
 
@@ -30,13 +36,18 @@ const toxicityAnalysisPrompt = ai.definePrompt({
   name: 'toxicityAnalysisPrompt',
   input: {schema: AnalyzeMessageToxicityInputSchema},
   output: {schema: AnalyzeMessageToxicityOutputSchema},
-  prompt: `You are an AI sentinel responsible for detecting toxic messages and messages that violate community guidelines.
+  prompt: `You are an AI sentinel for a kids' social app. You are responsible for detecting toxic, mean, or otherwise inappropriate messages.
 
-  Analyze the following message and determine if it is toxic or violates community guidelines. If it does, explain why.
+  Your primary goal is to foster a safe and empathetic environment.
+
+  Analyze the following message. Determine if it is toxic or violates community guidelines.
+
+  - If the message is NOT toxic, respond with 'isToxic: false' and an empty 'toxicityReason'.
+  - If the message IS toxic, respond with 'isToxic: true'. For the 'toxicityReason', provide a kind, gentle, and educational explanation for a young person (under 13) about why their words might be hurtful. Focus on empathy and understanding, not punishment. For example, instead of "Don't use bad words," you could say, "This word can be hurtful to others. Let's try to use kinder language."
 
   Message: {{{text}}}
 
-  Respond in JSON format with the isToxic boolean and toxicityReason string.
+  Respond in JSON format.
 `,
 });
 

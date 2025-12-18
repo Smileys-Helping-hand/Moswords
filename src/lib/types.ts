@@ -5,7 +5,7 @@ export interface UserProfile {
     email?: string | null;
     displayName?: string | null;
     photoURL?: string | null;
-    createdAt: Date;
+    createdAt: any;
 }
 
 export interface Server {
@@ -37,8 +37,8 @@ export interface Message {
   timestamp: any;
   author: {
     uid: string;
-    name: string;
-    avatarUrl: string;
+    displayName: string;
+    photoURL: string;
     imageHint: string;
   };
   reactions: { emoji: string; count: number; reacted: boolean }[];

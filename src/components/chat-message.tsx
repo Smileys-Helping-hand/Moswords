@@ -19,28 +19,21 @@ export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
     return (
         <div className={`flex items-start gap-4 group ${showAvatar ? 'mt-4' : ''}`}>
             <div className="w-10 h-10">
-                {showAvatar && <UserAvatar src={message.author.avatarUrl} imageHint={message.author.imageHint} />}
+                {showAvatar && <UserAvatar src={message.author.photoURL} imageHint={message.author.imageHint} />}
             </div>
             <div className="flex-1">
                 {showAvatar && (
                     <div className="flex items-baseline gap-2">
-                        <p className="font-semibold text-primary">{message.author.name}</p>
-                        <p className="text-xs text-muted-foreground">{message.timestamp}</p>
+                        <p className="font-semibold text-primary">{message.author.displayName}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(message.timestamp?.seconds * 1000).toLocaleTimeString()}</p>
                     </div>
                 )}
-                <div className="text-sm text-muted-foreground/80 italic flex items-center gap-2 rounded-md bg-muted/30 p-2">
-                   <ShieldAlert className="w-4 h-4 text-yellow-500" />
-                   <span>This message was flagged by our AI moderator.</span>
-                    <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <MessageCircleWarning className="w-4 h-4 cursor-help hover:text-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p className="max-w-xs text-sm">{message.toxicityReason}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                <div className="text-sm text-yellow-200/80 italic flex items-center gap-2 rounded-md bg-yellow-900/30 p-3 border border-yellow-700/50">
+                   <ShieldAlert className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                   <div>
+                        <span className="font-semibold">A message from the AI Sentinel:</span>
+                        <p className="not-italic text-yellow-100/90">{message.toxicityReason}</p>
+                   </div>
                 </div>
             </div>
         </div>
@@ -50,13 +43,13 @@ export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
   return (
     <div className={`flex items-start gap-4 group ${showAvatar ? 'mt-4' : ''}`}>
       <div className="w-10 h-10">
-        {showAvatar && <UserAvatar src={message.author.avatarUrl} imageHint={message.author.imageHint} />}
+        {showAvatar && <UserAvatar src={message.author.photoURL} imageHint={message.author.imageHint} />}
       </div>
       <div className="flex-1">
         {showAvatar && (
           <div className="flex items-baseline gap-2">
-            <p className="font-semibold text-primary">{message.author.name}</p>
-            <p className="text-xs text-muted-foreground">{message.timestamp}</p>
+            <p className="font-semibold text-primary">{message.author.displayName}</p>
+            <p className="text-xs text-muted-foreground">{new Date(message.timestamp?.seconds * 1000).toLocaleTimeString()}</p>
           </div>
         )}
         <p className="text-base text-foreground/90">{message.content}</p>
