@@ -1,3 +1,5 @@
+"use client"
+
 import { Bell, Hash, Pin, Users, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,6 +10,83 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { useState } from 'react';
+import { summarizeThread } from '@/ai/flows/ai-summarize-thread';
+import { mockMessages } from '@/lib/placeholder-data';
+import { Skeleton } from './ui/skeleton';
+
+function ThreadSummary() {
+    const [summary, setSummary] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleSummarize = async () => {
+        setLoading(true);
+        setSummary(null);
+        try {
+            const result = await summarizeThread({
+                channelId: '1',
+                threadId: '1',
+                messages: mockMessages.map(m => `${m.author.name}: ${m.content}`),
+            });
+            setSummary(result.summary);
+        } catch (error) {
+            console.error("Failed to summarize thread:", error);
+            setSummary("Sorry, I couldn't generate a summary for this thread.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog onOpenChange={(open) => !open && setSummary(null)}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                    </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Summarize Thread</p>
+              </TooltipContent>
+            </Tooltip>
+            <DialogContent onOpenAutoFocus={handleSummarize}>
+                <DialogHeader>
+                    <DialogTitle>Thread Summary</DialogTitle>
+                    <DialogDescription>
+                        Here's a quick summary of the conversation.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="prose prose-sm dark:prose-invert">
+                    {loading && (
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-4/5" />
+                        </div>
+                    )}
+                    {summary && (
+                        <ul>
+                            {summary.split('- ').filter(s => s.trim()).map((s, i) => (
+                                <li key={i}>{s.trim()}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 export default function ChatHeader() {
   const currentChannel = mockChannels[0];
@@ -23,16 +102,7 @@ export default function ChatHeader() {
 
       <TooltipProvider>
         <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Summarize Thread</p>
-              </TooltipContent>
-            </Tooltip>
+            <ThreadSummary />
           
           <div className="w-64">
             <Input

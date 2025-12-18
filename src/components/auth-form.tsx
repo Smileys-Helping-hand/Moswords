@@ -7,6 +7,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   User,
+  deleteUser,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, firestore } from '@/lib/firebase';
@@ -25,16 +26,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ChromeIcon } from 'lucide-react';
 import { MoswordsIcon } from './icons';
+import { FirebaseError } from 'firebase/app';
 
 async function createUserDocument(user: User) {
   const userRef = doc(firestore, 'users', user.uid);
+  // Use setDoc with merge:true to create or update the document
+  // This is useful for Google Sign-In where the user might already exist
   await setDoc(userRef, {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
     photoURL: user.photoURL,
     createdAt: new Date(),
-  });
+  }, { merge: true });
 }
 
 export default function AuthForm() {
@@ -46,30 +50,35 @@ export default function AuthForm() {
   const handleAuthError = (error: any) => {
     console.error('Authentication error:', error);
     let description = 'An unknown error occurred.';
-    switch (error.code) {
-      case 'auth/invalid-email':
-        description = 'Please enter a valid email address.';
-        break;
-      case 'auth/user-disabled':
-        description = 'This user account has been disabled.';
-        break;
-      case 'auth/user-not-found':
-        description = 'No user found with this email.';
-        break;
-      case 'auth/wrong-password':
-        description = 'Incorrect password. Please try again.';
-        break;
-      case 'auth/email-already-in-use':
-        description = 'An account already exists with this email address.';
-        break;
-      case 'auth/network-request-failed':
-        description = 'Network error. Please check your internet connection.';
-        break;
-      case 'permission-denied':
-         description = 'You do not have permission to perform this action.';
-         break;
-      default:
-        description = error.message;
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case 'auth/invalid-email':
+          description = 'Please enter a valid email address.';
+          break;
+        case 'auth/user-disabled':
+          description = 'This user account has been disabled.';
+          break;
+        case 'auth/user-not-found':
+          description = 'No user found with this email.';
+          break;
+        case 'auth/wrong-password':
+          description = 'Incorrect password. Please try again.';
+          break;
+        case 'auth/email-already-in-use':
+          description = 'An account already exists with this email address.';
+          break;
+        case 'auth/network-request-failed':
+          description = 'Network error. Please check your internet connection.';
+          break;
+        case 'auth/popup-closed-by-user':
+          description = 'Sign-in popup closed before completion.';
+          break;
+        case 'permission-denied':
+           description = 'You do not have permission to perform this action.';
+           break;
+        default:
+          description = error.message;
+      }
     }
     toast({
       variant: 'destructive',
@@ -80,16 +89,40 @@ export default function AuthForm() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password.length < 6) {
+        toast({
+            variant: 'destructive',
+            title: 'Password too short',
+            description: 'Your password must be at least 6 characters long.',
+        });
+        return;
+    }
     setLoading(true);
+    let user: User | null = null;
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await createUserDocument(userCredential.user);
+      user = userCredential.user;
+      await createUserDocument(user);
       toast({
         title: 'Success!',
         description: 'Your account has been created.',
       });
     } catch (error) {
-      handleAuthError(error);
+        // If creating the user document fails, we should delete the auth user
+        // to prevent having an auth user without a database entry.
+        if (user) {
+            await deleteUser(user).catch(deleteError => {
+                console.error("Failed to delete orphaned auth user:", deleteError);
+                // If this fails, we have an orphaned auth user.
+                // We should probably log this to a monitoring service.
+                 toast({
+                    variant: 'destructive',
+                    title: 'Critical Error',
+                    description: "Could not create user profile and failed to cleanup. Please contact support.",
+                });
+            });
+        }
+        handleAuthError(error);
     } finally {
       setLoading(false);
     }
@@ -112,7 +145,7 @@ export default function AuthForm() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      // Check if the user is new
+      // Create user document on first sign in
       if (result.user.metadata.creationTime === result.user.metadata.lastSignInTime) {
         await createUserDocument(result.user);
       }
