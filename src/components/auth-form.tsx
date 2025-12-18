@@ -9,8 +9,8 @@ import {
   User,
   deleteUser,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, firestore } from '@/lib/firebase';
+import { doc, setDoc, writeBatch } from 'firebase/firestore';
+import { auth, firestore }_from_ '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -27,19 +27,26 @@ import { useToast } from '@/hooks/use-toast';
 import { ChromeIcon } from 'lucide-react';
 import { MoswordsIcon } from './icons';
 import { FirebaseError } from 'firebase/app';
+import { emitAuthError } from '@/lib/firebase-error-handler';
 
 async function createUserDocument(user: User) {
+  const batch = writeBatch(firestore);
   const userRef = doc(firestore, 'users', user.uid);
-  // Use setDoc with merge:true to create or update the document
-  // This is useful for Google Sign-In where the user might already exist
-  await setDoc(userRef, {
+  
+  batch.set(userRef, {
     uid: user.uid,
     email: user.email,
-    displayName: user.displayName,
+    displayName: user.displayName || 'Anonymous',
     photoURL: user.photoURL,
     createdAt: new Date(),
-  }, { merge: true });
+  });
+
+  // You can add more operations to the batch here, for example,
+  // creating a default server membership for the new user.
+
+  await batch.commit();
 }
+
 
 export default function AuthForm() {
   const [email, setEmail] = useState('');
@@ -48,43 +55,7 @@ export default function AuthForm() {
   const { toast } = useToast();
 
   const handleAuthError = (error: any) => {
-    console.error('Authentication error:', error);
-    let description = 'An unknown error occurred.';
-    if (error instanceof FirebaseError) {
-      switch (error.code) {
-        case 'auth/invalid-email':
-          description = 'Please enter a valid email address.';
-          break;
-        case 'auth/user-disabled':
-          description = 'This user account has been disabled.';
-          break;
-        case 'auth/user-not-found':
-          description = 'No user found with this email.';
-          break;
-        case 'auth/wrong-password':
-          description = 'Incorrect password. Please try again.';
-          break;
-        case 'auth/email-already-in-use':
-          description = 'An account already exists with this email address.';
-          break;
-        case 'auth/network-request-failed':
-          description = 'Network error. Please check your internet connection.';
-          break;
-        case 'auth/popup-closed-by-user':
-          description = 'Sign-in popup closed before completion.';
-          break;
-        case 'permission-denied':
-           description = 'You do not have permission to perform this action.';
-           break;
-        default:
-          description = error.message;
-      }
-    }
-    toast({
-      variant: 'destructive',
-      title: 'Authentication Failed',
-      description,
-    });
+    emitAuthError(error);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -108,14 +79,10 @@ export default function AuthForm() {
         description: 'Your account has been created.',
       });
     } catch (error) {
-        // If creating the user document fails, we should delete the auth user
-        // to prevent having an auth user without a database entry.
         if (user) {
             await deleteUser(user).catch(deleteError => {
                 console.error("Failed to delete orphaned auth user:", deleteError);
-                // If this fails, we have an orphaned auth user.
-                // We should probably log this to a monitoring service.
-                 toast({
+                toast({
                     variant: 'destructive',
                     title: 'Critical Error',
                     description: "Could not create user profile and failed to cleanup. Please contact support.",
@@ -145,7 +112,7 @@ export default function AuthForm() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      // Create user document on first sign in
+      // Create user document only on first sign in
       if (result.user.metadata.creationTime === result.user.metadata.lastSignInTime) {
         await createUserDocument(result.user);
       }
