@@ -1,13 +1,50 @@
+"use client";
+
 import Image from 'next/image';
 import { Plus, Compass } from 'lucide-react';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { mockServers } from '@/lib/placeholder-data';
 import { MoswordsIcon } from './icons';
+import { useEffect, useState } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
+import type { Server } from '@/lib/types';
+import { Skeleton } from './ui/skeleton';
 
 export default function ServerSidebar() {
-  const activeServerId = mockServers[0].id;
+  const [servers, setServers] = useState<Server[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // This would be dynamic based on user's current server
+  const activeServerId = servers[0]?.id;
+
+  useEffect(() => {
+    const serversQuery = collection(firestore, 'servers');
+    const unsubscribe = onSnapshot(serversQuery, (snapshot) => {
+      const serversData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Server));
+      setServers(serversData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) {
+      return (
+        <nav className="w-20 bg-neutral-950/80 backdrop-blur-2xl flex flex-col items-center py-3 gap-3 z-20">
+            <Skeleton className="w-12 h-12 rounded-2xl" />
+            <Separator className="w-8 bg-border/20" />
+            <div className="flex flex-col gap-2 items-center">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <Skeleton className="w-12 h-12 rounded-full" />
+            </div>
+             <Skeleton className="w-12 h-12 rounded-full" />
+             <Skeleton className="w-12 h-12 rounded-full" />
+        </nav>
+      )
+  }
 
   return (
     <nav className="w-20 bg-neutral-950/80 backdrop-blur-2xl flex flex-col items-center py-3 gap-3 z-20">
@@ -26,7 +63,7 @@ export default function ServerSidebar() {
         <Separator className="w-8 bg-border/20" />
 
         <div className="flex flex-col gap-2 items-center">
-          {mockServers.map((server) => (
+          {servers.map((server) => (
             <Tooltip key={server.id}>
               <TooltipTrigger asChild>
                 <div className="relative group">

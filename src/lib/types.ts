@@ -8,6 +8,15 @@ export interface UserProfile {
     createdAt: any;
     last_seen?: any;
     points?: number;
+    customStatus?: string;
+    themePreference?: 'obsidian' | 'neon' | 'classic';
+    bannerUrl?: string;
+    socialLinks?: {
+        twitter?: string;
+        github?: string;
+        [key: string]: string | undefined;
+    };
+    isPro?: boolean;
 }
 
 export interface Server {

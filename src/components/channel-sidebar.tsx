@@ -1,9 +1,13 @@
+"use client";
+
 import { Hash, Mic, Plus, Settings, Headphones, Search } from 'lucide-react';
 import { Button } from './ui/button';
-import { Separator } from './ui/separator';
 import UserAvatar from './user-avatar';
-import { mockChannels, mockServers, mockUser } from '@/lib/placeholder-data';
 import type { Channel } from '@/lib/types';
+import { useAuth } from '@/hooks/use-auth';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
+import { useEffect, useState } from 'react';
 
 function ChannelLink({ channel, active }: { channel: Channel; active?: boolean }) {
   return (
@@ -22,13 +26,46 @@ function ChannelLink({ channel, active }: { channel: Channel; active?: boolean }
 }
 
 export default function ChannelSidebar() {
-  const textChannels = mockChannels.filter((c) => c.type === 'text');
-  const voiceChannels = mockChannels.filter((c) => c.type === 'voice');
+  const { user } = useAuth();
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [activeServer, setActiveServer] = useState<any>(null); // Replace with Server type
+
+  useEffect(() => {
+    // For now, let's assume we have a way to get the active server
+    // In a real app, this would come from a global state or prop
+    const mockActiveServerId = '1'; 
+
+    const channelsQuery = query(
+      collection(firestore, 'channels'),
+      where('serverId', '==', mockActiveServerId)
+    );
+
+    const unsubscribe = onSnapshot(channelsQuery, (snapshot) => {
+      const channelsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Channel));
+      setChannels(channelsData);
+    });
+
+    // Fetch server details separately
+    const serverRef = doc(firestore, 'servers', mockActiveServerId);
+    const unsubServer = onSnapshot(serverRef, (doc) => {
+        if (doc.exists()) {
+            setActiveServer({ id: doc.id, ...doc.data() });
+        }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubServer();
+    };
+  }, []);
+
+  const textChannels = channels.filter((c) => c.type === 'text');
+  const voiceChannels = channels.filter((c) => c.type === 'voice');
 
   return (
     <nav className="w-64 flex flex-col bg-neutral-900/60 backdrop-blur-xl border-r border-white/5 z-10">
       <header className="p-4 border-b border-white/5 shadow-md">
-        <h2 className="font-bold text-lg">{mockServers[0].name}</h2>
+        <h2 className="font-bold text-lg">{activeServer?.name || 'Loading...'}</h2>
       </header>
       
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -66,9 +103,9 @@ export default function ChannelSidebar() {
       <footer className="p-2 bg-neutral-950/70 backdrop-blur-lg">
         <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary/50">
             <div className="flex items-center gap-2">
-                <UserAvatar src={mockUser.photoURL ?? ''} imageHint="person portrait" />
+                <UserAvatar src={user?.photoURL ?? ''} />
                 <div>
-                    <p className="font-semibold text-sm">{mockUser.displayName}</p>
+                    <p className="font-semibold text-sm">{user?.displayName}</p>
                     <p className="text-xs text-muted-foreground">Online</p>
                 </div>
             </div>

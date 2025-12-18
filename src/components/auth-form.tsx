@@ -9,7 +9,7 @@ import {
   User,
   deleteUser,
 } from 'firebase/auth';
-import { doc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { auth, firestore } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +28,28 @@ import { ChromeIcon } from 'lucide-react';
 import { MoswordsIcon } from './icons';
 import { FirebaseError } from 'firebase/app';
 import { emitAuthError } from '@/lib/firebase-error-handler';
+
+const createUserDocument = async (user: User) => {
+    if (!user) return;
+    const userRef = doc(firestore, 'users', user.uid);
+    const batch = writeBatch(firestore);
+
+    batch.set(userRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || 'Anonymous',
+        photoURL: user.photoURL,
+        createdAt: serverTimestamp(),
+        points: 0,
+        customStatus: 'Just joined!',
+        themePreference: 'obsidian',
+        isPro: false,
+    });
+
+    // You can add more operations to the batch here, like creating a default server membership
+
+    await batch.commit();
+};
 
 
 export default function AuthForm() {
@@ -51,13 +73,23 @@ export default function AuthForm() {
         return;
     }
     setLoading(true);
+    let newUser: User | null = null;
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      newUser = userCredential.user;
+      await createUserDocument(newUser);
       toast({
         title: 'Success!',
         description: 'Your account has been created.',
       });
     } catch (error) {
+        if (newUser) {
+            // If createUserDocument fails, delete the auth user
+            await deleteUser(newUser).catch(deleteErr => {
+                // Emitting a specific error for this case could be useful for debugging
+                emitAuthError(new FirebaseError('auth/ghost-account', `Failed to cleanup user: ${deleteErr.message}`) as any)
+            });
+        }
         handleAuthError(error);
     } finally {
       setLoading(false);

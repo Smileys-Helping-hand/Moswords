@@ -3,7 +3,6 @@
 import { Bell, Hash, Pin, Users, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { mockChannels } from '@/lib/placeholder-data';
 import {
   Tooltip,
   TooltipContent,
@@ -18,14 +17,38 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { summarizeThread } from '@/ai/flows/ai-summarize-thread';
-import { mockMessages } from '@/lib/placeholder-data';
 import { Skeleton } from './ui/skeleton';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
+import type { Message, Channel } from '@/lib/types';
+
 
 function ThreadSummary() {
     const [summary, setSummary] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [messages, setMessages] = useState<Message[]>([]);
+    
+    // Assuming active channel is 1, replace with dynamic channel ID
+    const activeChannelId = '1';
+
+    useEffect(() => {
+        const messagesQuery = query(
+            collection(firestore, 'messages'),
+            where('channelId', '==', activeChannelId),
+            orderBy('timestamp', 'desc'),
+            limit(50)
+        );
+
+        const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+            const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message)).reverse();
+            setMessages(messagesData);
+        });
+        
+        return () => unsubscribe();
+    }, [activeChannelId]);
+
 
     const handleSummarize = async () => {
         setLoading(true);
@@ -34,7 +57,7 @@ function ThreadSummary() {
             const result = await summarizeThread({
                 channelId: '1',
                 threadId: '1',
-                messages: mockMessages.map(m => `${m.author.name}: ${m.content}`),
+                messages: messages.map(m => `${m.author.displayName}: ${m.content}`),
             });
             setSummary(result.summary);
         } catch (error) {
@@ -89,13 +112,25 @@ function ThreadSummary() {
 
 
 export default function ChatHeader() {
-  const currentChannel = mockChannels[0];
+  const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  const activeChannelId = '1'; // Assuming active channel is 1
+
+  useEffect(() => {
+    const channelRef = doc(firestore, 'channels', activeChannelId);
+    const unsubscribe = onSnapshot(channelRef, (doc) => {
+      if (doc.exists()) {
+        setCurrentChannel({ id: doc.id, ...doc.data() } as Channel);
+      }
+    });
+    return () => unsubscribe();
+  }, [activeChannelId]);
+
 
   return (
     <header className="flex items-center h-14 px-4 border-b border-white/5 shadow-md bg-neutral-900/60 backdrop-blur-xl z-10">
       <div className="flex items-center gap-2">
         <Hash className="w-6 h-6 text-muted-foreground" />
-        <h2 className="font-semibold text-lg">{currentChannel.name}</h2>
+        <h2 className="font-semibold text-lg">{currentChannel?.name || 'Loading...'}</h2>
       </div>
 
       <div className="flex-1" />
@@ -106,7 +141,7 @@ export default function ChatHeader() {
           
           <div className="w-64">
             <Input
-              placeholder={`Search in #${currentChannel.name}`}
+              placeholder={`Search in #${currentChannel?.name || 'channel'}`}
               className="bg-neutral-900/50 border-none h-9"
             />
           </div>
