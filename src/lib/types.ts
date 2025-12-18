@@ -7,6 +7,7 @@ export interface UserProfile {
     photoURL?: string | null;
     createdAt: any;
     last_seen?: any;
+    points?: number;
 }
 
 export interface Server {
@@ -17,7 +18,7 @@ export interface Server {
 }
 
 export interface Channel {
-  id: string;
+  id:string;
   name: string;
   type: 'text' | 'voice';
   serverId: string;
@@ -45,4 +46,22 @@ export interface Message {
   reactions: { emoji: string; count: number; reacted: boolean }[];
   isFlagged?: boolean;
   toxicityReason?: string;
+}
+
+export interface Quest {
+    id: string;
+    title: string;
+    description?: string;
+    dueDate?: any;
+    assigneeId?: string;
+    pointsValue: number;
+    status: 'pending' | 'completed' | 'approved';
+    flyerRef?: string;
+}
+
+export interface Reward {
+    id: string;
+    item: string;
+    cost: number;
+    icon?: string;
 }
