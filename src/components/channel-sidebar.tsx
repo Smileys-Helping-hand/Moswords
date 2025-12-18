@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import UserAvatar from './user-avatar';
 import type { Channel } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { useEffect, useState } from 'react';
 
