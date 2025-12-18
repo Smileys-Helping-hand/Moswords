@@ -10,7 +10,7 @@ import {
   deleteUser,
 } from 'firebase/auth';
 import { doc, setDoc, writeBatch } from 'firebase/firestore';
-import { auth, firestore }_from_ '@/lib/firebase';
+import { auth, firestore } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
