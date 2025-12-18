@@ -7,6 +7,8 @@ import { collection, query, where, onSnapshot, orderBy, doc } from 'firebase/fir
 import { firestore } from '@/lib/firebase';
 import type { Message, Channel } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
+import { emitPermissionError } from '@/lib/firebase-error-handler';
+import { FirestorePermissionError } from '@/lib/errors';
 
 export default function ChatMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -25,18 +27,37 @@ export default function ChatMessages() {
       orderBy('timestamp', 'asc')
     );
 
-    const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
-      const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-      setMessages(messagesData);
-      setLoading(false);
-    });
+    const unsubscribeMessages = onSnapshot(messagesQuery, 
+      (snapshot) => {
+        const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+        setMessages(messagesData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Chat messages listener failed:", error);
+        emitPermissionError(new FirestorePermissionError({
+          path: messagesQuery.path,
+          operation: 'list'
+        }));
+        setLoading(false);
+      }
+    );
 
     const channelRef = doc(firestore, 'channels', activeChannelId);
-    const unsubscribeChannel = onSnapshot(channelRef, (doc) => {
+    const unsubscribeChannel = onSnapshot(channelRef, 
+      (doc) => {
         if(doc.exists()) {
             setCurrentChannel({ id: doc.id, ...doc.data()} as Channel);
         }
-    });
+      },
+      (error) => {
+        console.error("Channel details listener failed:", error);
+        emitPermissionError(new FirestorePermissionError({
+          path: channelRef.path,
+          operation: 'get'
+        }));
+      }
+    );
 
     return () => {
       unsubscribeMessages();
@@ -87,3 +108,5 @@ export default function ChatMessages() {
     </div>
   );
 }
+
+    

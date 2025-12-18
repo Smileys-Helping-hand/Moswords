@@ -9,7 +9,7 @@ import {
   User,
   deleteUser,
 } from 'firebase/auth';
-import { doc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, writeBatch, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { auth, firestore } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,30 +27,39 @@ import { useToast } from '@/hooks/use-toast';
 import { ChromeIcon } from 'lucide-react';
 import { MoswordsIcon } from './icons';
 import { FirebaseError } from 'firebase/app';
-import { emitAuthError } from '@/lib/firebase-error-handler';
+import { emitAuthError, emitPermissionError } from '@/lib/firebase-error-handler';
+import { FirestorePermissionError } from '@/lib/errors';
 
 const createUserDocument = async (user: User) => {
     if (!user) return;
     const userRef = doc(firestore, 'users', user.uid);
-    const batch = writeBatch(firestore);
 
-    batch.set(userRef, {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || 'Anonymous',
-        photoURL: user.photoURL,
-        createdAt: serverTimestamp(),
-        points: 0,
-        customStatus: 'Just joined!',
-        themePreference: 'obsidian',
-        isPro: false,
-    });
-
-    // You can add more operations to the batch here, like creating a default server membership
-
-    await batch.commit();
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (userDoc.exists()) {
+                // This case should ideally not happen in a sign-up flow
+                // but as a safeguard, we can either update or just return.
+                return;
+            }
+            transaction.set(userRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || 'Anonymous',
+                photoURL: user.photoURL || `https://picsum.photos/seed/${user.uid}/48/48`,
+                createdAt: serverTimestamp(),
+                points: 0,
+                customStatus: 'Just joined!',
+                themePreference: 'obsidian',
+                isPro: false,
+            });
+        });
+    } catch (error: any) {
+        console.error("Transaction to create user document failed:", error);
+        // Re-throw the error to be caught by the calling function
+        throw error;
+    }
 };
-
 
 export default function AuthForm() {
   const [email, setEmail] = useState('');
@@ -59,7 +68,11 @@ export default function AuthForm() {
   const { toast } = useToast();
 
   const handleAuthError = (error: any) => {
-    emitAuthError(error);
+    if (error instanceof FirestorePermissionError) {
+      emitPermissionError(error);
+    } else {
+      emitAuthError(error);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -82,15 +95,29 @@ export default function AuthForm() {
         title: 'Success!',
         description: 'Your account has been created.',
       });
-    } catch (error) {
+    } catch (error: any) {
         if (newUser) {
-            // If createUserDocument fails, delete the auth user
+            // If createUserDocument fails, delete the auth user to prevent ghost accounts
             await deleteUser(newUser).catch(deleteErr => {
-                // Emitting a specific error for this case could be useful for debugging
-                emitAuthError(new FirebaseError('auth/ghost-account', `Failed to cleanup user: ${deleteErr.message}`) as any)
+                // This is a critical failure state. The user has an auth account but no DB record,
+                // and we failed to clean up the auth account.
+                const ghostError = new FirebaseError('auth/ghost-account', `CRITICAL: User document creation failed, and automatic cleanup of auth user ${newUser.uid} also failed. Manual cleanup required. Cleanup error: ${deleteErr.message}`)
+                emitAuthError(ghostError as any);
             });
+             if (error.name === 'FirestorePermissionError') {
+                handleAuthError(error);
+            } else {
+                const wrappedError = new FirestorePermissionError({
+                    path: `/users/${newUser.uid}`,
+                    operation: 'create',
+                    requestResourceData: { email: newUser.email, displayName: newUser.displayName }
+                });
+                handleAuthError(wrappedError);
+            }
+        } else {
+            // Error happened during createUserWithEmailAndPassword
+            handleAuthError(error);
         }
-        handleAuthError(error);
     } finally {
       setLoading(false);
     }
@@ -112,6 +139,7 @@ export default function AuthForm() {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
+      // The auth provider will handle document creation for Google Sign-In
       await signInWithPopup(auth, provider);
     } catch (error) {
       handleAuthError(error);
@@ -194,3 +222,5 @@ export default function AuthForm() {
     </div>
   );
 }
+
+    

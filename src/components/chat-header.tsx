@@ -23,6 +23,8 @@ import { Skeleton } from './ui/skeleton';
 import { collection, query, where, onSnapshot, orderBy, limit, doc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import type { Message, Channel } from '@/lib/types';
+import { emitPermissionError } from '@/lib/firebase-error-handler';
+import { FirestorePermissionError } from '@/lib/errors';
 
 
 function ThreadSummary() {
@@ -41,10 +43,19 @@ function ThreadSummary() {
             limit(50)
         );
 
-        const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+        const unsubscribe = onSnapshot(messagesQuery, 
+          (snapshot) => {
             const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message)).reverse();
             setMessages(messagesData);
-        });
+          },
+          (error) => {
+            console.error("Thread summary message listener failed:", error);
+            emitPermissionError(new FirestorePermissionError({
+              path: messagesQuery.path,
+              operation: 'list'
+            }));
+          }
+        );
         
         return () => unsubscribe();
     }, [activeChannelId]);
@@ -117,11 +128,20 @@ export default function ChatHeader() {
 
   useEffect(() => {
     const channelRef = doc(firestore, 'channels', activeChannelId);
-    const unsubscribe = onSnapshot(channelRef, (doc) => {
-      if (doc.exists()) {
-        setCurrentChannel({ id: doc.id, ...doc.data() } as Channel);
+    const unsubscribe = onSnapshot(channelRef, 
+      (doc) => {
+        if (doc.exists()) {
+          setCurrentChannel({ id: doc.id, ...doc.data() } as Channel);
+        }
+      },
+      (error) => {
+        console.error("Chat header listener failed:", error);
+        emitPermissionError(new FirestorePermissionError({
+          path: channelRef.path,
+          operation: 'get'
+        }));
       }
-    });
+    );
     return () => unsubscribe();
   }, [activeChannelId]);
 
@@ -180,3 +200,5 @@ export default function ChatHeader() {
     </header>
   );
 }
+
+    

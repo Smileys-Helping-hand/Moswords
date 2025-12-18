@@ -1,5 +1,8 @@
+"use client";
+
 import { EventEmitter } from "events";
-import { AuthError, FirestoreError } from "firebase/app";
+import type { AuthError } from "firebase/auth";
+import type { FirestorePermissionError } from "./errors";
 
 const errorEmitter = new EventEmitter();
 
@@ -12,11 +15,13 @@ export function onAuthError(callback: (error: AuthError) => void) {
   return () => errorEmitter.off("authError", callback);
 }
 
-export function emitPermissionError(error: FirestoreError) {
+export function emitPermissionError(error: FirestorePermissionError) {
   errorEmitter.emit("permissionError", error);
 }
 
-export function onPermissionError(callback: (error: FirestoreError) => void) {
+export function onPermissionError(callback: (error: FirestorePermissionError) => void) {
   errorEmitter.on("permissionError", callback);
   return () => errorEmitter.off("permissionError", callback);
 }
+
+    

@@ -11,6 +11,8 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import type { Server } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
+import { emitPermissionError } from '@/lib/firebase-error-handler';
+import { FirestorePermissionError } from '@/lib/errors';
 
 export default function ServerSidebar() {
   const [servers, setServers] = useState<Server[]>([]);
@@ -21,11 +23,21 @@ export default function ServerSidebar() {
 
   useEffect(() => {
     const serversQuery = collection(firestore, 'servers');
-    const unsubscribe = onSnapshot(serversQuery, (snapshot) => {
-      const serversData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Server));
-      setServers(serversData);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(serversQuery, 
+      (snapshot) => {
+        const serversData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Server));
+        setServers(serversData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Server sidebar listener failed:", error);
+        emitPermissionError(new FirestorePermissionError({
+          path: serversQuery.path,
+          operation: 'list'
+        }));
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
@@ -126,3 +138,5 @@ export default function ServerSidebar() {
     </nav>
   );
 }
+
+    

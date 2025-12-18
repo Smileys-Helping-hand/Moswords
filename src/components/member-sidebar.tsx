@@ -4,9 +4,11 @@ import UserAvatar from './user-avatar';
 import type { Member } from '@/lib/types';
 import { Crown } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { Skeleton } from './ui/skeleton';
+import { emitPermissionError } from '@/lib/firebase-error-handler';
+import { FirestorePermissionError } from '@/lib/errors';
 
 function MemberRow({ member }: { member: Member }) {
   const statusColor = {
@@ -47,17 +49,23 @@ export default function MemberSidebar() {
         const memberPromises = snapshot.docs.map(async (memberDoc) => {
             const memberData = memberDoc.data();
             const userRef = doc(firestore, 'users', memberData.uid);
-            const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) {
-                const userData = userSnap.data();
-                return {
-                    uid: userData.uid,
-                    displayName: userData.displayName,
-                    photoURL: userData.photoURL,
-                    imageHint: 'person portrait', // This might need to come from user data
-                    status: 'online', // This should come from RTDB
-                    role: memberData.role,
-                } as Member;
+            try {
+              const userSnap = await getDoc(userRef);
+              if (userSnap.exists()) {
+                  const userData = userSnap.data();
+                  return {
+                      uid: userData.uid,
+                      displayName: userData.displayName,
+                      photoURL: userData.photoURL,
+                      imageHint: 'person portrait', // This might need to come from user data
+                      status: 'online', // This should come from RTDB
+                      role: memberData.role,
+                  } as Member;
+              }
+            } catch (error) {
+              console.error(`Failed to fetch user doc for member ${memberData.uid}:`, error);
+              // We can decide not to emit here to avoid flooding,
+              // or emit a more specific error. For now, just logging.
             }
             return null;
         });
@@ -65,6 +73,14 @@ export default function MemberSidebar() {
         const resolvedMembers = (await Promise.all(memberPromises)).filter(m => m !== null) as Member[];
         setMembers(resolvedMembers);
         setLoading(false);
+    },
+    (error) => {
+      console.error("Memberships listener failed:", error);
+      emitPermissionError(new FirestorePermissionError({
+        path: membersQuery.path,
+        operation: 'list'
+      }));
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -124,3 +140,5 @@ export default function MemberSidebar() {
     </aside>
   );
 }
+
+    

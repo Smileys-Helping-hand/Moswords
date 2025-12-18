@@ -8,6 +8,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { useEffect, useState } from 'react';
+import { emitPermissionError } from '@/lib/firebase-error-handler';
+import { FirestorePermissionError } from '@/lib/errors';
 
 function ChannelLink({ channel, active }: { channel: Channel; active?: boolean }) {
   return (
@@ -40,18 +42,36 @@ export default function ChannelSidebar() {
       where('serverId', '==', mockActiveServerId)
     );
 
-    const unsubscribe = onSnapshot(channelsQuery, (snapshot) => {
-      const channelsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Channel));
-      setChannels(channelsData);
-    });
+    const unsubscribe = onSnapshot(channelsQuery, 
+      (snapshot) => {
+        const channelsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Channel));
+        setChannels(channelsData);
+      },
+      (error) => {
+        console.error("Channel sidebar listener failed:", error);
+        emitPermissionError(new FirestorePermissionError({
+          path: channelsQuery.path,
+          operation: 'list'
+        }));
+      }
+    );
 
     // Fetch server details separately
     const serverRef = doc(firestore, 'servers', mockActiveServerId);
-    const unsubServer = onSnapshot(serverRef, (doc) => {
+    const unsubServer = onSnapshot(serverRef, 
+      (doc) => {
         if (doc.exists()) {
             setActiveServer({ id: doc.id, ...doc.data() });
         }
-    });
+      },
+      (error) => {
+        console.error("Server details listener failed:", error);
+        emitPermissionError(new FirestorePermissionError({
+          path: serverRef.path,
+          operation: 'get'
+        }));
+      }
+    );
 
     return () => {
       unsubscribe();
@@ -119,3 +139,5 @@ export default function ChannelSidebar() {
     </nav>
   );
 }
+
+    
