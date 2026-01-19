@@ -7,23 +7,21 @@ if (typeof window === 'undefined' && !process.env.DATABASE_URL) {
   require('dotenv').config({ path: '.env.local' });
 }
 
-let dbInstance: ReturnType<typeof drizzle> | null = null;
-
-function getDb() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL must be set in environment variables');
+// During build time, DATABASE_URL might not be available
+// We'll create a mock connection that will be replaced at runtime
+const getDatabaseUrl = () => {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
   }
   
-  if (!dbInstance) {
-    const sql = neon(process.env.DATABASE_URL);
-    dbInstance = drizzle(sql, { schema });
+  // Return a dummy URL for build time - this won't actually be used
+  // Real connection is only needed at runtime
+  if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
+    return 'postgresql://dummy:dummy@localhost:5432/dummy';
   }
   
-  return dbInstance;
-}
+  throw new Error('DATABASE_URL must be set in environment variables');
+};
 
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
-  get: (target, prop) => {
-    return (getDb() as any)[prop];
-  }
-});
+const sql = neon(getDatabaseUrl());
+export const db = drizzle(sql, { schema });
