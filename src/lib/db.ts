@@ -11,26 +11,9 @@ if (typeof window === 'undefined' && !process.env.DATABASE_URL) {
   }
 }
 
-let cachedDb: ReturnType<typeof drizzle> | null = null;
+// Get database URL with fallback for build time
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy';
 
-function createDb() {
-  if (!process.env.DATABASE_URL) {
-    // For build time, return a dummy connection that won't be used
-    console.warn('DATABASE_URL not set, using dummy connection for build');
-    const dummySql = neon('postgresql://dummy:dummy@localhost:5432/dummy');
-    return drizzle(dummySql, { schema });
-  }
-  
-  const sql = neon(process.env.DATABASE_URL);
-  return drizzle(sql, { schema });
-}
-
-// Export a proxy that creates the connection lazily
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
-  get(target, prop) {
-    if (!cachedDb) {
-      cachedDb = createDb();
-    }
-    return (cachedDb as any)[prop];
-  }
-});
+// Create database connection
+const sql = neon(databaseUrl);
+export const db = drizzle(sql, { schema });
