@@ -4,22 +4,33 @@ import * as schema from './schema';
 
 // For Node.js scripts, load from .env.local
 if (typeof window === 'undefined' && !process.env.DATABASE_URL) {
-  require('dotenv').config({ path: '.env.local' });
+  try {
+    require('dotenv').config({ path: '.env.local' });
+  } catch (e) {
+    // Ignore if dotenv is not available
+  }
 }
 
-// During build time, DATABASE_URL might not be available
-// We'll create a connection with a fallback dummy URL for build
-const getDatabaseUrl = () => {
-  // If DATABASE_URL exists, use it
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
+let cachedDb: ReturnType<typeof drizzle> | null = null;
+
+function createDb() {
+  if (!process.env.DATABASE_URL) {
+    // For build time, return a dummy connection that won't be used
+    console.warn('DATABASE_URL not set, using dummy connection for build');
+    const dummySql = neon('postgresql://dummy:dummy@localhost:5432/dummy');
+    return drizzle(dummySql, { schema });
   }
   
-  // Fallback for build time - this won't actually connect during build
-  // Real connection only happens at runtime when API routes are called
-  console.warn('DATABASE_URL not set, using dummy URL for build');
-  return 'postgresql://dummy:dummy@localhost:5432/dummy';
-};
+  const sql = neon(process.env.DATABASE_URL);
+  return drizzle(sql, { schema });
+}
 
-const sql = neon(getDatabaseUrl());
-export const db = drizzle(sql, { schema });
+// Export a proxy that creates the connection lazily
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(target, prop) {
+    if (!cachedDb) {
+      cachedDb = createDb();
+    }
+    return (cachedDb as any)[prop];
+  }
+});
