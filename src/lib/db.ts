@@ -8,19 +8,17 @@ if (typeof window === 'undefined' && !process.env.DATABASE_URL) {
 }
 
 // During build time, DATABASE_URL might not be available
-// We'll create a mock connection that will be replaced at runtime
+// We'll create a connection with a fallback dummy URL for build
 const getDatabaseUrl = () => {
+  // If DATABASE_URL exists, use it
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
   
-  // Return a dummy URL for build time - this won't actually be used
-  // Real connection is only needed at runtime
-  if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
-    return 'postgresql://dummy:dummy@localhost:5432/dummy';
-  }
-  
-  throw new Error('DATABASE_URL must be set in environment variables');
+  // Fallback for build time - this won't actually connect during build
+  // Real connection only happens at runtime when API routes are called
+  console.warn('DATABASE_URL not set, using dummy URL for build');
+  return 'postgresql://dummy:dummy@localhost:5432/dummy';
 };
 
 const sql = neon(getDatabaseUrl());
