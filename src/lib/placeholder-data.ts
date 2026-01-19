@@ -1,22 +1,16 @@
-import type { Server, Channel, Member, Message, User } from './types';
+import type { Server, Channel, Member, Message, UserProfile } from './types';
 
-export const mockUser: User = {
-  uid: '1',
-  displayName: 'ByteRider',
-  email: 'bytor@example.com',
-  photoURL: 'https://picsum.photos/seed/101/48/48',
-  providerId: 'google.com',
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: {},
-  providerData: [],
-  refreshToken: '',
-  tenantId: null,
-  delete: async () => {},
-  getIdToken: async () => '',
-  getIdTokenResult: async () => ({} as any),
-  reload: async () => {},
-  toJSON: () => ({}),
+export const mockUser: UserProfile = {
+    uid: '1',
+    displayName: 'ByteRider',
+    email: 'bytor@example.com',
+    photoURL: 'https://picsum.photos/seed/101/48/48',
+    createdAt: new Date(),
+    last_seen: new Date(),
+    points: 100,
+    customStatus: 'Just joined!',
+    themePreference: 'obsidian',
+    isPro: false,
 };
 
 
@@ -27,21 +21,21 @@ export const mockServers: Server[] = [
 ];
 
 export const mockChannels: Channel[] = [
-  { id: '1', name: 'general', type: 'text' },
-  { id: '2', name: 'dev-talk', type: 'text' },
-  { id: '3', name: 'design-critique', type: 'text' },
-  { id: '4', name: 'random', type: 'text' },
-  { id: '5', name: 'Lounge', type: 'voice' },
-  { id: '6', name: 'Gaming', type: 'voice' },
+    { id: '1', name: 'general', type: 'text', serverId: '1' },
+    { id: '2', name: 'dev-talk', type: 'text', serverId: '1' },
+    { id: '3', name: 'design-critique', type: 'text', serverId: '1' },
+    { id: '4', name: 'random', type: 'text', serverId: '1' },
+    { id: '5', name: 'Lounge', type: 'voice', serverId: '1' },
+    { id: '6', name: 'Gaming', type: 'voice', serverId: '1' },
 ];
 
 export const mockMembers: Member[] = [
-    { id: '1', name: 'ByteRider', avatarUrl: 'https://picsum.photos/seed/101/48/48', imageHint: 'person portrait', status: 'online', role: 'owner' },
-    { id: '2', name: 'PixelPioneer', avatarUrl: 'https://picsum.photos/seed/102/48/48', imageHint: 'person portrait', status: 'online', role: 'admin' },
-    { id: '3', name: 'SynthWave', avatarUrl: 'https://picsum.photos/seed/103/48/48', imageHint: 'person portrait', status: 'idle', role: 'moderator' },
-    { id: '4', name: 'DataDaemon', avatarUrl: 'https://picsum.photos/seed/104/48/48', imageHint: 'person portrait', status: 'offline', role: 'member' },
-    { id: '5', name: 'LogicLane', avatarUrl: 'https://picsum.photos/seed/105/48/48', imageHint: 'person portrait', status: 'online', role: 'member' },
-    { id: '6', name: 'KernelKnight', avatarUrl: 'https://picsum.photos/seed/106/48/48', imageHint: 'person portrait', status: 'offline', role: 'member' },
+        { uid: '1', displayName: 'ByteRider', photoURL: 'https://picsum.photos/seed/101/48/48', imageHint: 'person portrait', status: 'online', role: 'owner' },
+        { uid: '2', displayName: 'PixelPioneer', photoURL: 'https://picsum.photos/seed/102/48/48', imageHint: 'person portrait', status: 'online', role: 'admin' },
+        { uid: '3', displayName: 'SynthWave', photoURL: 'https://picsum.photos/seed/103/48/48', imageHint: 'person portrait', status: 'idle', role: 'moderator' },
+        { uid: '4', displayName: 'DataDaemon', photoURL: 'https://picsum.photos/seed/104/48/48', imageHint: 'person portrait', status: 'offline', role: 'member' },
+        { uid: '5', displayName: 'LogicLane', photoURL: 'https://picsum.photos/seed/105/48/48', imageHint: 'person portrait', status: 'online', role: 'member' },
+        { uid: '6', displayName: 'KernelKnight', photoURL: 'https://picsum.photos/seed/106/48/48', imageHint: 'person portrait', status: 'offline', role: 'member' },
 ];
 
 export const mockMessages: Message[] = [

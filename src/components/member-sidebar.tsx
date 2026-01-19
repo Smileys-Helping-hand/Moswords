@@ -1,14 +1,31 @@
 "use client";
 
 import UserAvatar from './user-avatar';
-import type { Member } from '@/lib/types';
-import { Crown } from 'lucide-react';
+import { Crown, Shield, Star, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { firestore } from '@/lib/firebase';
 import { Skeleton } from './ui/skeleton';
-import { emitPermissionError } from '@/lib/firebase-error-handler';
-import { FirestorePermissionError } from '@/lib/errors';
+import { useToast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface Member {
+  membership: {
+    id: string;
+    serverId: string;
+    userId: string;
+    role: string;
+    joinedAt: Date;
+  };
+  user: {
+    id: string;
+    name: string | null;
+    displayName: string | null;
+    email: string | null;
+    image: string | null;
+    photoURL: string | null;
+    customStatus: string | null;
+    lastSeen: string | null;
+  };
+}
 
 function MemberRow({ member }: { member: Member }) {
   const statusColor = {
@@ -17,79 +34,118 @@ function MemberRow({ member }: { member: Member }) {
     offline: 'bg-gray-500',
   };
 
+  const status = member.user.lastSeen === 'online' ? 'online' : 'offline';
+  
+  const getRoleIcon = () => {
+    switch (member.membership.role) {
+      case 'owner':
+        return <Crown className="w-4 h-4 text-yellow-500" />;
+      case 'admin':
+        return <Shield className="w-4 h-4 text-blue-500" />;
+      case 'moderator':
+        return <Star className="w-4 h-4 text-purple-500" />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary">
-      <UserAvatar 
-        src={member.photoURL} 
-        imageHint={member.imageHint}
-        status={member.status} 
-      />
-      <p className={`font-medium ${member.status === 'offline' ? 'text-muted-foreground' : ''}`}>
-        {member.displayName}
-      </p>
-      {member.role === 'owner' && <Crown className="w-4 h-4 text-yellow-500" />}
-    </div>
+    <motion.div 
+      className="flex items-center gap-3 p-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors group"
+      whileHover={{ x: 4, scale: 1.02 }}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+    >
+      <div className="relative">
+        <UserAvatar 
+          src={member.user.photoURL || member.user.image || ''} 
+          status={status} 
+        />
+        <motion.div
+          className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${statusColor[status]}`}
+          animate={status === 'online' ? { 
+            scale: [1, 1.2, 1],
+            opacity: [1, 0.8, 1]
+          } : {}}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`font-medium text-sm truncate ${status === 'offline' ? 'text-muted-foreground' : ''}`}>
+          {member.user.displayName || member.user.name || 'Unknown'}
+        </p>
+        {member.user.customStatus && (
+          <p className="text-xs text-muted-foreground truncate">{member.user.customStatus}</p>
+        )}
+      </div>
+      {getRoleIcon()}
+      <motion.div
+        className="opacity-0 group-hover:opacity-100 transition-opacity"
+        initial={{ scale: 0 }}
+        whileHover={{ scale: 1 }}
+      >
+        <Zap className="w-3 h-3 text-primary" />
+      </motion.div>
+    </motion.div>
   );
 }
 
 export default function MemberSidebar() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Assuming we are in a server context, replace '1' with dynamic server ID
-  const activeServerId = '1'; 
+  const [activeServerId, setActiveServerId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const membersQuery = query(
-      collection(firestore, 'memberships'),
-      where('serverId', '==', activeServerId)
-    );
+    const fetchServers = async () => {
+      try {
+        const response = await fetch('/api/servers');
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.servers.length > 0) {
+          setActiveServerId(data.servers[0].server.id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch servers:", error);
+      }
+    };
+    fetchServers();
+  }, []);
 
-    const unsubscribe = onSnapshot(membersQuery, async (snapshot) => {
-        const memberPromises = snapshot.docs.map(async (memberDoc) => {
-            const memberData = memberDoc.data();
-            const userRef = doc(firestore, 'users', memberData.uid);
-            try {
-              const userSnap = await getDoc(userRef);
-              if (userSnap.exists()) {
-                  const userData = userSnap.data();
-                  return {
-                      uid: userData.uid,
-                      displayName: userData.displayName,
-                      photoURL: userData.photoURL,
-                      imageHint: 'person portrait', // This might need to come from user data
-                      status: 'online', // This should come from RTDB
-                      role: memberData.role,
-                  } as Member;
-              }
-            } catch (error) {
-              console.error(`Failed to fetch user doc for member ${memberData.uid}:`, error);
-              // We can decide not to emit here to avoid flooding,
-              // or emit a more specific error. For now, just logging.
-            }
-            return null;
-        });
-
-        const resolvedMembers = (await Promise.all(memberPromises)).filter(m => m !== null) as Member[];
-        setMembers(resolvedMembers);
-        setLoading(false);
-    },
-    (error) => {
-      console.error("Memberships listener failed:", error);
-      emitPermissionError(new FirestorePermissionError({
-        path: membersQuery.path,
-        operation: 'list'
-      }));
+  useEffect(() => {
+    if (!activeServerId) {
       setLoading(false);
-    });
+      return;
+    }
 
-    return () => unsubscribe();
-  }, [activeServerId]);
+    const fetchMembers = async () => {
+      try {
+        const response = await fetch(`/api/servers/${activeServerId}/members`);
+        if (!response.ok) throw new Error('Failed to fetch members');
+        const data = await response.json();
+        setMembers(data.members);
+      } catch (error) {
+        console.error("Failed to fetch members:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load members',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const admins = members.filter(m => m.role === 'admin' || m.role === 'owner');
-    const moderators = members.filter(m => m.role === 'moderator');
-    const onlineMembers = members.filter(m => m.role === 'member' && m.status !== 'offline');
-    const offlineMembers = members.filter(m => m.status === 'offline');
+    fetchMembers();
+    const interval = setInterval(fetchMembers, 5000);
+    return () => clearInterval(interval);
+  }, [activeServerId, toast]);
+
+    const admins = members.filter(m => m.membership.role === 'admin' || m.membership.role === 'owner');
+    const moderators = members.filter(m => m.membership.role === 'moderator');
+    const regularMembers = members.filter(m => m.membership.role === 'member');
+    const onlineMembers = regularMembers.filter(m => m.user.lastSeen === 'online');
+    const offlineMembers = regularMembers.filter(m => m.user.lastSeen !== 'online');
 
   if (loading) {
     return (
@@ -112,32 +168,119 @@ export default function MemberSidebar() {
   }
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-neutral-900/60 backdrop-blur-xl p-3 space-y-4 overflow-y-auto">
-      <div>
-        <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-1">Admins — {admins.length}</h3>
+    <motion.aside 
+      className="w-64 flex-shrink-0 glass-panel border-l border-white/5 p-3 space-y-4 overflow-y-auto"
+      initial={{ x: 300, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 100, damping: 20 }}
+    >
+      <AnimatePresence>
+        {admins.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2 flex items-center gap-2">
+              <Shield className="w-3 h-3" />
+              Admins — {admins.length}
+            </h3>
+            <div className="space-y-1">
+                {admins.map((member, i) => (
+                  <motion.div 
+                    key={member.user.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <MemberRow member={member} />
+                  </motion.div>
+                ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+        {moderators.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2 flex items-center gap-2">
+              <Star className="w-3 h-3" />
+              Moderators — {moderators.length}
+            </h3>
+            <div className="space-y-1">
+                {moderators.map((member, i) => (
+                  <motion.div 
+                    key={member.user.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <MemberRow member={member} />
+                  </motion.div>
+                ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+      >
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2 flex items-center gap-2">
+          <motion.span
+            className="inline-block w-2 h-2 bg-green-500 rounded-full"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          Online — {onlineMembers.length}
+        </h3>
         <div className="space-y-1">
-            {admins.map(member => <MemberRow key={member.uid} member={member} />)}
+            {onlineMembers.map((member, i) => (
+              <motion.div 
+                key={member.user.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <MemberRow member={member} />
+              </motion.div>
+            ))}
         </div>
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-1">Moderators — {moderators.length}</h3>
-        <div className="space-y-1">
-            {moderators.map(member => <MemberRow key={member.uid} member={member} />)}
-        </div>
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-1">Members — {onlineMembers.length}</h3>
-        <div className="space-y-1">
-            {onlineMembers.map(member => <MemberRow key={member.uid} member={member} />)}
-        </div>
-      </div>
-       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-1">Offline — {offlineMembers.length}</h3>
-        <div className="space-y-1">
-            {offlineMembers.map(member => <MemberRow key={member.uid} member={member} />)}
-        </div>
-      </div>
-    </aside>
+      </motion.div>
+      
+      <AnimatePresence>
+        {offlineMembers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-2 mb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-gray-500 rounded-full" />
+              Offline — {offlineMembers.length}
+            </h3>
+            <div className="space-y-1">
+                {offlineMembers.map((member, i) => (
+                  <motion.div 
+                    key={member.user.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <MemberRow member={member} />
+                  </motion.div>
+                ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.aside>
   );
 }
 

@@ -1,14 +1,14 @@
 import { useContext, createContext } from 'react';
-import type { User as FirebaseUser } from 'firebase/auth';
+import { Session } from 'next-auth';
 
 interface AuthContextType {
-  user: FirebaseUser | null;
-  loading: boolean;
+  session: Session | null;
+  status: 'authenticated' | 'loading' | 'unauthenticated';
 }
 
 export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
+  session: null,
+  status: 'loading',
 });
 
 export const useAuth = () => {

@@ -1,0 +1,302 @@
+'use client';
+
+import { useState, useEffect, useRef, use } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import UserAvatar from '@/components/user-avatar';
+import ChatMessage from '@/components/chat-message';
+import { Send, ArrowLeft, Archive, MoreVertical, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface Message {
+  id: string;
+  content: string;
+  senderId: string;
+  receiverId: string;
+  createdAt: Date;
+  read: boolean;
+  archived: boolean;
+  sender?: {
+    id: string;
+    email: string;
+    name: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+  };
+}
+
+interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
+export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = use(params);
+  const { status } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [otherUser, setOtherUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const previousMessageCount = useRef<number>(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+
+    const fetchConversation = async () => {
+      try {
+        // Always fetch the other user's profile (conversation may be empty)
+        const otherRes = await fetch(`/api/users/${userId}`);
+        if (otherRes.ok) {
+          const otherData = await otherRes.json();
+          setOtherUser(otherData.user);
+        }
+
+        const response = await fetch(`/api/conversations/${userId}`);
+        if (!response.ok) throw new Error('Failed to fetch conversation');
+        const data = await response.json();
+        
+        // Deduplicate messages by ID
+        const uniqueMessages = Array.from(
+          new Map(data.messages.map((m: Message) => [m.id, m])).values()
+        ) as Message[];
+        
+        // Check for new messages and show notification
+        if (uniqueMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
+          const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
+          const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
+          
+          // Only notify if the new message is from the other user
+          if (lastNewMessage && lastNewMessage.senderId === userId) {
+            toast({
+              title: 'New message',
+              description: `${otherUser?.displayName || otherUser?.name || 'User'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
+            });
+          }
+        }
+        previousMessageCount.current = uniqueMessages.length;
+        setMessages(uniqueMessages);
+      } catch (error) {
+        console.error('Error fetching conversation:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load conversation',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (status === 'authenticated') {
+      fetchConversation();
+      const interval = setInterval(fetchConversation, 3000); // Poll every 3 seconds
+      return () => clearInterval(interval);
+    }
+  }, [status, userId, router, toast, otherUser]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || sending) return;
+
+    setSending(true);
+    try {
+      const response = await fetch('/api/direct-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receiverId: userId,
+          content: newMessage.trim(),
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to send message');
+
+      const data = await response.json();
+      setMessages((prev) => [...prev, data.message]);
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to send message',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    try {
+      const response = await fetch(`/api/conversations/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: true }),
+      });
+
+      if (!response.ok) throw new Error('Failed to archive');
+
+      toast({
+        title: 'Conversation archived',
+        description: 'This conversation has been archived',
+      });
+
+      router.push('/dm');
+    } catch (error) {
+      console.error('Error archiving conversation:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to archive conversation',
+      });
+    }
+  };
+
+  if (loading || status === 'loading') {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Header */}
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="glass-panel border-b border-white/10 p-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push('/')}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          {otherUser && (
+            <>
+              <UserAvatar
+                src={otherUser.photoURL || ''}
+                fallback={(otherUser.displayName || otherUser.email).substring(0, 2).toUpperCase()}
+                status="online"
+              />
+              <div>
+                <h2 className="font-semibold">
+                  {otherUser.displayName || otherUser.name || 'User'}
+                </h2>
+                <p className="text-xs text-muted-foreground">{otherUser.email}</p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="w-5 h-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="glass-card border-white/20">
+            <DropdownMenuItem onClick={handleArchive}>
+              <Archive className="w-4 h-4 mr-2" />
+              Archive Conversation
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </motion.header>
+
+      {/* Messages */}
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4 max-w-4xl mx-auto">
+          {messages.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No messages yet</p>
+              <p className="text-xs mt-1">Start the conversation!</p>
+            </div>
+          ) : (
+            messages.map((msg, index) => {
+              const showAvatar = index === 0 || messages[index - 1].senderId !== msg.senderId;
+              
+              return (
+                <ChatMessage
+                  key={msg.id}
+                  showAvatar={showAvatar}
+                  message={{
+                    id: msg.id,
+                    content: msg.content,
+                    timestamp: new Date(msg.createdAt),
+                    author: {
+                      uid: msg.senderId,
+                      displayName: msg.sender?.displayName || msg.sender?.name || 'User',
+                      photoURL: msg.sender?.photoURL || '',
+                      imageHint: (msg.sender?.displayName || msg.sender?.name || msg.sender?.email || 'U').substring(0, 2).toUpperCase(),
+                    },
+                    reactions: [],
+                    isFlagged: false,
+                  }}
+                />
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
+
+      {/* Input */}
+      <motion.form
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        onSubmit={handleSendMessage}
+        className="glass-panel border-t border-white/10 p-4"
+      >
+        <div className="max-w-4xl mx-auto flex gap-2">
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 glass-card border-white/20"
+            disabled={sending}
+          />
+          <Button
+            type="submit"
+            disabled={!newMessage.trim() || sending}
+            className="bg-gradient-to-r from-primary to-accent"
+          >
+            {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+          </Button>
+        </div>
+      </motion.form>
+    </div>
+  );
+}

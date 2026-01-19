@@ -1,5 +1,3 @@
-import type { User as FirebaseUser, UserInfo } from 'firebase/auth';
-
 export interface UserProfile {
     uid: string;
     email?: string | null;

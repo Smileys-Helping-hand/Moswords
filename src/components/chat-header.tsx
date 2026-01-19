@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Hash, Pin, Users, Sparkles } from 'lucide-react';
+import { Hash, Pin, Users, Sparkles, Video, Phone } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -9,6 +9,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './ui/tooltip';
+import { motion } from 'framer-motion';
+import KeyboardShortcutsDialog from './keyboard-shortcuts-dialog';
+import NotificationsPopover from './notifications-popover';
 import {
   Dialog,
   DialogContent,
@@ -18,62 +21,80 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useState, useEffect } from 'react';
-import { summarizeThread } from '@/ai/flows/ai-summarize-thread';
 import { Skeleton } from './ui/skeleton';
-import { collection, query, where, onSnapshot, orderBy, limit, doc } from 'firebase/firestore';
-import { firestore } from '@/lib/firebase';
-import type { Message, Channel } from '@/lib/types';
-import { emitPermissionError } from '@/lib/firebase-error-handler';
-import { FirestorePermissionError } from '@/lib/errors';
+import { useToast } from '@/hooks/use-toast';
 
+interface Channel {
+  id: string;
+  name: string;
+  type: string;
+  serverId: string;
+}
 
 function ThreadSummary() {
     const [summary, setSummary] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([]);
-    
-    // Assuming active channel is 1, replace with dynamic channel ID
-    const activeChannelId = '1';
+    const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+    const { toast } = useToast();
 
     useEffect(() => {
-        const messagesQuery = query(
-            collection(firestore, 'messages'),
-            where('channelId', '==', activeChannelId),
-            orderBy('timestamp', 'desc'),
-            limit(50)
-        );
-
-        const unsubscribe = onSnapshot(messagesQuery, 
-          (snapshot) => {
-            const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message)).reverse();
-            setMessages(messagesData);
-          },
-          (error) => {
-            console.error("Thread summary message listener failed:", error);
-            emitPermissionError(new FirestorePermissionError({
-              path: messagesQuery.path,
-              operation: 'list'
-            }));
+        const fetchChannels = async () => {
+          try {
+            const serversResponse = await fetch('/api/servers');
+            if (!serversResponse.ok) return;
+            const serversData = await serversResponse.json();
+            if (serversData.servers.length === 0) return;
+            
+            const firstServer = serversData.servers[0].server;
+            const channelsResponse = await fetch(`/api/servers/${firstServer.id}/channels`);
+            if (!channelsResponse.ok) return;
+            const channelsData = await channelsResponse.json();
+            
+            if (channelsData.channels.length > 0) {
+              setActiveChannelId(channelsData.channels[0].id);
+            }
+          } catch (error) {
+            console.error("Failed to fetch channel:", error);
           }
-        );
-        
-        return () => unsubscribe();
-    }, [activeChannelId]);
-
+        };
+        fetchChannels();
+    }, []);
 
     const handleSummarize = async () => {
+        if (!activeChannelId) return;
+        
         setLoading(true);
         setSummary(null);
         try {
-            const result = await summarizeThread({
-                channelId: '1',
-                threadId: '1',
-                messages: messages.map(m => `${m.author.displayName}: ${m.content}`),
+            const response = await fetch(`/api/channels/${activeChannelId}/messages`);
+            if (!response.ok) throw new Error('Failed to fetch messages');
+            const data = await response.json();
+            
+            const messageTexts = data.messages.map((m: any) => 
+                `${m.user.displayName || m.user.name}: ${m.message.content}`
+            );
+            
+            const aiRes = await fetch('/api/ai/summarize-thread', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channelId: activeChannelId,
+                threadId: activeChannelId,
+                messages: messageTexts,
+              }),
             });
-            setSummary(result.summary);
+
+            if (!aiRes.ok) throw new Error('Failed to summarize');
+            const aiData = await aiRes.json();
+            setSummary(aiData.summary);
         } catch (error) {
             console.error("Failed to summarize thread:", error);
             setSummary("Sorry, I couldn't generate a summary for this thread.");
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Failed to generate summary',
+            });
         } finally {
             setLoading(false);
         }
@@ -81,39 +102,71 @@ function ThreadSummary() {
 
     return (
         <Dialog onOpenChange={(open) => !open && setSummary(null)}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                        <Sparkles className="w-5 h-5 text-primary" />
-                    </Button>
-                </DialogTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Summarize Thread</p>
-              </TooltipContent>
-            </Tooltip>
-            <DialogContent onOpenAutoFocus={handleSummarize}>
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                          <Sparkles className="w-5 h-5 text-primary" />
+                      </Button>
+                  </DialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>AI Summarize Thread</p>
+                </TooltipContent>
+              </Tooltip>
+            </motion.div>
+            <DialogContent onOpenAutoFocus={handleSummarize} className="glass-card border-white/20 sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Thread Summary</DialogTitle>
+                    <DialogTitle className="text-gradient flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" />
+                      AI Thread Summary
+                    </DialogTitle>
                     <DialogDescription>
-                        Here's a quick summary of the conversation.
+                        Powered by Gemini 1.5 Flash
                     </DialogDescription>
                 </DialogHeader>
                 <div className="prose prose-sm dark:prose-invert">
                     {loading && (
-                        <div className="space-y-2">
+                        <motion.div 
+                          className="space-y-3 py-4"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        >
+                            <div className="flex items-center gap-2 text-primary">
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                              >
+                                <Sparkles className="w-5 h-5" />
+                              </motion.div>
+                              <span className="text-sm">AI is analyzing messages...</span>
+                            </div>
                             <Skeleton className="h-4 w-full" />
                             <Skeleton className="h-4 w-full" />
                             <Skeleton className="h-4 w-4/5" />
-                        </div>
+                        </motion.div>
                     )}
                     {summary && (
-                        <ul>
-                            {summary.split('- ').filter(s => s.trim()).map((s, i) => (
-                                <li key={i}>{s.trim()}</li>
-                            ))}
-                        </ul>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="glass-card p-4 rounded-lg"
+                        >
+                          <ul className="space-y-2">
+                              {summary.split('- ').filter(s => s.trim()).map((s, i) => (
+                                  <motion.li 
+                                    key={i}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: i * 0.1 }}
+                                    className="text-foreground"
+                                  >
+                                    {s.trim()}
+                                  </motion.li>
+                              ))}
+                          </ul>
+                        </motion.div>
                     )}
                 </div>
             </DialogContent>
@@ -124,80 +177,118 @@ function ThreadSummary() {
 
 export default function ChatHeader() {
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
-  const activeChannelId = '1'; // Assuming active channel is 1
 
   useEffect(() => {
-    const channelRef = doc(firestore, 'channels', activeChannelId);
-    const unsubscribe = onSnapshot(channelRef, 
-      (doc) => {
-        if (doc.exists()) {
-          setCurrentChannel({ id: doc.id, ...doc.data() } as Channel);
+    const fetchChannels = async () => {
+      try {
+        const serversResponse = await fetch('/api/servers');
+        if (!serversResponse.ok) return;
+        const serversData = await serversResponse.json();
+        if (serversData.servers.length === 0) return;
+        
+        const firstServer = serversData.servers[0].server;
+        const channelsResponse = await fetch(`/api/servers/${firstServer.id}/channels`);
+        if (!channelsResponse.ok) return;
+        const channelsData = await channelsResponse.json();
+        
+        if (channelsData.channels.length > 0) {
+          setCurrentChannel(channelsData.channels[0]);
         }
-      },
-      (error) => {
-        console.error("Chat header listener failed:", error);
-        emitPermissionError(new FirestorePermissionError({
-          path: channelRef.path,
-          operation: 'get'
-        }));
+      } catch (error) {
+        console.error("Failed to fetch channel:", error);
       }
-    );
-    return () => unsubscribe();
-  }, [activeChannelId]);
+    };
+    fetchChannels();
+  }, []);
 
 
   return (
-    <header className="flex items-center h-14 px-4 border-b border-white/5 shadow-md bg-neutral-900/60 backdrop-blur-xl z-10">
+    <motion.header 
+      className="flex items-center h-14 px-4 border-b border-white/10 shadow-lg glass-panel z-10"
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+    >
       <div className="flex items-center gap-2">
-        <Hash className="w-6 h-6 text-muted-foreground" />
-        <h2 className="font-semibold text-lg">{currentChannel?.name || 'Loading...'}</h2>
+        <Hash className="w-6 h-6 text-primary" />
+        <h2 className="font-bold text-lg">{currentChannel?.name || 'Loading...'}</h2>
+        <span className="text-xs text-muted-foreground px-2 py-1 rounded-full glass-card">
+          {Math.floor(Math.random() * 50) + 10} online
+        </span>
       </div>
 
       <div className="flex-1" />
 
       <TooltipProvider>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
             <ThreadSummary />
           
           <div className="w-64">
             <Input
               placeholder={`Search in #${currentChannel?.name || 'channel'}`}
-              className="bg-neutral-900/50 border-none h-9"
+              className="glass-card border-white/20 h-9 focus:border-primary transition-all"
             />
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Bell className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Notification Settings</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Pin className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Pinned Messages</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Users className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Member List</p>
-            </TooltipContent>
-          </Tooltip>
+          
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                  <Video className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Start Video Call</p>
+              </TooltipContent>
+            </Tooltip>
+          </motion.div>
+          
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                  <Phone className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Start Voice Call</p>
+              </TooltipContent>
+            </Tooltip>
+          </motion.div>
+          
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+            <NotificationsPopover />
+          </motion.div>
+          
+          <KeyboardShortcutsDialog />
+          
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                  <Pin className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Pinned Messages</p>
+              </TooltipContent>
+            </Tooltip>
+          </motion.div>
+          
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                  <Users className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Member List</p>
+              </TooltipContent>
+            </Tooltip>
+          </motion.div>
         </div>
       </TooltipProvider>
-    </header>
+    </motion.header>
   );
 }
 
