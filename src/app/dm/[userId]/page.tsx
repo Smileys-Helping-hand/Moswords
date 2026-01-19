@@ -89,19 +89,24 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         ) as Message[];
         
         // Check for new messages and show notification
-        if (uniqueMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
-          const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
-          const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
-          
-          // Only notify if the new message is from the other user
-          if (lastNewMessage && lastNewMessage.senderId === userId) {
-            toast({
-              title: 'New message',
-              description: `${otherUser?.displayName || otherUser?.name || 'User'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
-            });
+        if (uniqueMessages.length > previousMessageCount.current) {
+          // Only show notification if we had messages before (not on initial load)
+          if (previousMessageCount.current > 0) {
+            const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
+            const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
+            
+            // Only notify if the new message is from the other user
+            if (lastNewMessage && lastNewMessage.senderId === userId) {
+              toast({
+                title: '💬 New message',
+                description: `${otherUser?.displayName || otherUser?.name || 'User'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
+                variant: 'message' as any,
+                duration: 5000,
+              });
+            }
           }
+          previousMessageCount.current = uniqueMessages.length;
         }
-        previousMessageCount.current = uniqueMessages.length;
         setMessages(uniqueMessages);
       } catch (error) {
         console.error('Error fetching conversation:', error);
