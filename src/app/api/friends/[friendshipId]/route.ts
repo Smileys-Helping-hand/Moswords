@@ -5,6 +5,9 @@ import { db } from '@/lib/db';
 import { friends } from '@/lib/schema';
 import { eq, and, or } from 'drizzle-orm';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // PATCH /api/friends/[friendshipId] - Accept/reject friend request or block
 export async function PATCH(
   request: NextRequest,

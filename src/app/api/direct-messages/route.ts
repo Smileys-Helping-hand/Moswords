@@ -5,6 +5,9 @@ import { db } from '@/lib/db';
 import { directMessages, users } from '@/lib/schema';
 import { eq, or, desc } from 'drizzle-orm';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // GET /api/direct-messages - Get all direct message conversations
 export async function GET() {
   try {

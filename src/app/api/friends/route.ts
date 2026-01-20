@@ -5,6 +5,9 @@ import { db } from '@/lib/db';
 import { friends, users } from '@/lib/schema';
 import { eq, or, and } from 'drizzle-orm';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // GET /api/friends - Get all friends and friend requests
 export async function GET(request: NextRequest) {
   try {
