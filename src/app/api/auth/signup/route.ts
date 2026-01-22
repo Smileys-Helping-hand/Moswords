@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, name } = await request.json();
 
+    console.log('Signup attempt for:', email);
+
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -30,6 +32,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (existingUser) {
+      console.log('User already exists:', email);
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 400 }
@@ -55,14 +58,16 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    console.log('User created successfully:', newUser.id);
+
     return NextResponse.json(
       { message: 'User created successfully', userId: newUser.id },
       { status: 201 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Signup error:', error);
     return NextResponse.json(
-      { error: 'Failed to create user' },
+      { error: error.message || 'Failed to create user' },
       { status: 500 }
     );
   }

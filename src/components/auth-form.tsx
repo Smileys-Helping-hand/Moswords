@@ -88,15 +88,22 @@ export default function AuthForm() {
         redirect: false,
       });
 
+      console.log('Sign in result:', result);
+
       if (result?.error) {
         throw new Error(result.error);
       }
 
-      toast({
-        title: 'Success!',
-        description: 'You have been signed in.',
-      });
+      if (result?.ok) {
+        toast({
+          title: 'Success!',
+          description: 'You have been signed in.',
+        });
+        // Redirect to home page
+        window.location.href = '/';
+      }
     } catch (error: any) {
+      console.error('Sign in error:', error);
       toast({
         variant: 'destructive',
         title: 'Sign in failed',
@@ -108,17 +115,11 @@ export default function AuthForm() {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      await signIn('google', { callbackUrl: '/' });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Sign in failed',
-        description: error.message || 'Failed to sign in with Google.',
-      });
-      setLoading(false);
-    }
+    toast({
+      variant: 'destructive',
+      title: 'Google Sign-In Not Configured',
+      description: 'Please use email and password to sign in. Google Sign-In is not yet set up.',
+    });
   };
 
   return (

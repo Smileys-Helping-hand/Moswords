@@ -16,35 +16,46 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please enter an email and password');
+        try {
+          console.log('Authorization attempt for:', credentials?.email);
+          
+          if (!credentials?.email || !credentials?.password) {
+            console.error('Missing email or password');
+            throw new Error('Please enter an email and password');
+          }
+
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, credentials.email))
+            .limit(1);
+
+          if (!user || !user.password) {
+            console.error('User not found:', credentials.email);
+            throw new Error('No user found with this email');
+          }
+
+          const passwordMatch = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!passwordMatch) {
+            console.error('Password mismatch for:', credentials.email);
+            throw new Error('Incorrect password');
+          }
+
+          console.log('Authorization successful for:', credentials.email);
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.displayName || user.name,
+            image: user.photoURL || user.image,
+          };
+        } catch (error) {
+          console.error('Authorization error:', error);
+          throw error;
         }
-
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, credentials.email))
-          .limit(1);
-
-        if (!user || !user.password) {
-          throw new Error('No user found with this email');
-        }
-
-        const passwordMatch = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!passwordMatch) {
-          throw new Error('Incorrect password');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.displayName || user.name,
-          image: user.photoURL || user.image,
-        };
       },
     }),
   ],
@@ -69,4 +80,5 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
 };
