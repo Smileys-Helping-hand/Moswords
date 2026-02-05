@@ -42,6 +42,29 @@ export default function NotificationsPopover() {
     if (stored) {
       setViewedConversations(new Set(JSON.parse(stored)));
     }
+
+    // Listen for storage changes from other tabs/components
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'viewedConversations' && e.newValue) {
+        setViewedConversations(new Set(JSON.parse(e.newValue)));
+      }
+    };
+
+    // Also listen for custom event from same window
+    const handleCustomEvent = () => {
+      const stored = localStorage.getItem('viewedConversations');
+      if (stored) {
+        setViewedConversations(new Set(JSON.parse(stored)));
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('viewedConversationsUpdated', handleCustomEvent);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('viewedConversationsUpdated', handleCustomEvent);
+    };
   }, []);
 
   const fetchMessages = useCallback(async () => {
@@ -170,6 +193,10 @@ export default function NotificationsPopover() {
                         newViewed.add(msg.senderId);
                         setViewedConversations(newViewed);
                         localStorage.setItem('viewedConversations', JSON.stringify(Array.from(newViewed)));
+                        
+                        // Update unread count immediately
+                        const unviewed = messages.filter(m => !newViewed.has(m.senderId));
+                        setUnreadCount(unviewed.length);
                         
                         // Navigate to DM
                         window.location.href = `/dm/${msg.senderId}`;

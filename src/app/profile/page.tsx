@@ -102,11 +102,6 @@ export default function ProfilePage() {
         title: 'Success!',
         description: 'Profile updated successfully',
       });
-      
-      // Reload page to refresh user data in sidebar
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({

@@ -75,6 +75,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     const viewedSet = stored ? new Set(JSON.parse(stored)) : new Set();
     viewedSet.add(userId);
     localStorage.setItem('viewedConversations', JSON.stringify(Array.from(viewedSet)));
+    
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event('viewedConversationsUpdated'));
 
     const fetchConversation = async () => {
       try {

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CreateChannelDialog from './create-channel-dialog';
 import AddContactDialog from './add-contact-dialog';
 import FriendsDialog from './friends-dialog';
+import { useRouter } from 'next/navigation';
 
 interface Channel {
   id: string;
@@ -48,11 +49,31 @@ function ChannelLink({ channel, active }: { channel: Channel; active?: boolean }
 
 export default function ChannelSidebar() {
   const { session } = useAuth();
+  const router = useRouter();
   const user = session?.user;
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeServer, setActiveServer] = useState<Server | null>(null);
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string>('User');
   const { toast } = useToast();
+
+  // Fetch updated user data including displayName
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('/api/profile');
+        if (response.ok) {
+          const data = await response.json();
+          setDisplayName(data.user.displayName || data.user.name || data.user.email?.split('@')[0] || 'User');
+        }
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+      }
+    };
+    if (user) {
+      fetchUserData();
+    }
+  }, [user]);
 
   // Get the first server as active (in a real app, this would be from state/context)
   useEffect(() => {
@@ -208,7 +229,7 @@ export default function ChannelSidebar() {
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></span>
                 </div>
                 <div>
-                    <p className="font-semibold text-sm">{user?.name ?? 'User'}</p>
+                    <p className="font-semibold text-sm">{displayName}</p>
                     <p className="text-xs text-green-400">● Online</p>
                 </div>
             </div>
