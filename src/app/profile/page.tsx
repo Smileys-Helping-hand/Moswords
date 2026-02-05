@@ -242,6 +242,7 @@ export default function ProfilePage() {
                       placeholder="Your name"
                       className="glass-card border-white/20"
                     />
+                    <p className="text-xs text-muted-foreground">This is how others will see you in chats</p>
                   </div>
 
                   <div className="space-y-2">

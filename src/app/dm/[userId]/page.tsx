@@ -89,24 +89,20 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         ) as Message[];
         
         // Check for new messages and show notification
-        if (uniqueMessages.length > previousMessageCount.current) {
-          // Only show notification if we had messages before (not on initial load)
-          if (previousMessageCount.current > 0) {
-            const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
-            const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
-            
-            // Only notify if the new message is from the other user
-            if (lastNewMessage && lastNewMessage.senderId === userId) {
-              toast({
-                title: '💬 New message',
-                description: `${otherUser?.displayName || otherUser?.name || 'User'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
-                variant: 'message' as any,
-                duration: 5000,
-              });
-            }
+        if (uniqueMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
+          const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
+          const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
+          
+          // Only notify if the new message is from the other user (not sent by current user)
+          if (lastNewMessage && lastNewMessage.senderId === userId) {
+            toast({
+              title: '💬 New message',
+              description: `${otherUser?.displayName || otherUser?.name || 'User'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
+              duration: 3000,
+            });
           }
-          previousMessageCount.current = uniqueMessages.length;
         }
+        previousMessageCount.current = uniqueMessages.length;
         setMessages(uniqueMessages);
       } catch (error) {
         console.error('Error fetching conversation:', error);
@@ -218,7 +214,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               />
               <div>
                 <h2 className="font-semibold">
-                  {otherUser.displayName || otherUser.name || 'User'}
+                  {otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'Anonymous'}
                 </h2>
                 <p className="text-xs text-muted-foreground">{otherUser.email}</p>
               </div>
@@ -253,6 +249,22 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             messages.map((msg, index) => {
               const showAvatar = index === 0 || messages[index - 1].senderId !== msg.senderId;
               
+              // Parse date properly - handle both string and Date objects
+              let timestamp: Date;
+              if (typeof msg.createdAt === 'string') {
+                timestamp = new Date(msg.createdAt);
+              } else if (msg.createdAt instanceof Date) {
+                timestamp = msg.createdAt;
+              } else {
+                timestamp = new Date();
+              }
+
+              // Get display name with fallback to email username or Anonymous
+              const displayName = msg.sender?.displayName 
+                || msg.sender?.name 
+                || msg.sender?.email?.split('@')[0] 
+                || 'Anonymous';
+
               return (
                 <ChatMessage
                   key={`${msg.id}-${index}`}
@@ -260,12 +272,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                   message={{
                     id: msg.id,
                     content: msg.content,
-                    timestamp: new Date(msg.createdAt),
+                    timestamp: timestamp,
                     author: {
                       uid: msg.senderId,
-                      displayName: msg.sender?.displayName || msg.sender?.name || 'User',
+                      displayName: displayName,
                       photoURL: msg.sender?.photoURL || '',
-                      imageHint: (msg.sender?.displayName || msg.sender?.name || msg.sender?.email || 'U').substring(0, 2).toUpperCase(),
+                      imageHint: displayName.substring(0, 2).toUpperCase(),
                     },
                     reactions: [],
                     isFlagged: false,
