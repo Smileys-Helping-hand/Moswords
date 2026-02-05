@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import UserAvatar from '@/components/user-avatar';
 import Image from 'next/image';
-import { User, Lock, Palette, Loader2 } from 'lucide-react';
+import { User, Lock, Palette, Loader2, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
@@ -102,6 +102,11 @@ export default function ProfilePage() {
         title: 'Success!',
         description: 'Profile updated successfully',
       });
+      
+      // Reload page to refresh user data in sidebar
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({
@@ -185,8 +190,20 @@ export default function ProfilePage() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gradient mb-2">Profile Settings</h1>
-          <p className="text-muted-foreground">Manage your account and customize your experience</p>
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/')}
+              className="hover:bg-white/10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-4xl font-bold text-gradient">Profile Settings</h1>
+              <p className="text-muted-foreground">Manage your account and customize your experience</p>
+            </div>
+          </div>
         </motion.div>
 
         <Tabs defaultValue="profile" className="space-y-6">

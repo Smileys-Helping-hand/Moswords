@@ -210,7 +210,7 @@ export default function NotificationsPopover() {
               variant="ghost"
               className="w-full text-sm text-primary"
               onClick={() => {
-                window.location.href = '/messages';
+                window.location.href = '/dm';
                 setIsOpen(false);
               }}
             >

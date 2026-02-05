@@ -70,6 +70,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       return;
     }
 
+    // Mark this conversation as viewed for notification badge
+    const stored = localStorage.getItem('viewedConversations');
+    const viewedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+    viewedSet.add(userId);
+    localStorage.setItem('viewedConversations', JSON.stringify(Array.from(viewedSet)));
+
     const fetchConversation = async () => {
       try {
         // Always fetch the other user's profile (conversation may be empty)
