@@ -107,16 +107,36 @@ export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
       <AnimatePresence>
         {isHovered && (
           <motion.div
-            className="absolute -top-2 right-4 glass-card p-1 rounded-lg shadow-xl border border-white/10 flex gap-1"
+            className="absolute -top-2 right-4 glass-card p-1 rounded-lg shadow-xl border border-white/10 flex gap-1 z-10"
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
             transition={{ duration: 0.15 }}
           >
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                // TODO: Implement reply functionality
+                console.log('Reply to:', message.id);
+              }}
+              title="Reply"
+            >
               <Reply className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                // TODO: Show more options menu
+                console.log('More options for:', message.id);
+              }}
+              title="More options"
+            >
               <MoreVertical className="w-4 h-4" />
             </Button>
           </motion.div>

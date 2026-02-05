@@ -210,7 +210,7 @@ export default function ChatHeader() {
     >
       <div className="flex items-center gap-2">
         <Hash className="w-6 h-6 text-primary" />
-        <h2 className="font-bold text-lg">{currentChannel?.name || 'Loading...'}</h2>
+        <h2 className="font-bold text-lg">{currentChannel?.name || 'Select a channel'}</h2>
         <span className="text-xs text-muted-foreground px-2 py-1 rounded-full glass-card">
           {Math.floor(Math.random() * 50) + 10} online
         </span>

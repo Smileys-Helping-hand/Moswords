@@ -71,19 +71,27 @@ export default function NotificationsPopover() {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Poll for new messages every 5 seconds
+  // Poll for new messages every 10 seconds (reduced for performance)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchMessages();
-    }, 5000);
+      // Only poll if popover is closed to save resources
+      if (!isOpen) {
+        fetchMessages();
+      }
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [fetchMessages]);
+  }, [fetchMessages, isOpen]);
 
-  // Also fetch when popover opens
+  // Fetch and clear notifications when popover opens
   useEffect(() => {
     if (isOpen) {
       fetchMessages();
+      // Clear the unread count after a short delay to allow viewing
+      const timer = setTimeout(() => {
+        setUnreadCount(0);
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, fetchMessages]);
 

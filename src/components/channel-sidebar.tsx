@@ -124,8 +124,8 @@ export default function ChannelSidebar() {
         animate={{ y: 0, opacity: 1 }}
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-bold text-lg text-gradient">{activeServer?.name || 'Loading...'}</h2>
-          <Crown className="w-5 h-5 text-accent" />
+          <h2 className="font-bold text-lg text-gradient">{activeServer?.name || 'No Server'}</h2>
+          {activeServer && <Crown className="w-5 h-5 text-accent" />}
         </div>
       </motion.header>
       
