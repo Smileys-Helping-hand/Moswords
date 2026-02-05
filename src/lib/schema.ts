@@ -293,3 +293,26 @@ export const groupChatMessagesRelations = relations(groupChatMessages, ({ one })
     references: [users.id],
   }),
 }));
+
+// ===== NEXUSMAIL TABLES =====
+
+// Registered apps table for NexusMail service
+export const registeredApps = pgTable('registered_apps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  apiKey: text('api_key').notNull().unique(),
+  status: text('status').notNull().default('active'), // 'active', 'suspended', 'inactive'
+  emailsSent: integer('emails_sent').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Email logs table for NexusMail service
+export const emailLogs = pgTable('email_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  appSource: text('app_source').notNull(),
+  recipient: text('recipient').notNull(),
+  templateId: text('template_id').notNull(),
+  status: text('status').notNull(), // 'sent', 'failed', 'pending'
+  timestamp: timestamp('timestamp').notNull().defaultNow(),
+  errorMessage: text('error_message'),
+});

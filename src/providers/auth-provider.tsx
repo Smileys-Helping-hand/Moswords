@@ -17,7 +17,7 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
     if (status === 'unauthenticated' && pathname !== '/login') {
       router.push('/login');
     } else if (status === 'authenticated' && pathname === '/login') {
-      router.push('/');
+      router.replace('/');
     }
   }, [status, router, pathname]);
 
@@ -33,11 +33,25 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
   }
 
   if (status === 'unauthenticated' && pathname !== '/login') {
-    return null;
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="w-full max-w-md space-y-4 p-4">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
   }
 
   if (status === 'authenticated' && pathname === '/login') {
-    return null;
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="w-full max-w-md space-y-4 p-4">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

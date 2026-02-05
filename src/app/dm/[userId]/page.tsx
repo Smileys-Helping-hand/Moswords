@@ -255,7 +255,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               
               return (
                 <ChatMessage
-                  key={msg.id}
+                  key={`${msg.id}-${index}`}
                   showAvatar={showAvatar}
                   message={{
                     id: msg.id,

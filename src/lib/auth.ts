@@ -1,13 +1,13 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { db } from './db';
 import { users } from './schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 
 export const authOptions: NextAuthOptions = {
-  adapter: DrizzleAdapter(db) as any,
+  // Note: DrizzleAdapter is not compatible with CredentialsProvider + JWT sessions
+  // adapter: DrizzleAdapter(db) as any,
   providers: [
     CredentialsProvider({
       name: 'credentials',

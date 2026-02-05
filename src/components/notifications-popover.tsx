@@ -32,6 +32,7 @@ export default function NotificationsPopover() {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
 
   const fetchMessages = useCallback(async () => {
@@ -50,7 +51,9 @@ export default function NotificationsPopover() {
         }
       });
       
-      setMessages(Array.from(conversationMap.values()));
+      const newMessages = Array.from(conversationMap.values());
+      setMessages(newMessages);
+      setUnreadCount(newMessages.length);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -63,6 +66,21 @@ export default function NotificationsPopover() {
     }
   }, [toast]);
 
+  // Fetch messages immediately on mount
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  // Poll for new messages every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [fetchMessages]);
+
+  // Also fetch when popover opens
   useEffect(() => {
     if (isOpen) {
       fetchMessages();
@@ -74,12 +92,14 @@ export default function NotificationsPopover() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative hover:bg-white/10">
           <Bell className="w-5 h-5" />
-          {messages.length > 0 && (
+          {unreadCount > 0 && (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full"
-            />
+              className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold"
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </motion.span>
           )}
         </Button>
       </PopoverTrigger>
