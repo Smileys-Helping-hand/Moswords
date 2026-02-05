@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
+import ChatInput from '@/components/chat/ChatInput';
 import { Send, ArrowLeft, Archive, MoreVertical, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -132,8 +133,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   }, [status, userId, router, toast, otherUser]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || sending) return;
 
     setSending(true);
@@ -300,29 +300,15 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       </ScrollArea>
 
       {/* Input */}
-      <motion.form
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        onSubmit={handleSendMessage}
-        className="glass-panel border-t border-white/10 p-4"
-      >
-        <div className="max-w-4xl mx-auto flex gap-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 glass-card border-white/20"
-            disabled={sending}
-          />
-          <Button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="bg-gradient-to-r from-primary to-accent"
-          >
-            {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </Button>
-        </div>
-      </motion.form>
+      <div className="glass-panel border-t border-white/10 p-4">
+        <ChatInput
+          value={newMessage}
+          onChange={setNewMessage}
+          onSend={handleSendMessage}
+          placeholder={`Message ${otherUser?.displayName || otherUser?.name || 'user'}...`}
+          disabled={sending}
+        />
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
+import ChatInput from '@/components/chat/ChatInput';
 import { Send, ArrowLeft, Users, Settings, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -157,8 +158,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     }
   }, [status, groupChatId, router, toast, groupChat]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || sending) return;
 
     setSending(true);
@@ -386,24 +386,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       </ScrollArea>
 
       {/* Input */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-t border-white/10 p-4"
-      >
-        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex gap-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={`Message ${groupChat.name}`}
-            disabled={sending}
-            className="flex-1"
-          />
-          <Button type="submit" disabled={!newMessage.trim() || sending}>
-            <Send className="w-4 h-4" />
-          </Button>
-        </form>
-      </motion.div>
+      <div className="glass-panel border-t border-white/10 p-4">
+        <ChatInput
+          value={newMessage}
+          onChange={setNewMessage}
+          onSend={handleSendMessage}
+          placeholder={`Message ${groupChat.name}`}
+          disabled={sending}
+        />
+      </div>
 
       {/* Members Dialog */}
       <Dialog open={showMembers} onOpenChange={setShowMembers}>
