@@ -89,26 +89,39 @@ export default function CreateGroupChatDialog() {
   };
 
   const handleCreate = async () => {
+    // Validate group name
     if (!groupName.trim()) {
       toast({
         variant: 'destructive',
-        title: 'Error',
+        title: 'Validation Error',
         description: 'Please enter a group name',
       });
       return;
     }
 
+    // Validate member selection
     if (selectedFriends.size === 0) {
       toast({
         variant: 'destructive',
-        title: 'Error',
+        title: 'Validation Error',
         description: 'Please select at least one friend',
       });
       return;
     }
 
     setCreating(true);
+    
     try {
+      // Prepare payload with correct member IDs
+      const memberIds = Array.from(selectedFriends);
+      
+      console.log('Creating group with payload:', {
+        name: groupName.trim(),
+        description: description.trim() || undefined,
+        memberIds,
+      });
+
+      // Make API call and explicitly await response
       const response = await fetch('/api/group-chats', {
         method: 'POST',
         headers: {
@@ -117,37 +130,51 @@ export default function CreateGroupChatDialog() {
         body: JSON.stringify({
           name: groupName.trim(),
           description: description.trim() || undefined,
-          memberIds: Array.from(selectedFriends),
+          memberIds,
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create group');
-      }
-
+      // Parse response data
       const data = await response.json();
 
+      // Check if request failed
+      if (!response.ok) {
+        throw new Error(data.error || `Server error: ${response.status} ${response.statusText}`);
+      }
+
+      // Verify we got a valid groupChat object with ID
+      if (!data.groupChat || !data.groupChat.id) {
+        throw new Error('Invalid response: Missing group ID');
+      }
+
+      console.log('Group created successfully:', data.groupChat);
+
+      // Show success message
       toast({
         title: 'Success!',
-        description: `Group "${groupName}" created with ${data.memberCount} members`,
+        description: `Group "${groupName}" created with ${data.memberCount || selectedFriends.size} members`,
       });
 
-      // Reset and close
+      // Reset form
       setGroupName('');
       setDescription('');
       setSelectedFriends(new Set());
       setIsOpen(false);
 
-      // Refresh page to show new group
-      window.location.reload();
+      // Navigate to the newly created group
+      window.location.href = `/group/${data.groupChat.id}`;
+      
     } catch (error: any) {
       console.error('Error creating group:', error);
+      
+      // Keep modal open and show detailed error
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to create group chat',
+        title: 'Failed to Create Group',
+        description: error.message || 'An unexpected error occurred. Please try again.',
       });
+      
+      // Don't close modal or reset form on error
     } finally {
       setCreating(false);
     }

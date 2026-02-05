@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = (session.user as any).id;
-    const { name, description, memberIds } = await request.json();
+    const body = await request.json();
+    const { name, description, memberIds } = body;
+
+    console.log('Creating group chat:', { userId, name, memberCount: memberIds?.length });
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
@@ -104,12 +107,20 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    if (!newGroupChat || !newGroupChat.id) {
+      throw new Error('Failed to create group chat - no ID returned');
+    }
+
+    console.log('Group chat created:', newGroupChat.id);
+
     // Add creator as admin
     await db.insert(groupChatMembers).values({
       groupChatId: newGroupChat.id,
       userId,
       role: 'admin',
     });
+
+    console.log('Added creator as admin');
 
     // Add other members
     const memberValues = memberIds
@@ -122,16 +133,22 @@ export async function POST(request: NextRequest) {
 
     if (memberValues.length > 0) {
       await db.insert(groupChatMembers).values(memberValues);
+      console.log(`Added ${memberValues.length} additional members`);
     }
+
+    console.log('Group chat creation complete:', {
+      id: newGroupChat.id,
+      totalMembers: memberIds.length + 1, // including creator
+    });
 
     return NextResponse.json({
       groupChat: newGroupChat,
-      memberCount: memberIds.length,
+      memberCount: memberIds.length + 1, // Include creator in count
     });
   } catch (error) {
     console.error('Error creating group chat:', error);
     return NextResponse.json(
-      { error: 'Failed to create group chat' },
+      { error: error instanceof Error ? error.message : 'Failed to create group chat' },
       { status: 500 }
     );
   }
