@@ -392,7 +392,6 @@ export default function ChatInput({
           )}
         </div>
       </div>
-      </TooltipProvider>
-    </div>
+    </TooltipProvider>
   );
 }
