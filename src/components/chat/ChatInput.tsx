@@ -9,6 +9,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Utility function to merge Tailwind classes
 const cn = (...inputs: any[]) => twMerge(clsx(inputs));
@@ -16,7 +22,14 @@ const cn = (...inputs: any[]) => twMerge(clsx(inputs));
 // Dynamically import EmojiPicker to avoid SSR issues
 const EmojiPicker = dynamic(
   () => import('emoji-picker-react'),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-[350px] h-[400px] bg-black/80 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center justify-center">
+        <div className="text-white/60">Loading emojis...</div>
+      </div>
+    )
+  }
 );
 
 interface ChatInputProps {
@@ -163,10 +176,11 @@ export default function ChatInput({
   const hasContent = value.trim().length > 0 || files.length > 0;
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-4xl mx-auto">
-      {/* PREVIEW DOCK - Shows file attachments */}
-      <AnimatePresence>
-        {files.length > 0 && (
+    <TooltipProvider>
+      <div ref={containerRef} className="relative w-full max-w-4xl mx-auto">
+        {/* PREVIEW DOCK - Shows file attachments */}
+        <AnimatePresence>
+          {files.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -262,32 +276,44 @@ export default function ChatInput({
               className="hidden"
               accept="image/*,video/*,.pdf,.txt,.md"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Attach files</p>
+              </TooltipContent>
+            </Tooltip>
 
             {/* Smiley - Emoji Picker */}
-            <Button
-              ref={emojiButtonRef}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "shrink-0 hover:bg-white/10 transition-all rounded-xl",
-                showEmojiPicker ? "text-[#00F0FF]" : "hover:text-white"
-              )}
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              disabled={disabled}
-            >
-              <Smile className="w-5 h-5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  ref={emojiButtonRef}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "shrink-0 hover:bg-white/10 transition-all rounded-xl",
+                    showEmojiPicker ? "text-[#00F0FF] bg-white/10" : "hover:text-white"
+                  )}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  <Smile className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Add emoji</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* CENTER INPUT */}
@@ -312,32 +338,46 @@ export default function ChatInput({
           {/* RIGHT ACTIONS */}
           <div className="flex items-center gap-1">
             {/* Mic Icon - Voice Notes */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
-              onClick={() => console.log('Voice recording feature')}
-              disabled={disabled}
-            >
-              <Mic className="w-5 h-5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
+                  onClick={() => console.log('Voice recording feature')}
+                  disabled={disabled}
+                >
+                  <Mic className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Voice message (coming soon)</p>
+              </TooltipContent>
+            </Tooltip>
 
             {/* Send Button */}
-            <Button
-              type="button"
-              size="icon"
-              className={cn(
-                "shrink-0 rounded-xl transition-all",
-                hasContent
-                  ? "bg-gradient-to-r from-[#00F0FF] to-[#7B2FBE] hover:shadow-[0_0_20px_rgba(0,240,255,0.5)] text-white"
-                  : "bg-white/10 text-white/30 cursor-not-allowed"
-              )}
-              onClick={handleSend}
-              disabled={!hasContent || disabled}
-            >
-              <Send className="w-5 h-5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  className={cn(
+                    "shrink-0 rounded-xl transition-all",
+                    hasContent
+                      ? "bg-gradient-to-r from-[#00F0FF] to-[#7B2FBE] hover:shadow-[0_0_20px_rgba(0,240,255,0.5)] text-white"
+                      : "bg-white/10 text-white/30 cursor-not-allowed"
+                  )}
+                  onClick={handleSend}
+                  disabled={!hasContent || disabled}
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{hasContent ? 'Send message (Enter)' : 'Type a message'}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
@@ -352,6 +392,6 @@ export default function ChatInput({
           )}
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

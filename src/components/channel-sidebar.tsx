@@ -11,6 +11,14 @@ import CreateChannelDialog from './create-channel-dialog';
 import AddContactDialog from './add-contact-dialog';
 import FriendsDialog from './friends-dialog';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 interface Channel {
   id: string;
@@ -219,46 +227,48 @@ export default function ChannelSidebar() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <motion.div 
-          className="flex items-center justify-between p-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
-          whileHover={{ scale: 1.02 }}
-        >
+        <div className="flex items-center justify-between p-2 rounded-md hover:bg-white/5 transition-colors">
             <div className="flex items-center gap-2">
                 <div className="relative">
                   <UserAvatar src={user?.image ?? ''} />
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></span>
                 </div>
-                <div>
-                    <p className="font-semibold text-sm">{displayName}</p>
+                <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{displayName}</p>
                     <p className="text-xs text-green-400">● Online</p>
                 </div>
             </div>
-            <div className="flex items-center">
-                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                  <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
-                    <Mic className="w-5 h-5" />
-                  </Button>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                  <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
-                    <Headphones className="w-5 h-5" />
-                  </Button>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="hover:text-primary hover:bg-white/10"
-                    onClick={() => window.location.href = '/profile'}
-                  >
-                    <Settings className="w-5 h-5" />
-                  </Button>
-                </motion.div>
+            <div className="flex items-center gap-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="hover:text-primary hover:bg-white/10 h-8 w-8"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => router.push('/profile')}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Profile Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      className="text-red-500 focus:text-red-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Log Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-        </motion.div>
+        </div>
       </motion.footer>
     </nav>
   );
 }
-
-    
