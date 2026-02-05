@@ -232,29 +232,16 @@ export default function ProfilePage() {
 
                 <Separator className="bg-white/10" />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="displayName">Display Name</Label>
-                    <Input
-                      id="displayName"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Your name"
-                      className="glass-card border-white/20"
-                    />
-                    <p className="text-xs text-muted-foreground">This is how others will see you in chats</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="pronouns">Pronouns</Label>
-                    <Input
-                      id="pronouns"
-                      value={pronouns}
-                      onChange={(e) => setPronouns(e.target.value)}
-                      placeholder="e.g., they/them"
-                      className="glass-card border-white/20"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
+                    id="displayName"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Your name"
+                    className="glass-card border-white/20"
+                  />
+                  <p className="text-xs text-muted-foreground">This is how others will see you in chats</p>
                 </div>
 
                 <div className="space-y-2">
