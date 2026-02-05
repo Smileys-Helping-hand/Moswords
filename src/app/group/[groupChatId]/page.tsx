@@ -78,6 +78,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [showMembers, setShowMembers] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [availableFriends, setAvailableFriends] = useState<any[]>([]);
+  const [addingMember, setAddingMember] = useState(false);
   const previousMessageCount = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -212,6 +215,80 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       });
     }
   };
+
+  const fetchAvailableFriends = async () => {
+    try {
+      const response = await fetch('/api/friends');
+      if (!response.ok) throw new Error('Failed to fetch friends');
+      const data = await response.json();
+      
+      // Filter out friends who are already members
+      const memberIds = new Set(members.map(m => m.userId));
+      const available = data.friends
+        .filter((f: any) => f.status === 'accepted' && f.friend && !memberIds.has(f.friend.id))
+        .map((f: any) => f.friend);
+      
+      setAvailableFriends(available);
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load friends',
+      });
+    }
+  };
+
+  const handleAddMember = async (friendId: string) => {
+    setAddingMember(true);
+    try {
+      const response = await fetch(`/api/group-chats/${groupChatId}/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newMemberId: friendId,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to add member');
+      }
+
+      toast({
+        title: 'Member added',
+        description: 'Successfully added member to the group',
+      });
+
+      // Refresh members list
+      const detailsRes = await fetch(`/api/group-chats/${groupChatId}`);
+      if (detailsRes.ok) {
+        const detailsData = await detailsRes.json();
+        setMembers(detailsData.members);
+      }
+
+      setShowAddMember(false);
+      await fetchAvailableFriends(); // Refresh available friends
+    } catch (error: any) {
+      console.error('Error adding member:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to add member',
+        description: error.message || 'An error occurred',
+      });
+    } finally {
+      setAddingMember(false);
+    }
+  };
+
+  // Fetch available friends when showing add member dialog
+  useEffect(() => {
+    if (showAddMember) {
+      fetchAvailableFriends();
+    }
+  }, [showAddMember, members]);
 
   if (loading || status === 'loading') {
     return (
@@ -357,6 +434,63 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
               ))}
             </div>
           </ScrollArea>
+          {userRole === 'admin' && (
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                variant="default"
+                className="w-full gap-2"
+                onClick={() => {
+                  setShowMembers(false);
+                  setShowAddMember(true);
+                }}
+              >
+                <Users className="w-4 h-4" />
+                Add Member
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member Dialog */}
+      <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Member</DialogTitle>
+            <DialogDescription>
+              Select a friend to add to this group
+            </DialogDescription>
+          </DialogHeader>
+          {availableFriends.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No friends available to add
+            </div>
+          ) : (
+            <ScrollArea className="h-[300px] pr-4">
+              <div className="space-y-2">
+                {availableFriends.map((friend) => (
+                  <motion.button
+                    key={friend.id}
+                    onClick={() => handleAddMember(friend.id)}
+                    disabled={addingMember}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors disabled:opacity-50"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <UserAvatar
+                      src={friend.photoURL || ''}
+                      fallback={(friend.displayName || friend.name || friend.email || 'U').substring(0, 2).toUpperCase()}
+                    />
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">
+                        {friend.displayName || friend.name || friend.email}
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
         </DialogContent>
       </Dialog>
     </div>
