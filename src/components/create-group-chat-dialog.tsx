@@ -46,13 +46,25 @@ export default function CreateGroupChatDialog() {
 
   const handleOpen = async (open: boolean) => {
     setIsOpen(open);
-    if (open && friends.length === 0) {
+    if (open) {
       setLoading(true);
       try {
         const response = await fetch('/api/friends');
         if (!response.ok) throw new Error('Failed to fetch friends');
         const data = await response.json();
-        setFriends(data.friends.filter((f: Friend) => f.status === 'accepted'));
+        
+        // Get all accepted friends and filter out any null friend objects
+        const acceptedFriends = data.friends
+          .filter((f: Friend) => f.status === 'accepted' && f.friend)
+          .map((f: Friend) => ({
+            ...f,
+            friend: {
+              ...f.friend,
+              displayName: f.friend?.displayName || f.friend?.name || f.friend?.email?.split('@')[0] || 'User'
+            }
+          }));
+        
+        setFriends(acceptedFriends);
       } catch (error) {
         console.error('Error fetching friends:', error);
         toast({

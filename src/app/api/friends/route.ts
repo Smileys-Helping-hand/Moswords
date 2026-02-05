@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       whereParts.push(eq(friends.status, status));
     }
 
+    // Get friends where current user is userId
     const userFriends = await db
       .select({
         id: friends.id,
@@ -46,6 +47,28 @@ export async function GET(request: NextRequest) {
       .from(friends)
       .leftJoin(users, eq(friends.friendId, users.id))
       .where(and(...whereParts));
+
+    // Also get friends where current user is friendId (accepted friendships)
+    const reverseFriends = await db
+      .select({
+        id: friends.id,
+        userId: friends.userId,
+        friendId: friends.friendId,
+        status: friends.status,
+        createdAt: friends.createdAt,
+        friend: {
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          displayName: users.displayName,
+          photoURL: users.photoURL,
+          customStatus: users.customStatus,
+          lastSeen: users.lastSeen,
+        },
+      })
+      .from(friends)
+      .leftJoin(users, eq(friends.userId, users.id))
+      .where(and(eq(friends.friendId, userId), eq(friends.status, 'accepted')));
 
     // Also get pending requests sent to this user
     const pendingRequests = await db
@@ -69,9 +92,19 @@ export async function GET(request: NextRequest) {
       .leftJoin(users, eq(friends.userId, users.id))
       .where(and(eq(friends.friendId, userId), eq(friends.status, 'pending')));
 
+    // Merge and dedupe - for reverse friends, swap to make current user the "owner"
+    const allFriends = [
+      ...userFriends,
+      ...reverseFriends.map(rf => ({
+        ...rf,
+        userId: rf.friendId,
+        friendId: rf.userId,
+      }))
+    ];
+
     // Dedupe defensively in case duplicate rows exist
     const uniqueByFriendId = new Map<string, (typeof userFriends)[number]>();
-    for (const row of userFriends) {
+    for (const row of allFriends) {
       const key = row.friend?.id ?? row.friendId;
       if (!uniqueByFriendId.has(key)) uniqueByFriendId.set(key, row);
     }
