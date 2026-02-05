@@ -33,7 +33,16 @@ export default function NotificationsPopover() {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [viewedConversations, setViewedConversations] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  // Load viewed conversations from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('viewedConversations');
+    if (stored) {
+      setViewedConversations(new Set(JSON.parse(stored)));
+    }
+  }, []);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -45,7 +54,7 @@ export default function NotificationsPopover() {
       // Get unique conversations grouped by sender
       const conversationMap = new Map<string, DirectMessage>();
       data.messages.forEach((msg: any) => {
-        const otherUserId = msg.senderId; // Simplified - in real app check if sender or receiver
+        const otherUserId = msg.senderId;
         if (!conversationMap.has(otherUserId)) {
           conversationMap.set(otherUserId, msg);
         }
@@ -53,7 +62,10 @@ export default function NotificationsPopover() {
       
       const newMessages = Array.from(conversationMap.values());
       setMessages(newMessages);
-      setUnreadCount(newMessages.length);
+      
+      // Only count messages from conversations we haven't viewed
+      const unviewed = newMessages.filter(msg => !viewedConversations.has(msg.senderId));
+      setUnreadCount(unviewed.length);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -64,7 +76,7 @@ export default function NotificationsPopover() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, viewedConversations]);
 
   // Fetch messages immediately on mount
   useEffect(() => {
@@ -83,15 +95,10 @@ export default function NotificationsPopover() {
     return () => clearInterval(interval);
   }, [fetchMessages, isOpen]);
 
-  // Fetch and clear notifications when popover opens
+  // Fetch when popover opens
   useEffect(() => {
     if (isOpen) {
       fetchMessages();
-      // Clear the unread count after a short delay to allow viewing
-      const timer = setTimeout(() => {
-        setUnreadCount(0);
-      }, 1000);
-      return () => clearTimeout(timer);
     }
   }, [isOpen, fetchMessages]);
 
@@ -158,7 +165,13 @@ export default function NotificationsPopover() {
                       variant="ghost"
                       className="w-full justify-start h-auto p-3 hover:bg-white/5"
                       onClick={() => {
-                        // Navigate to DM view (we'll implement this next)
+                        // Mark this conversation as viewed
+                        const newViewed = new Set(viewedConversations);
+                        newViewed.add(msg.senderId);
+                        setViewedConversations(newViewed);
+                        localStorage.setItem('viewedConversations', JSON.stringify(Array.from(newViewed)));
+                        
+                        // Navigate to DM
                         window.location.href = `/dm/${msg.senderId}`;
                         setIsOpen(false);
                       }}

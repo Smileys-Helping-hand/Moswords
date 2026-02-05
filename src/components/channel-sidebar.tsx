@@ -1,6 +1,6 @@
 "use client";
 
-import { Hash, Mic, Settings, Headphones, Search, Volume2, Crown } from 'lucide-react';
+import { Hash, Mic, Settings, Headphones, Search, Volume2, Crown, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import UserAvatar from './user-avatar';
 import { useAuth } from '@/hooks/use-auth';
@@ -138,7 +138,14 @@ export default function ChannelSidebar() {
                 <Search className="w-4 h-4" /> 
                 <span className="text-sm">Search</span>
             </Button>
-            <FriendsDialog />
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-muted-foreground gap-2 glass-card hover:bg-primary/10 hover:text-primary"
+              onClick={() => router.push('/dm')}
+            >
+                <Users className="w-4 h-4" /> 
+                <span className="text-sm">Friends & DMs</span>
+            </Button>
             <AddContactDialog />
         </motion.div>
         
