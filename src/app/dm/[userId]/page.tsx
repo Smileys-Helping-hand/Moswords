@@ -133,17 +133,28 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   }, [status, userId, router, toast, otherUser]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || sending) return;
+  const handleSendMessage = async (text?: string, files?: File[]) => {
+    const messageText = text || newMessage;
+    if ((!messageText.trim() && (!files || files.length === 0)) || sending) return;
 
     setSending(true);
     try {
+      // TODO: Implement file upload to storage service
+      // For now, just send text messages
+      if (files && files.length > 0) {
+        console.log('Files to upload:', files);
+        toast({
+          title: 'File upload',
+          description: 'File upload feature coming soon!',
+        });
+      }
+
       const response = await fetch('/api/direct-messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receiverId: userId,
-          content: newMessage.trim(),
+          content: messageText.trim(),
         }),
       });
 
@@ -304,7 +315,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         <ChatInput
           value={newMessage}
           onChange={setNewMessage}
-          onSend={handleSendMessage}
+          onSend={(text, files) => handleSendMessage(text, files)}
           placeholder={`Message ${otherUser?.displayName || otherUser?.name || 'user'}...`}
           disabled={sending}
         />
