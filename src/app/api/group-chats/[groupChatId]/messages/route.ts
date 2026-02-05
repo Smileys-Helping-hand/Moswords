@@ -8,16 +8,16 @@ import { eq, and, desc } from 'drizzle-orm';
 // GET /api/group-chats/[groupChatId]/messages - Get messages for a group chat
 export async function GET(
   request: NextRequest,
-  { params }: { params: { groupChatId: string } }
+  { params }: { params: Promise<{ groupChatId: string }> }
 ) {
   try {
+    const { groupChatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
-    const groupChatId = params.groupChatId;
 
     // Check if user is a member
     const [membership] = await db
@@ -78,16 +78,16 @@ export async function GET(
 // POST /api/group-chats/[groupChatId]/messages - Send a message to group chat
 export async function POST(
   request: NextRequest,
-  { params }: { params: { groupChatId: string } }
+  { params }: { params: Promise<{ groupChatId: string }> }
 ) {
   try {
+    const { groupChatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
-    const groupChatId = params.groupChatId;
     const { content } = await request.json();
 
     if (!content || content.trim().length === 0) {

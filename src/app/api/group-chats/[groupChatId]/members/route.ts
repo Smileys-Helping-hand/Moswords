@@ -8,16 +8,16 @@ import { eq, and } from 'drizzle-orm';
 // POST /api/group-chats/[groupChatId]/members - Add member to group
 export async function POST(
   request: NextRequest,
-  { params }: { params: { groupChatId: string } }
+  { params }: { params: Promise<{ groupChatId: string }> }
 ) {
   try {
+    const { groupChatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
-    const groupChatId = params.groupChatId;
     const { newMemberId } = await request.json();
 
     if (!newMemberId) {
@@ -86,16 +86,16 @@ export async function POST(
 // DELETE /api/group-chats/[groupChatId]/members - Remove member from group
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { groupChatId: string } }
+  { params }: { params: Promise<{ groupChatId: string }> }
 ) {
   try {
+    const { groupChatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
-    const groupChatId = params.groupChatId;
     const { searchParams } = new URL(request.url);
     const memberIdToRemove = searchParams.get('memberId');
 
