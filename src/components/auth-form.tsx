@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ChromeIcon } from 'lucide-react';
 import { MoswordsIcon } from './icons';
+import { PasswordInput, validationRules } from './ui/password-input';
 
 export default function AuthForm() {
   const [email, setEmail] = useState('');
@@ -24,13 +25,18 @@ export default function AuthForm() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  // Check if all password validation rules pass
+  const passwordValid = useMemo(() => {
+    return validationRules.every((rule) => rule.test(password));
+  }, [password]);
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
+    if (!passwordValid) {
       toast({
         variant: 'destructive',
-        title: 'Password too short',
-        description: 'Your password must be at least 6 characters long.',
+        title: 'Invalid password',
+        description: 'Please meet all password requirements.',
       });
       return;
     }
@@ -173,11 +179,25 @@ export default function AuthForm() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input id="signup-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+                  <PasswordInput 
+                    id="signup-password" 
+                    required 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    disabled={loading}
+                    showValidation={true}
+                    placeholder="Create a strong password"
+                  />
                 </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Creating Account...' : 'Sign Up'}</Button>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={loading || !passwordValid || !email}
+                >
+                  {loading ? 'Creating Account...' : 'Sign Up'}
+                </Button>
               </CardFooter>
             </form>
           </Card>
