@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 import CreateServerDialog from './create-server-dialog';
 import { useRouter } from 'next/navigation';
+import UnreadBadge from './unread-badge';
+import { useUnread } from '@/providers/unread-provider';
 
 interface Server {
   id: string;
@@ -26,9 +28,23 @@ export default function ServerSidebar() {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { unreadChannels } = useUnread();
 
   // This would be dynamic based on user's current server
   const activeServerId = servers[0]?.id;
+
+  /**
+   * Get unread count for a specific server
+   */
+  const getServerUnreadCount = (serverId: string) => {
+    let count = 0;
+    unreadChannels.forEach((unreadCount, channelId) => {
+      // In a real implementation, we'd need to know which channels belong to which server
+      // For now, we'll assume any unread channel counts toward the server
+      count += unreadCount;
+    });
+    return count;
+  };
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -152,20 +168,7 @@ export default function ServerSidebar() {
                     className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-full"
                     initial={{ height: 0 }}
                     animate={{ 
-                      height: activeServerId === server.id ? '2.5rem' : '0'
-                    }}
-                    transition={{ duration: 0.2 }}
-                  />
-                  <motion.div
-                    className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 bg-white/50 rounded-r-full"
-                    initial={{ height: 0 }}
-                    whileHover={{ height: activeServerId === server.id ? 0 : '1.25rem' }}
-                    transition={{ duration: 0.2 }}
-                  />
-
-                  <motion.div
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.95 }}
+                    className="relative"
                   >
                     <Button 
                       variant="ghost" 
@@ -176,6 +179,25 @@ export default function ServerSidebar() {
                       <motion.div
                         className="w-full h-full"
                         animate={{ 
+                          borderRadius: activeServerId === server.id ? '16px' : '50%'
+                        }}
+                        whileHover={{ borderRadius: '16px' }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Image
+                          src={server.imageUrl || '/default-server.png'}
+                          alt={server.name}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover"
+                        />
+                      </motion.div>
+                    </Button>
+                    {/* Unread badge for server */}
+                    <UnreadBadge 
+                      count={getServerUnreadCount(server.id)} 
+                      size="md"
+                    /ate={{ 
                           borderRadius: activeServerId === server.id ? '16px' : '50%'
                         }}
                         whileHover={{ borderRadius: '16px' }}

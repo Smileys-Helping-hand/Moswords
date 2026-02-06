@@ -12,6 +12,8 @@ import AddContactDialog from './add-contact-dialog';
 import FriendsDialog from './friends-dialog';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import UnreadBadge from './unread-badge';
+import { useUnread } from '@/providers/unread-provider';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,11 +36,12 @@ interface Server {
   imageUrl: string | null;
 }
 
-function ChannelLink({ channel, active }: { channel: Channel; active?: boolean }) {
+function ChannelLink({ channel, active, unreadCount }: { channel: Channel; active?: boolean; unreadCount?: number }) {
   return (
     <motion.div
       whileHover={{ x: 4 }}
       whileTap={{ scale: 0.98 }}
+      className="relative"
     >
       <Button
         variant={active ? 'secondary' : 'ghost'}
@@ -51,6 +54,12 @@ function ChannelLink({ channel, active }: { channel: Channel; active?: boolean }
         )}
         <span className={active ? 'font-semibold' : 'text-muted-foreground'}>{channel.name}</span>
       </Button>
+      {/* Unread badge */}
+      {unreadCount && unreadCount > 0 && !active && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          <UnreadBadge count={unreadCount} size="sm" />
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -64,6 +73,10 @@ export default function ChannelSidebar() {
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>('User');
   const { toast } = useToast();
+  const { unreadChannels, unreadDMs } = useUnread();
+
+  // Calculate total unread DMs
+  const totalUnreadDMs = Array.from(unreadDMs.values()).reduce((sum, count) => sum + count, 0);
 
   // Fetch updated user data including displayName
   useEffect(() => {
@@ -167,14 +180,21 @@ export default function ChannelSidebar() {
                 <Search className="w-4 h-4" /> 
                 <span className="text-sm">Search</span>
             </Button>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-muted-foreground gap-2 glass-card hover:bg-primary/10 hover:text-primary"
-              onClick={() => router.push('/dm')}
-            >
-                <Users className="w-4 h-4" /> 
-                <span className="text-sm">Friends & DMs</span>
-            </Button>
+            <div className="relative">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start text-muted-foreground gap-2 glass-card hover:bg-primary/10 hover:text-primary"
+                onClick={() => router.push('/dm')}
+              >
+                  <Users className="w-4 h-4" /> 
+                  <span className="text-sm">Friends & DMs</span>
+              </Button>
+              {totalUnreadDMs > 0 && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <UnreadBadge count={totalUnreadDMs} size="sm" />
+                </div>
+              )}
+            </div>
             <AddContactDialog />
         </motion.div>
         
@@ -193,7 +213,11 @@ export default function ChannelSidebar() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
-                    <ChannelLink channel={channel} active={i === 0} />
+                    <ChannelLink 
+                      channel={channel} 
+                      active={i === 0} 
+                      unreadCount={unreadChannels.get(channel.id)} 
+                    />
                   </motion.div>
               ))}
             </AnimatePresence>
@@ -210,7 +234,10 @@ export default function ChannelSidebar() {
               {voiceChannels.map((channel, i) => (
                   <motion.div
                     key={channel.id}
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ op
+                      channel={channel} 
+                      unreadCount={unreadChannels.get(channel.id)} 
+                   }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
