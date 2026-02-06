@@ -72,21 +72,21 @@ export async function POST(request: NextRequest) {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0',
-        
-        status: 500,
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
         }
-     
       }
     );
   } catch (error: any) {
     console.error('Signup error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create user' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
     );
   }
 }
