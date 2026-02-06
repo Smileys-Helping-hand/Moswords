@@ -36,9 +36,13 @@ export default function AuthForm() {
     }
     setLoading(true);
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch(`/api/auth/signup?_t=${Date.now()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        cache: 'no-store',
         body: JSON.stringify({ email, password }),
       });
 
