@@ -100,7 +100,17 @@ export default function ChannelSidebar() {
       try {
         const response = await fetch('/api/profile');
         if (response.ok) {
-     Fetch server details when activeServerId changes
+          const data = await response.json();
+          setDisplayName(data.user?.displayName || data.user?.name || 'User');
+        }
+      } catch (error) {
+        console.error("Failed to fetch user data:", error);
+      }
+    };
+    fetchUserData();
+  }, []);
+
+  // Fetch server details when activeServerId changes
   useEffect(() => {
     if (!activeServerId) return;
     
@@ -117,19 +127,7 @@ export default function ChannelSidebar() {
     };
     
     fetchServerDetails();
-  }, [activeServerId  if (!response.ok) throw new Error('Failed to fetch servers');
-        const data = await response.json();
-        if (data.servers.length > 0) {
-          const firstServer = data.servers[0].server;
-          setActiveServerId(firstServer.id);
-          setActiveServer(firstServer);
-        }
-      } catch (error) {
-        console.error("Failed to fetch servers:", error);
-      }
-    };
-    fetchServers();
-  }, []);
+  }, [activeServerId]);
 
   useEffect(() => {
     if (!activeServerId) return;
