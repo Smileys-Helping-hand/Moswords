@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Skeleton } from './ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 
 interface Member {
   membership: {
@@ -91,26 +92,21 @@ function MemberRow({ member }: { member: Member }) {
 }
 
 export default function MemberSidebar() {
+  const pathname = usePathname();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Extract serverId from URL
   useEffect(() => {
-    const fetchServers = async () => {
-      try {
-        const response = await fetch('/api/servers');
-        if (!response.ok) return;
-        const data = await response.json();
-        if (data.servers.length > 0) {
-          setActiveServerId(data.servers[0].server.id);
-        }
-      } catch (error) {
-        console.error("Failed to fetch servers:", error);
-      }
-    };
-    fetchServers();
-  }, []);
+    const serverMatch = pathname?.match(/\/servers\/([^\/]+)/);
+    if (serverMatch) {
+      setActiveServerId(serverMatch[1]);
+    } else {
+      setActiveServerId(null);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (!activeServerId) {
