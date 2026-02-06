@@ -168,8 +168,11 @@ export default function ServerSidebar() {
                     className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-full"
                     initial={{ height: 0 }}
                     animate={{ 
-                    className="relative"
-                  >
+                      height: activeServerId === server.id ? '20px' : '0px'
+                    }}
+                    transition={{ duration: 0.2 }}
+                  />
+                  <div className="relative">
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -193,12 +196,11 @@ export default function ServerSidebar() {
                         />
                       </motion.div>
                     </Button>
-                    {/* Unread badge for server */}
                     <UnreadBadge 
                       count={getServerUnreadCount(server.id)} 
                       size="md"
                     />
-                  </motion.div>
+                  </div>
                 </motion.div>
               </TooltipTrigger>
               <TooltipContent side="right">
