@@ -16,7 +16,7 @@ export const users = pgTable('users', {
   customStatus: text('custom_status').default('Just joined!'),
   themePreference: text('theme_preference').default('obsidian'),
   isPro: boolean('is_pro').notNull().default(false),
-  lastSeen: text('last_seen').default('offline'),
+  lastSeen: timestamp('last_seen').notNull().defaultNow(),
 });
 
 // Accounts table for OAuth providers
