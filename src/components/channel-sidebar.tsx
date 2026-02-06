@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CreateChannelDialog from './create-channel-dialog';
 import AddContactDialog from './add-contact-dialog';
 import FriendsDialog from './friends-dialog';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import UnreadBadge from './unread-badge';
 import { useUnread } from '@/providers/unread-provider';
@@ -36,7 +36,7 @@ interface Server {
   imageUrl: string | null;
 }
 
-function ChannelLink({ channel, active, unreadCount }: { channel: Channel; active?: boolean; unreadCount?: number }) {
+function ChannelLink({ channel, active, unreadCount, onClick }: { channel: Channel; active?: boolean; unreadCount?: number; onClick?: () => void }) {
   return (
     <motion.div
       whileHover={{ x: 4 }}
@@ -46,6 +46,7 @@ function ChannelLink({ channel, active, unreadCount }: { channel: Channel; activ
       <Button
         variant={active ? 'secondary' : 'ghost'}
         className={`w-full justify-start gap-2 ${active ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+        onClick={onClick}
       >
         {channel.type === 'text' ? (
           <Hash className="w-5 h-5 text-muted-foreground" />
@@ -67,6 +68,7 @@ function ChannelLink({ channel, active, unreadCount }: { channel: Channel; activ
 export default function ChannelSidebar() {
   const { session } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const user = session?.user;
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeServer, setActiveServer] = useState<Server | null>(null);
@@ -74,6 +76,20 @@ export default function ChannelSidebar() {
   const [displayName, setDisplayName] = useState<string>('User');
   const { toast } = useToast();
   const { unreadChannels, unreadDMs } = useUnread();
+
+  // Extract channelId from URL
+  const activeChannelId = pathname?.match(/\/channels\/([^/]+)/)?.[1] || null;
+
+  // Extract serverId from URL if on a server route
+  useEffect(() => {
+    const match = pathname?.match(/\/servers\/([^/]+)/);
+    if (match) {
+      const urlServerId = match[1];
+      if (urlServerId !== activeServerId) {
+        setActiveServerId(urlServerId);
+      }
+    }
+  }, [pathname]);
 
   // Calculate total unread DMs
   const totalUnreadDMs = Array.from(unreadDMs.values()).reduce((sum, count) => sum + count, 0);
@@ -84,24 +100,24 @@ export default function ChannelSidebar() {
       try {
         const response = await fetch('/api/profile');
         if (response.ok) {
+     Fetch server details when activeServerId changes
+  useEffect(() => {
+    if (!activeServerId) return;
+    
+    const fetchServerDetails = async () => {
+      try {
+        const response = await fetch(`/api/servers/${activeServerId}`);
+        if (response.ok) {
           const data = await response.json();
-          setDisplayName(data.user.displayName || data.user.name || data.user.email?.split('@')[0] || 'User');
+          setActiveServer(data.server);
         }
       } catch (error) {
-        console.error('Failed to fetch user data:', error);
+        console.error("Failed to fetch server details:", error);
       }
     };
-    if (user) {
-      fetchUserData();
-    }
-  }, [user]);
-
-  // Get the first server as active (in a real app, this would be from state/context)
-  useEffect(() => {
-    const fetchServers = async () => {
-      try {
-        const response = await fetch('/api/servers');
-        if (!response.ok) throw new Error('Failed to fetch servers');
+    
+    fetchServerDetails();
+  }, [activeServerId  if (!response.ok) throw new Error('Failed to fetch servers');
         const data = await response.json();
         if (data.servers.length > 0) {
           const firstServer = data.servers[0].server;
@@ -215,8 +231,9 @@ export default function ChannelSidebar() {
                   >
                     <ChannelLink 
                       channel={channel} 
-                      active={i === 0} 
+                      active={channel.id === activeChannelId} 
                       unreadCount={unreadChannels.get(channel.id)} 
+                      onClick={() => router.push(`/servers/${activeServerId}/channels/${channel.id}`)}
                     />
                   </motion.div>
               ))}
@@ -238,7 +255,11 @@ export default function ChannelSidebar() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
-                    <ChannelLink channel={channel} />
+                    <ChannelLink 
+                      channel={channel} 
+                      active={channel.id === activeChannelId}
+                      onClick={() => router.push(`/servers/${activeServerId}/channels/${channel.id}`)}
+                    />
                   </motion.div>
               ))}
             </AnimatePresence>
