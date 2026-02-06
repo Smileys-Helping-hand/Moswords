@@ -7,6 +7,7 @@ import { Skeleton } from './ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './ui/button';
+import { usePathname } from 'next/navigation';
 
 interface Channel {
   id: string;
@@ -33,6 +34,7 @@ interface Message {
 }
 
 export default function ChatMessages() {
+  const pathname = usePathname();
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,16 @@ export default function ChatMessages() {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Extract channelId from URL
+  useEffect(() => {
+    const channelMatch = pathname?.match(/\/channels\/([^\/]+)/);
+    if (channelMatch) {
+      setActiveChannelId(channelMatch[1]);
+    } else {
+      setActiveChannelId(null);
+    }
+  }, [pathname]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -53,31 +65,31 @@ export default function ChatMessages() {
     setShowScrollButton(!isNearBottom);
   };
 
-  // Get the first channel as active
+  // Fetch channel details when channelId changes
   useEffect(() => {
-    const fetchChannels = async () => {
+    if (!activeChannelId) return;
+
+    const fetchChannelDetails = async () => {
       try {
-        const serversResponse = await fetch('/api/servers');
-        if (!serversResponse.ok) return;
-        const serversData = await serversResponse.json();
-        if (serversData.servers.length === 0) return;
+        const serverMatch = pathname?.match(/\/servers\/([^\/]+)/);
+        if (!serverMatch) return;
         
-        const firstServer = serversData.servers[0].server;
-        const channelsResponse = await fetch(`/api/servers/${firstServer.id}/channels`);
+        const serverId = serverMatch[1];
+        const channelsResponse = await fetch(`/api/servers/${serverId}/channels`);
         if (!channelsResponse.ok) return;
         const channelsData = await channelsResponse.json();
         
-        if (channelsData.channels.length > 0) {
-          const firstChannel = channelsData.channels[0];
-          setActiveChannelId(firstChannel.id);
-          setCurrentChannel(firstChannel);
+        const channel = channelsData.channels.find((ch: Channel) => ch.id === activeChannelId);
+        if (channel) {
+          setCurrentChannel(channel);
         }
       } catch (error) {
-        console.error("Failed to fetch initial channel:", error);
+        console.error("Failed to fetch channel details:", error);
       }
     };
-    fetchChannels();
-  }, []);
+    
+    fetchChannelDetails();
+  }, [activeChannelId, pathname]);
 
   useEffect(() => {
     if (!activeChannelId) {

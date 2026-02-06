@@ -34,33 +34,19 @@ interface Channel {
 }
 
 function ThreadSummary() {
+    const pathname = usePathname();
     const [summary, setSummary] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
-        const fetchChannels = async () => {
-          try {
-            const serversResponse = await fetch('/api/servers');
-            if (!serversResponse.ok) return;
-            const serversData = await serversResponse.json();
-            if (serversData.servers.length === 0) return;
-            
-            const firstServer = serversData.servers[0].server;
-            const channelsResponse = await fetch(`/api/servers/${firstServer.id}/channels`);
-            if (!channelsResponse.ok) return;
-            const channelsData = await channelsResponse.json();
-            
-            if (channelsData.channels.length > 0) {
-              setActiveChannelId(channelsData.channels[0].id);
-            }
-          } catch (error) {
-            console.error("Failed to fetch channel:", error);
-          }
-        };
-        fetchChannels();
-    }, []);
+        // Extract channelId from URL
+        const channelMatch = pathname?.match(/\/channels\/([^\/]+)/);
+        if (channelMatch) {
+          setActiveChannelId(channelMatch[1]);
+        }
+    }, [pathname]);
 
     const handleSummarize = async () => {
         if (!activeChannelId) return;
@@ -181,35 +167,42 @@ export default function ChatHeader() {
   const pathname = usePathname();
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [serverId, setServerId] = useState<string | null>(null);
+  const [channelId, setChannelId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Extract serverId from URL: /servers/[serverId]/channels/[channelId]
-    const match = pathname?.match(/\/servers\/([^\/]+)/);
-    if (match) {
-      setServerId(match[1]);
+    // Extract serverId and channelId from URL: /servers/[serverId]/channels/[channelId]
+    const serverMatch = pathname?.match(/\/servers\/([^\/]+)/);
+    const channelMatch = pathname?.match(/\/channels\/([^\/]+)/);
+    
+    if (serverMatch) {
+      setServerId(serverMatch[1]);
     }
+    
+    if (channelMatch) {
+      setChannelId(channelMatch[1]);
+    }
+  }, [pathname]);
 
-    const fetchChannels = async () => {
+  useEffect(() => {
+    if (!serverId || !channelId) return;
+
+    const fetchChannelDetails = async () => {
       try {
-        const serversResponse = await fetch('/api/servers');
-        if (!serversResponse.ok) return;
-        const serversData = await serversResponse.json();
-        if (serversData.servers.length === 0) return;
-        
-        const firstServer = serversData.servers[0].server;
-        const channelsResponse = await fetch(`/api/servers/${firstServer.id}/channels`);
+        const channelsResponse = await fetch(`/api/servers/${serverId}/channels`);
         if (!channelsResponse.ok) return;
         const channelsData = await channelsResponse.json();
         
-        if (channelsData.channels.length > 0) {
-          setCurrentChannel(channelsData.channels[0]);
+        const channel = channelsData.channels.find((ch: Channel) => ch.id === channelId);
+        if (channel) {
+          setCurrentChannel(channel);
         }
       } catch (error) {
         console.error("Failed to fetch channel:", error);
       }
     };
-    fetchChannels();
-  }, [pathname]);
+    
+    fetchChannelDetails();
+  }, [serverId, channelId]);
 
 
   return (
