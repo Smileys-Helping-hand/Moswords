@@ -234,10 +234,7 @@ export default function ChannelSidebar() {
               {voiceChannels.map((channel, i) => (
                   <motion.div
                     key={channel.id}
-                    initial={{ op
-                      channel={channel} 
-                      unreadCount={unreadChannels.get(channel.id)} 
-                   }}
+                    initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >

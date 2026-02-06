@@ -197,21 +197,7 @@ export default function ServerSidebar() {
                     <UnreadBadge 
                       count={getServerUnreadCount(server.id)} 
                       size="md"
-                    /ate={{ 
-                          borderRadius: activeServerId === server.id ? '16px' : '50%'
-                        }}
-                        whileHover={{ borderRadius: '16px' }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <Image
-                          src={server.imageUrl || '/default-server.png'}
-                          alt={server.name}
-                          width={48}
-                          height={48}
-                          className="w-full h-full object-cover"
-                        />
-                      </motion.div>
-                    </Button>
+                    />
                   </motion.div>
                 </motion.div>
               </TooltipTrigger>
