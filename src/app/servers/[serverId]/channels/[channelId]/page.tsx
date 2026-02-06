@@ -95,7 +95,22 @@ export default function ServerChannelPage({
         const messagesRes = await fetch(`/api/channels/${channelId}/messages`);
         if (!messagesRes.ok) throw new Error('Failed to fetch messages');
         const messagesData = await messagesRes.json();
-        setMessages(messagesData.messages || []);
+        
+        // Transform the API response to match the Message interface
+        const transformedMessages = (messagesData.messages || []).map((item: any) => ({
+          id: item.message.id,
+          content: item.message.content,
+          channelId: item.message.channelId,
+          userId: item.message.userId,
+          createdAt: item.message.createdAt,
+          deleted: item.message.deleted,
+          user: {
+            id: item.user.id,
+            displayName: item.user.displayName || item.user.name,
+            photoURL: item.user.photoURL || item.user.image,
+          },
+        }));
+        setMessages(transformedMessages);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -116,7 +131,20 @@ export default function ServerChannelPage({
         const messagesRes = await fetch(`/api/channels/${channelId}/messages`);
         if (messagesRes.ok) {
           const messagesData = await messagesRes.json();
-          setMessages(messagesData.messages || []);
+          const transformedMessages = (messagesData.messages || []).map((item: any) => ({
+            id: item.message.id,
+            content: item.message.content,
+            channelId: item.message.channelId,
+            userId: item.message.userId,
+            createdAt: item.message.createdAt,
+            deleted: item.message.deleted,
+            user: {
+              id: item.user.id,
+              displayName: item.user.displayName || item.user.name,
+              photoURL: item.user.photoURL || item.user.image,
+            },
+          }));
+          setMessages(transformedMessages);
         }
       } catch (error) {
         console.error('Error polling messages:', error);
@@ -126,7 +154,23 @@ export default function ServerChannelPage({
     return () => clearInterval(interval);
   }, [user, serverId, channelId, toast, router]);
 
-  const handleSendMessage = async (content: string) => {
+  cons
+      // Transform the message to match our interface
+      const newMessage = {
+        id: data.message.message.id,
+        content: data.message.message.content,
+        channelId: data.message.message.channelId,
+        userId: data.message.message.userId,
+        createdAt: data.message.message.createdAt,
+        deleted: data.message.message.deleted,
+        user: {
+          id: data.message.user.id,
+          displayName: data.message.user.displayName || data.message.user.name,
+          photoURL: data.message.user.photoURL || data.message.user.image,
+        },
+      };
+      
+      setMessages((prev) => [...prev, newMstring) => {
     if (!user || !content.trim()) return;
 
     try {
