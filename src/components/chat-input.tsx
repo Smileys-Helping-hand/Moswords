@@ -8,8 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmojiPicker from './emoji-picker';
 import MediaUploadDialog from './media-upload-dialog';
+import { usePathname } from 'next/navigation';
 
 export default function ChatInput() {
+  const pathname = usePathname();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
@@ -20,30 +22,41 @@ export default function ChatInput() {
     setMessage(prev => prev + emoji);
   };
 
+  // Extract channelId from URL
   useEffect(() => {
-    const fetchChannels = async () => {
+    const channelMatch = pathname?.match(/\/channels\/([^\/]+)/);
+    if (channelMatch) {
+      setActiveChannelId(channelMatch[1]);
+    } else {
+      setActiveChannelId(null);
+    }
+  }, [pathname]);
+
+  // Fetch channel name when channelId changes
+  useEffect(() => {
+    if (!activeChannelId) return;
+
+    const fetchChannelName = async () => {
       try {
-        const serversResponse = await fetch('/api/servers');
-        if (!serversResponse.ok) return;
-        const serversData = await serversResponse.json();
-        if (serversData.servers.length === 0) return;
+        const serverMatch = pathname?.match(/\/servers\/([^\/]+)/);
+        if (!serverMatch) return;
         
-        const firstServer = serversData.servers[0].server;
-        const channelsResponse = await fetch(`/api/servers/${firstServer.id}/channels`);
+        const serverId = serverMatch[1];
+        const channelsResponse = await fetch(`/api/servers/${serverId}/channels`);
         if (!channelsResponse.ok) return;
         const channelsData = await channelsResponse.json();
         
-        if (channelsData.channels.length > 0) {
-          const firstChannel = channelsData.channels[0];
-          setActiveChannelId(firstChannel.id);
-          setChannelName(firstChannel.name);
+        const channel = channelsData.channels.find((ch: any) => ch.id === activeChannelId);
+        if (channel) {
+          setChannelName(channel.name);
         }
       } catch (error) {
-        console.error("Failed to fetch channel:", error);
+        console.error("Failed to fetch channel name:", error);
       }
     };
-    fetchChannels();
-  }, []);
+    
+    fetchChannelName();
+  }, [activeChannelId, pathname]);
 
   const handleSend = async () => {
     if (!message.trim() || !activeChannelId || sending) return;
