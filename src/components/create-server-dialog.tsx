@@ -15,12 +15,14 @@ import {
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 interface CreateServerDialogProps {
   onServerCreated?: () => void;
 }
 
 export default function CreateServerDialog({ onServerCreated }: CreateServerDialogProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [serverName, setServerName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -65,6 +67,9 @@ export default function CreateServerDialog({ onServerCreated }: CreateServerDial
       setIsOpen(false);
       resetState();
       onServerCreated?.();
+
+      // Navigate immediately to the new server's general channel
+      router.push(`/servers/${data.server.id}/channels/${data.generalChannelId}`);
     } catch (error) {
       console.error('Error creating server:', error);
       toast({

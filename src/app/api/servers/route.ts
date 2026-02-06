@@ -36,7 +36,7 @@ export async function GET() {
   }
 }
 
-// POST /api/servers - Create a new server
+// POST /api/servers - Create a new server with transaction
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -55,42 +55,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate a random invite code
-    const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    // Use transaction to ensure all steps succeed or all fail (prevents ghost servers)
+    const result = await db.transaction(async (tx) => {
+      // Generate a random invite code
+      const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    // Create server
-    const [newServer] = await db
-      .insert(servers)
-      .values({
-        name,
-        imageUrl: imageUrl || `https://picsum.photos/seed/${name}/200/200`,
-        inviteCode,
-        ownerId: userId,
-      })
-      .returning();
+      // Step 1: Create server
+      const [newServer] = await tx
+        .insert(servers)
+        .values({
+          name,
+          imageUrl: imageUrl || `https://picsum.photos/seed/${name}/200/200`,
+          inviteCode,
+          ownerId: userId,
+        })
+        .returning();
 
-    // Add creator as owner member
-    await db.insert(serverMembers).values({
-      serverId: newServer.id,
-      userId,
-      role: 'owner',
-    });
+      // Step 2: Add creator as admin member
+      await tx.insert(serverMembers).values({
+        serverId: newServer.id,
+        userId,
+        role: 'admin',
+      });
 
-    // Create default channels
-    await db.insert(channels).values([
-      {
+      // Step 3: Create default general channel
+      const [generalChannel] = await tx.insert(channels).values({
         name: 'general',
         type: 'text',
         serverId: newServer.id,
-      },
-      {
+      }).returning();
+
+      // Step 4: Create additional default channel
+      await tx.insert(channels).values({
         name: 'random',
         type: 'text',
         serverId: newServer.id,
-      },
-    ]);
+      });
 
-    return NextResponse.json({ server: newServer }, { status: 201 });
+      return { server: newServer, generalChannelId: generalChannel.id };
+    });
+
+    return NextResponse.json(
+      { 
+        server: result.server, 
+        generalChannelId: result.generalChannelId 
+      }, 
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating server:', error);
     return NextResponse.json(

@@ -70,6 +70,35 @@ export default function ServerSidebar() {
     fetchServers();
   };
 
+  const handleServerClick = async (serverId: string) => {
+    try {
+      // Fetch the server's channels to find the general/default channel
+      const response = await fetch(`/api/servers/${serverId}/channels`);
+      if (!response.ok) throw new Error('Failed to fetch channels');
+      const data = await response.json();
+      
+      // Find general channel or use first available channel
+      const generalChannel = data.channels.find((ch: any) => ch.name === 'general') || data.channels[0];
+      
+      if (generalChannel) {
+        router.push(`/servers/${serverId}/channels/${generalChannel.id}`);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'No channels found in this server',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching channels:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to navigate to server',
+      });
+    }
+  };
+
   if (loading) {
       return (
         <nav className="w-20 bg-neutral-950/80 backdrop-blur-2xl flex flex-col items-center py-3 gap-3 z-20">
@@ -141,6 +170,7 @@ export default function ServerSidebar() {
                     <Button 
                       variant="ghost" 
                       size="icon" 
+                      onClick={() => handleServerClick(server.id)}
                       className="w-12 h-12 rounded-2xl overflow-hidden p-0 hover:bg-transparent"
                     >
                       <motion.div

@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import KeyboardShortcutsDialog from './keyboard-shortcuts-dialog';
 import NotificationsPopover from './notifications-popover';
+import InviteMemberModal from './invite-member-modal';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ import {
 import { useState, useEffect } from 'react';
 import { Skeleton } from './ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { usePathname } from 'next/navigation';
 
 interface Channel {
   id: string;
@@ -176,9 +178,17 @@ function ThreadSummary() {
 
 
 export default function ChatHeader() {
+  const pathname = usePathname();
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  const [serverId, setServerId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Extract serverId from URL: /servers/[serverId]/channels/[channelId]
+    const match = pathname?.match(/\/servers\/([^\/]+)/);
+    if (match) {
+      setServerId(match[1]);
+    }
+
     const fetchChannels = async () => {
       try {
         const serversResponse = await fetch('/api/servers');
@@ -199,7 +209,7 @@ export default function ChatHeader() {
       }
     };
     fetchChannels();
-  }, []);
+  }, [pathname]);
 
 
   return (
@@ -222,6 +232,13 @@ export default function ChatHeader() {
         <div className="flex items-center gap-1">
             <ThreadSummary />
           
+          {/* Invite Members Button - Only show if on a server */}
+          {serverId && (
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <InviteMemberModal serverId={serverId} />
+            </motion.div>
+          )}
+
           <div className="w-64">
             <Input
               placeholder={`Search in #${currentChannel?.name || 'channel'}`}
