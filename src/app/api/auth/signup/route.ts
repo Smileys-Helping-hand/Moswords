@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         isPro: false,
         points: 0,
       })
-      .returning();
+      .returning({ id: users.id, email: users.email });
 
     console.log('User created successfully:', newUser.id);
 

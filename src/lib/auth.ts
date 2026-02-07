@@ -35,7 +35,9 @@ export const authOptions: NextAuthOptions = {
               id: users.id,
               email: users.email,
               password: users.password,
+              name: users.name,
               displayName: users.displayName,
+              image: users.image,
               photoURL: users.photoURL,
             })
             .from(users)
@@ -97,5 +99,4 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
-  trustHost: true,
 };
