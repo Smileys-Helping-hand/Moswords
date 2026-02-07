@@ -94,13 +94,14 @@ export const authOptions: NextAuthOptions = {
     callbackUrl: {
       name: `${cookiePrefix}next-auth.callback-url`,
       options: {
+        httpOnly: false,
         sameSite: 'lax',
         path: '/',
         secure: useSecureCookies,
       },
     },
     csrfToken: {
-      name: 'next-auth.csrf-token',
+      name: `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -132,4 +133,6 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
+  // Required for production deployment on Vercel and mobile browsers
+  trustHost: true,
 };
