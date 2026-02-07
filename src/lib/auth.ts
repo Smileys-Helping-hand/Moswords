@@ -6,6 +6,10 @@ import { users } from './schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const useSecureCookies = isProduction;
+const cookiePrefix = useSecureCookies ? '__Secure-' : '';
+
 export const authOptions: NextAuthOptions = {
   // Note: DrizzleAdapter is not compatible with CredentialsProvider + JWT sessions
   // adapter: DrizzleAdapter(db) as any,
@@ -75,6 +79,35 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
+      },
+    },
+    callbackUrl: {
+      name: `${cookiePrefix}next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
+      },
+    },
+    csrfToken: {
+      name: 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
+      },
+    },
   },
   pages: {
     signIn: '/login',
