@@ -26,8 +26,8 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Moswords',
     startupImage: [
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon-192.png' },
+      { url: '/icon-512.png' },
     ],
   },
   icons: [
@@ -65,7 +65,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="font-body antialiased">
+      <body className="font-body antialiased overflow-x-hidden max-w-full">
         <AuthProvider>
           <UnreadProvider>
             {children}

@@ -101,6 +101,29 @@ select {
   -webkit-touch-callout: none;
 }
 
+/* ===== iOS SMOOTH SCROLLING ===== */
+/* Native-like smooth scrolling on iOS */
+.smooth-scroll,
+[data-radix-scroll-area-viewport] {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Safe area utility classes */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Prevent horizontal overflow globally */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 /* ===== MOBILE MODAL BOTTOM SHEET STYLING ===== */
 /* Modals slide up from bottom on mobile */
 @media (max-width: 768px) {

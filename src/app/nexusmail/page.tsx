@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Mail, Plus, Copy, Check, AlertCircle } from 'lucide-react';
+import { Mail, Plus, Copy, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface RegisteredApp {
@@ -174,42 +174,54 @@ export default function NexusMailDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 p-4 md:p-8 pb-24 md:pb-8">
+      <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Mail className="w-10 h-10 text-purple-400" />
-              <h1 className="text-4xl font-bold text-white">NexusMail Dashboard</h1>
+          <div className="flex items-start gap-3">
+            {/* Mobile back button */}
+            <Button 
+              onClick={() => router.push('/')} 
+              variant="ghost" 
+              size="icon"
+              className="md:hidden shrink-0 w-10 h-10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
+                <Mail className="w-6 h-6 md:w-10 md:h-10 text-purple-400 shrink-0" />
+                <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-white">NexusMail Dashboard</h1>
+              </div>
+              <p className="text-sm md:text-base text-muted-foreground">
+                Manage your email service integrations and monitor delivery
+              </p>
             </div>
-            <p className="text-muted-foreground">
-              Manage your email service integrations and monitor delivery
-            </p>
           </div>
-          <Button onClick={() => router.push('/')} variant="outline">
+          {/* Desktop back button */}
+          <Button onClick={() => router.push('/')} variant="outline" className="hidden md:flex">
             Back to App
           </Button>
         </motion.div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
             <Card className="glass-panel border-purple-500/20">
-              <CardHeader>
-                <CardTitle className="text-white">Total Apps</CardTitle>
-                <CardDescription>Registered applications</CardDescription>
+              <CardHeader className="pb-2 md:pb-4">
+                <CardTitle className="text-white text-base md:text-lg">Total Apps</CardTitle>
+                <CardDescription className="text-sm">Registered applications</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-purple-400">{apps.length}</div>
+                <div className="text-2xl md:text-4xl font-bold text-purple-400">{apps.length}</div>
               </CardContent>
             </Card>
           </motion.div>
@@ -220,12 +232,12 @@ export default function NexusMailDashboard() {
             transition={{ delay: 0.2 }}
           >
             <Card className="glass-panel border-blue-500/20">
-              <CardHeader>
-                <CardTitle className="text-white">Emails Sent</CardTitle>
-                <CardDescription>Total across all apps</CardDescription>
+              <CardHeader className="pb-2 md:pb-4">
+                <CardTitle className="text-white text-base md:text-lg">Emails Sent</CardTitle>
+                <CardDescription className="text-sm">Total across all apps</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-blue-400">
+                <div className="text-2xl md:text-4xl font-bold text-blue-400">
                   {apps.reduce((sum, app) => sum + app.emailsSent, 0)}
                 </div>
               </CardContent>
@@ -238,12 +250,12 @@ export default function NexusMailDashboard() {
             transition={{ delay: 0.3 }}
           >
             <Card className="glass-panel border-green-500/20">
-              <CardHeader>
-                <CardTitle className="text-white">Success Rate</CardTitle>
-                <CardDescription>Last 50 emails</CardDescription>
+              <CardHeader className="pb-2 md:pb-4">
+                <CardTitle className="text-white text-base md:text-lg">Success Rate</CardTitle>
+                <CardDescription className="text-sm">Last 50 emails</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-green-400">
+                <div className="text-2xl md:text-4xl font-bold text-green-400">
                   {logs.length > 0
                     ? Math.round(
                         (logs.filter((l) => l.status === 'sent').length / logs.length) * 100

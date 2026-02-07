@@ -93,40 +93,40 @@ export default function DMInboxPage() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 overflow-x-hidden">
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-white/10 p-4 flex items-center justify-between"
+        className="glass-panel border-b border-white/10 p-3 md:p-4 flex items-center justify-between shrink-0"
       >
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-primary" />
-            <h1 className="font-semibold text-lg">Messages</h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+            <h1 className="font-semibold text-base md:text-lg truncate">Messages</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1 md:gap-2 shrink-0">
           <FriendsDialog />
           <CreateGroupChatDialog />
         </div>
       </motion.header>
 
-      <Tabs defaultValue="dms" className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-4">
-          <TabsTrigger value="dms" className="flex-1">
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Direct Messages
+      <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <TabsList className="mx-3 md:mx-4 mt-3 md:mt-4 shrink-0">
+          <TabsTrigger value="dms" className="flex-1 text-xs md:text-sm">
+            <MessageSquare className="w-4 h-4 mr-1 md:mr-2" />
+            <span className="hidden xs:inline">Direct </span>Messages
           </TabsTrigger>
-          <TabsTrigger value="groups" className="flex-1">
-            <Users className="w-4 h-4 mr-2" />
+          <TabsTrigger value="groups" className="flex-1 text-xs md:text-sm">
+            <Users className="w-4 h-4 mr-1 md:mr-2" />
             Groups ({groupChats.length})
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-3 md:p-4 pb-24 md:pb-4 smooth-scroll">
           <TabsContent value="dms" className="mt-0">
             <div className="max-w-3xl mx-auto space-y-2">
               {conversations.length === 0 ? (

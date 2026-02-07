@@ -143,24 +143,24 @@ export default function ChatMessages() {
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 pb-32 space-y-6 relative scroll-smooth"
+      className="flex-1 overflow-y-auto p-3 md:p-4 pb-32 space-y-4 md:space-y-6 relative scroll-smooth smooth-scroll"
       onScroll={handleScroll}
     >
       <motion.div 
-        className="flex items-start gap-4"
+        className="flex items-start gap-3 md:gap-4"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
         <motion.div 
-          className="w-16 h-16 rounded-full glass-card flex items-center justify-center"
+          className="w-12 h-12 md:w-16 md:h-16 rounded-full glass-card flex items-center justify-center shrink-0"
           whileHover={{ scale: 1.1, rotate: 5 }}
           transition={{ type: "spring", stiffness: 400, damping: 10 }}
         >
-            <Hash className="w-8 h-8 text-primary" />
+            <Hash className="w-6 h-6 md:w-8 md:h-8 text-primary" />
         </motion.div>
-        <div>
+        <div className="min-w-0">
             <motion.h2 
-              className="text-3xl font-bold text-gradient"
+              className="text-xl md:text-3xl font-bold text-gradient truncate"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}

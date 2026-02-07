@@ -111,16 +111,17 @@ export default function ChatInput() {
   };
 
   return (
-    <div className="p-4 glass-panel border-t border-white/10 relative z-50">
+    <div className="p-2 md:p-4 glass-panel border-t border-white/10 relative z-50">
       <motion.div 
         className="relative"
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10 pointer-events-auto">
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
-            <Button variant="ghost" size="icon" className="h-10 w-10 hover:text-primary pointer-events-auto">
-                <PlusCircle className="w-5 h-5" />
+        <div className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 md:gap-1 z-10 pointer-events-auto">
+          {/* Plus/attachment button - hidden on very small screens */}
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="hidden sm:block pointer-events-auto">
+            <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 hover:text-primary pointer-events-auto">
+                <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
           </motion.div>
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
@@ -132,25 +133,25 @@ export default function ChatInput() {
         </div>
         <Input 
           placeholder={`Message #${channelName}`} 
-          className="pl-36 pr-14 h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0" 
+          className="pl-20 sm:pl-28 md:pl-36 pr-12 md:pr-14 h-11 md:h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0 text-sm md:text-base" 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           disabled={sending || !activeChannelId}
         />
         <motion.div
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto"
+          className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
         >
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-10 w-10 text-primary hover:bg-primary/20 pointer-events-auto"
+            className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
             onClick={handleSend}
             disabled={sending || !activeChannelId || !message.trim()}
           >
-              <SendHorizonal className="w-5 h-5" />
+              <SendHorizonal className="w-4 h-4 md:w-5 md:h-5" />
           </Button>
         </motion.div>
       </motion.div>

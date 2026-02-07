@@ -207,14 +207,14 @@ export default function ChatHeader() {
 
   return (
     <motion.header 
-      className="flex items-center h-14 px-4 border-b border-white/10 shadow-lg glass-panel z-10"
+      className="flex items-center h-12 md:h-14 px-2 md:px-4 border-b border-white/10 shadow-lg glass-panel z-10"
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
     >
-      <div className="flex items-center gap-2">
-        <Hash className="w-6 h-6 text-primary" />
-        <h2 className="font-bold text-lg">{currentChannel?.name || 'Select a channel'}</h2>
-        <span className="text-xs text-muted-foreground px-2 py-1 rounded-full glass-card">
+      <div className="flex items-center gap-1 md:gap-2 min-w-0">
+        <Hash className="w-5 h-5 md:w-6 md:h-6 text-primary shrink-0" />
+        <h2 className="font-bold text-sm md:text-lg truncate">{currentChannel?.name || 'Select a channel'}</h2>
+        <span className="hidden md:inline text-xs text-muted-foreground px-2 py-1 rounded-full glass-card">
           {Math.floor(Math.random() * 50) + 10} online
         </span>
       </div>
@@ -222,24 +222,26 @@ export default function ChatHeader() {
       <div className="flex-1" />
 
       <TooltipProvider>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 md:gap-1">
             <ThreadSummary />
           
-          {/* Invite Members Button - Only show if on a server */}
+          {/* Invite Members Button - Only show if on a server (hidden on mobile) */}
           {serverId && (
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
               <InviteMemberModal serverId={serverId} />
             </motion.div>
           )}
 
-          <div className="w-64">
+          {/* Search - Hidden on mobile */}
+          <div className="hidden lg:block w-64">
             <Input
               placeholder={`Search in #${currentChannel?.name || 'channel'}`}
               className="glass-card border-white/20 h-9 focus:border-primary transition-all"
             />
           </div>
           
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          {/* Video call button - hidden on mobile */}
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
@@ -252,7 +254,8 @@ export default function ChatHeader() {
             </Tooltip>
           </motion.div>
           
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          {/* Voice call button - hidden on mobile */}
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
