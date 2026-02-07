@@ -9,10 +9,8 @@ import UserAvatar from '@/components/user-avatar';
 import { Loader2, MessageSquare, ArrowLeft, Users, UserPlus, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
 import CreateGroupChatDialog from '@/components/create-group-chat-dialog';
 import FriendsDialog from '@/components/friends-dialog';
-import AddContactDialog from '@/components/add-contact-dialog';
 
 type Conversation = {
   otherUserId: string;
@@ -96,40 +94,31 @@ export default function DMInboxPage() {
 
   return (
     <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 overflow-x-hidden">
-      {/* Header */}
+      {/* Header - Compact */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-white/10 p-3 shrink-0"
+        className="glass-panel border-b border-white/10 px-3 py-2 shrink-0"
       >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="shrink-0 w-9 h-9">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-2 min-w-0">
-              <MessageSquare className="w-5 h-5 text-primary shrink-0" />
-              <h1 className="font-bold text-lg truncate">Messages</h1>
-            </div>
-          </div>
-        </div>
-        
-        {/* Action Buttons - More prominent on mobile */}
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="shrink-0 w-9 h-9">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+          <h1 className="font-bold text-lg flex-1 truncate">Messages</h1>
           <FriendsDialog />
-          <AddContactDialog />
           <CreateGroupChatDialog />
         </div>
       </motion.header>
 
       <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <TabsList className="mx-3 mt-3 shrink-0 grid grid-cols-2 h-11">
+        <TabsList className="mx-3 mt-3 shrink-0 grid grid-cols-2 h-10">
           <TabsTrigger value="dms" className="text-sm font-medium">
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Messages
+            <MessageSquare className="w-4 h-4 mr-1.5" />
+            Chats
           </TabsTrigger>
           <TabsTrigger value="groups" className="text-sm font-medium">
-            <Users className="w-4 h-4 mr-2" />
+            <Users className="w-4 h-4 mr-1.5" />
             Groups ({groupChats.length})
           </TabsTrigger>
         </TabsList>

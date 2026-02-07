@@ -183,12 +183,11 @@ export default function CreateGroupChatDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" className="gap-2">
-          <Users className="w-4 h-4" />
-          Create Group
+        <Button variant="ghost" size="icon" className="w-9 h-9 hover:bg-white/10">
+          <Users className="w-5 h-5 text-primary" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="glass-card border-white/20 w-[95vw] max-w-[500px] p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Create Group Chat</DialogTitle>
           <DialogDescription>

@@ -170,16 +170,15 @@ export default function AddContactDialog() {
       if (!open) resetState();
     }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" className="w-full justify-start gap-2 glass-card hover:bg-white/5">
-          <UserPlus className="w-5 h-5" />
-          <span>Add Contact</span>
+        <Button variant="ghost" size="icon" className="w-9 h-9 hover:bg-white/10">
+          <UserPlus className="w-5 h-5 text-primary" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="glass-card border-white/20 sm:max-w-md">
+      <DialogContent className="glass-card border-white/20 w-[95vw] max-w-md p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-gradient">Add Contact & Send Message</DialogTitle>
-          <DialogDescription>
-            Search for users by name or email and start a conversation
+          <DialogTitle className="text-gradient text-lg">Add Contact</DialogTitle>
+          <DialogDescription className="text-sm">
+            Search for users and start a conversation
           </DialogDescription>
         </DialogHeader>
 

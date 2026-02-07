@@ -167,44 +167,43 @@ export default function FriendsDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" className="w-full justify-start gap-2 glass-card hover:bg-white/5">
+        <Button variant="ghost" size="icon" className="relative w-9 h-9 hover:bg-white/10">
           <Users className="w-5 h-5" />
-          <span>Friends</span>
           {pendingRequests.length > 0 && (
-            <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
               {pendingRequests.length}
             </span>
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="glass-card border-white/20 sm:max-w-2xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle className="text-gradient flex items-center gap-2">
+      <DialogContent className="glass-card border-white/20 w-[95vw] max-w-2xl max-h-[85vh] p-4 sm:p-6">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-gradient flex items-center gap-2 text-lg">
             <Users className="w-5 h-5" />
             Friends
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Manage your friends and friend requests
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="all" className="w-full">
-          <TabsList className="glass-card w-full">
-            <TabsTrigger value="all" className="flex-1">
-              <UserCheck className="w-4 h-4 mr-2" />
-              All Friends ({friends.length})
+          <TabsList className="glass-card w-full grid grid-cols-3 h-auto p-1">
+            <TabsTrigger value="all" className="text-xs sm:text-sm py-2 px-1 sm:px-3 flex flex-col sm:flex-row items-center gap-1">
+              <UserCheck className="w-4 h-4" />
+              <span className="hidden sm:inline">All</span> ({friends.length})
             </TabsTrigger>
-            <TabsTrigger value="pending" className="flex-1">
-              <Clock className="w-4 h-4 mr-2" />
-              Pending ({pendingRequests.length})
+            <TabsTrigger value="pending" className="text-xs sm:text-sm py-2 px-1 sm:px-3 flex flex-col sm:flex-row items-center gap-1">
+              <Clock className="w-4 h-4" />
+              <span className="hidden sm:inline">Pending</span> ({pendingRequests.length})
             </TabsTrigger>
-            <TabsTrigger value="add" className="flex-1">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add Friend
+            <TabsTrigger value="add" className="text-xs sm:text-sm py-2 px-1 sm:px-3 flex flex-col sm:flex-row items-center gap-1">
+              <UserPlus className="w-4 h-4" />
+              <span>Add</span>
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="h-[400px] mt-4">
+          <ScrollArea className="h-[50vh] sm:h-[400px] mt-4">
             <TabsContent value="all" className="space-y-2 mt-0">
               {loading ? (
                 <div className="space-y-2">
@@ -228,30 +227,23 @@ export default function FriendsDialog() {
                       exit={{ opacity: 0, y: -20 }}
                       className="glass-card p-3 rounded-lg"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <UserAvatar
-                            src={friend.friend?.photoURL || ''}
-                            fallback={(friend.friend?.displayName || friend.friend?.email || 'U').substring(0, 2).toUpperCase()}
-                            status={friend.friend?.lastSeen === 'online' ? 'online' : 'offline'}
-                          />
-                          <div>
-                            <p className="font-medium">
-                              {friend.friend?.displayName || friend.friend?.name || 'User'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{friend.friend?.email}</p>
-                            {friend.friend?.customStatus && (
-                              <p className="text-xs text-muted-foreground italic mt-1">
-                                {friend.friend?.customStatus}
-                              </p>
-                            )}
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          src={friend.friend?.photoURL || ''}
+                          fallback={(friend.friend?.displayName || friend.friend?.email || 'U').substring(0, 2).toUpperCase()}
+                          status={friend.friend?.lastSeen === 'online' ? 'online' : 'offline'}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {friend.friend?.displayName || friend.friend?.name || 'User'}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{friend.friend?.email}</p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 shrink-0">
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="text-primary"
+                            size="icon"
+                            className="h-8 w-8 text-primary"
                             onClick={() => {
                               if (friend.friend?.id) {
                                 router.push(`/dm/${friend.friend.id}`);
@@ -263,8 +255,8 @@ export default function FriendsDialog() {
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="text-destructive"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
                             onClick={() => handleRemoveFriend(friend.id)}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -299,37 +291,31 @@ export default function FriendsDialog() {
                       exit={{ opacity: 0, y: -20 }}
                       className="glass-card p-3 rounded-lg"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <UserAvatar
-                            src={request.requester?.photoURL || ''}
-                            fallback={(request.requester?.displayName || request.requester?.email || 'U').substring(0, 2).toUpperCase()}
-                          />
-                          <div>
-                            <p className="font-medium">
-                              {request.requester?.displayName || request.requester?.name || 'User'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {request.requester?.email}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Sent {new Date(request.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          src={request.requester?.photoURL || ''}
+                          fallback={(request.requester?.displayName || request.requester?.email || 'U').substring(0, 2).toUpperCase()}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {request.requester?.displayName || request.requester?.name || 'User'}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {request.requester?.email}
+                          </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 shrink-0">
                           <Button
-                            size="sm"
-                            className="bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                            size="icon"
+                            className="h-8 w-8 bg-green-500/20 text-green-400 hover:bg-green-500/30"
                             onClick={() => handleAcceptRequest(request.id)}
                           >
-                            <UserCheck className="w-4 h-4 mr-1" />
-                            Accept
+                            <UserCheck className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="text-destructive"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
                             onClick={() => handleRejectRequest(request.id)}
                           >
                             <UserX className="w-4 h-4" />
