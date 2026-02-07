@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { useAppearance } from '@/store/appearance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +22,7 @@ import ProfileCustomization from '@/components/profile/ProfileCustomization';
 export default function ProfilePage() {
   const { status } = useAuth();
   const { toast } = useToast();
+  const { loadFromDatabase } = useAppearance();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,9 +50,13 @@ export default function ProfilePage() {
 
     const fetchProfile = async () => {
       try {
-        const response = await fetch('/api/profile');
-        if (!response.ok) throw new Error('Failed to fetch profile');
-        const data = await response.json();
+        const [profileResponse, preferencesResponse] = await Promise.all([
+          fetch('/api/profile'),
+          fetch('/api/profile/preferences'),
+        ]);
+
+        if (!profileResponse.ok) throw new Error('Failed to fetch profile');
+        const data = await profileResponse.json();
 
         setDisplayName(data.user.displayName || '');
         setCustomStatus(data.user.customStatus || '');
@@ -62,6 +68,12 @@ export default function ProfilePage() {
           setWebsite(data.profile.website || '');
           setPronouns(data.profile.pronouns || '');
           setBanner(data.profile.banner || '');
+        }
+
+        // Load appearance preferences
+        if (preferencesResponse.ok) {
+          const prefsData = await preferencesResponse.json();
+          loadFromDatabase(prefsData.appearance);
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -78,6 +90,7 @@ export default function ProfilePage() {
     if (status === 'authenticated') {
       fetchProfile();
     }
+  }, [status, router, toast, loadFromDatabase]);
   }, [status, router, toast]);
 
   const handleSaveProfile = async () => {

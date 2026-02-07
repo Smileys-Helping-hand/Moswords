@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS "users_appearance" AS
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "appearance" jsonb DEFAULT NULL;

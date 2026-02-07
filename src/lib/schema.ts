@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, boolean, uuid, uniqueIndex, jsonb } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
@@ -17,6 +17,11 @@ export const users = pgTable('users', {
   themePreference: text('theme_preference').default('obsidian'),
   isPro: boolean('is_pro').notNull().default(false),
   lastSeen: timestamp('last_seen').notNull().defaultNow(),
+  appearance: jsonb('appearance').$type<{
+    theme: 'default' | 'light' | 'cyberpunk' | 'nord';
+    accent: string;
+    density: 'comfy' | 'compact';
+  }>(),
 });
 
 // Accounts table for OAuth providers
