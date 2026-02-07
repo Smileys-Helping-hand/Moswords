@@ -143,7 +143,7 @@ export default function ChatMessages() {
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-6 relative scroll-smooth"
+      className="flex-1 overflow-y-auto p-4 pb-32 space-y-6 relative scroll-smooth"
       onScroll={handleScroll}
     >
       <motion.div 

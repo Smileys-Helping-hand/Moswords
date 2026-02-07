@@ -4,11 +4,50 @@ import { Button } from './ui/button';
 import { ShieldAlert, MoreVertical, Reply } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
+import { format, isToday, isYesterday, parseISO, isValid } from 'date-fns';
 
 interface ChatMessageProps {
   message: Message;
   showAvatar: boolean;
 }
+
+// Helper function to format message timestamp
+const formatMessageTimestamp = (timestamp: any): string => {
+  try {
+    let date: Date | null = null;
+
+    // Handle different timestamp formats
+    if (timestamp?.seconds) {
+      // Firestore timestamp format
+      date = new Date(timestamp.seconds * 1000);
+    } else if (timestamp instanceof Date) {
+      date = timestamp;
+    } else if (typeof timestamp === 'string') {
+      // ISO string format
+      date = parseISO(timestamp);
+    } else if (typeof timestamp === 'number') {
+      // Unix timestamp in milliseconds
+      date = new Date(timestamp);
+    }
+
+    // Validate the date
+    if (!date || !isValid(date)) {
+      return 'Just now';
+    }
+
+    // Format based on recency
+    if (isToday(date)) {
+      return `Today at ${format(date, 'h:mm a')}`;
+    } else if (isYesterday(date)) {
+      return `Yesterday at ${format(date, 'h:mm a')}`;
+    } else {
+      return format(date, 'MMM d, yyyy, h:mm a');
+    }
+  } catch (error) {
+    console.error('Error formatting timestamp:', error);
+    return 'Just now';
+  }
+};
 
 export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -28,7 +67,7 @@ export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
                 {showAvatar && (
                     <div className="flex items-baseline gap-2">
                         <p className="font-semibold text-primary">{message.author.displayName}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(message.timestamp?.seconds * 1000).toLocaleTimeString()}</p>
+                        <p className="text-xs text-muted-foreground">{formatMessageTimestamp(message.timestamp)}</p>
                     </div>
                 )}
                 <motion.div 
@@ -71,7 +110,7 @@ export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
         {showAvatar && (
           <div className="flex items-baseline gap-2">
             <p className="font-semibold text-primary hover:underline cursor-pointer">{message.author.displayName}</p>
-            <p className="text-xs text-muted-foreground">{new Date(message.timestamp?.seconds * 1000).toLocaleTimeString()}</p>
+            <p className="text-xs text-muted-foreground">{formatMessageTimestamp(message.timestamp)}</p>
           </div>
         )}
         <p className="text-base text-foreground/90">{message.content}</p>
