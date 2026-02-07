@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const useSecureCookies = isProduction;
+const sameSitePolicy = isProduction ? 'none' : 'lax';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 
 export const authOptions: NextAuthOptions = {
@@ -86,7 +87,7 @@ export const authOptions: NextAuthOptions = {
       name: `${cookiePrefix}next-auth.session-token`,
       options: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: sameSitePolicy,
         path: '/',
         secure: useSecureCookies,
       },
@@ -95,7 +96,7 @@ export const authOptions: NextAuthOptions = {
       name: `${cookiePrefix}next-auth.callback-url`,
       options: {
         httpOnly: false,
-        sameSite: 'lax',
+        sameSite: sameSitePolicy,
         path: '/',
         secure: useSecureCookies,
       },
@@ -104,7 +105,7 @@ export const authOptions: NextAuthOptions = {
       name: `next-auth.csrf-token`,
       options: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: sameSitePolicy,
         path: '/',
         secure: useSecureCookies,
       },

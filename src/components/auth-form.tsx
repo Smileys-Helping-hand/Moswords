@@ -64,19 +64,13 @@ export default function AuthForm() {
       });
 
       // Auto sign in after successful signup
-      const result = await signIn('credentials', {
+      await signIn('credentials', {
         email,
         password,
-        redirect: false,
+        redirect: true,
+        callbackUrl: '/',
       });
-
-      if (result?.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Sign in failed',
-          description: 'Account created but failed to sign in. Please try signing in manually.',
-        });
-      }
+      return;
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -92,26 +86,13 @@ export default function AuthForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      const result = await signIn('credentials', {
+      await signIn('credentials', {
         email,
         password,
-        redirect: false,
+        redirect: true,
+        callbackUrl: '/',
       });
-
-      console.log('Sign in result:', result);
-
-      if (result?.error) {
-        throw new Error(result.error);
-      }
-
-      if (result?.ok) {
-        toast({
-          title: 'Success!',
-          description: 'You have been signed in.',
-        });
-        // Redirect to home page
-        window.location.href = '/';
-      }
+      return;
     } catch (error: any) {
       console.error('Sign in error:', error);
       toast({
