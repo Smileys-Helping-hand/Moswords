@@ -91,7 +91,6 @@ export default function ProfilePage() {
       fetchProfile();
     }
   }, [status, router, toast, loadFromDatabase]);
-  }, [status, router, toast]);
 
   const handleSaveProfile = async () => {
     setSaving(true);
