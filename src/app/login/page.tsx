@@ -6,7 +6,7 @@ import { MoswordsIcon } from '@/components/icons';
 
 export default function LoginPage() {
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 p-4 relative overflow-hidden">
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 p-4 relative pb-24 md:pb-0">
             {/* Animated background elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <motion.div 

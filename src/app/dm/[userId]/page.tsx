@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { Send, ArrowLeft, Archive, MoreVertical, Loader2 } from 'lucide-react';
+import { Send, ArrowLeft, Archive, MoreVertical, Loader2, Phone, Video } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
@@ -242,19 +242,37 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           )}
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="w-5 h-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="glass-card border-white/20">
-            <DropdownMenuItem onClick={handleArchive}>
-              <Archive className="w-4 h-4 mr-2" />
-              Archive Conversation
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/call?room=dm-${userId}&type=voice`)}
+            aria-label="Start voice call"
+          >
+            <Phone className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/call?room=dm-${userId}&type=video`)}
+            aria-label="Start video call"
+          >
+            <Video className="w-5 h-5" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-card border-white/20">
+              <DropdownMenuItem onClick={handleArchive}>
+                <Archive className="w-4 h-4 mr-2" />
+                Archive Conversation
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </motion.header>
 
       {/* Messages */}

@@ -17,6 +17,10 @@ export async function GET() {
 
     const userId = (session.user as any).id;
 
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID not found in session' }, { status: 401 });
+    }
+
     const [user] = await db
       .select({
         id: users.id,
@@ -29,10 +33,22 @@ export async function GET() {
       .from(users)
       .where(eq(users.id, userId));
 
-    const [profile] = await db
-      .select()
-      .from(userProfiles)
-      .where(eq(userProfiles.userId, userId));
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Try to get profile, but don't fail if table doesn't exist
+    let profile = null;
+    try {
+      const profiles = await db
+        .select()
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId));
+      profile = profiles[0] || null;
+    } catch (profileError) {
+      // userProfiles table might not exist in production yet
+      console.warn('Could not fetch user profile:', profileError);
+    }
 
     return NextResponse.json({ user, profile });
   } catch (error) {

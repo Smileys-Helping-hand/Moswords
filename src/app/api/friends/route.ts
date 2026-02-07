@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = (session.user as any).id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status'); // 'accepted', 'pending', 'blocked'
 
@@ -27,70 +32,83 @@ export async function GET(request: NextRequest) {
     }
 
     // Get friends where current user is userId
-    const userFriends = await db
-      .select({
-        id: friends.id,
-        userId: friends.userId,
-        friendId: friends.friendId,
-        status: friends.status,
-        createdAt: friends.createdAt,
-        friend: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          displayName: users.displayName,
-          photoURL: users.photoURL,
-          customStatus: users.customStatus,
-          lastSeen: users.lastSeen,
-        },
-      })
-      .from(friends)
-      .leftJoin(users, eq(friends.friendId, users.id))
-      .where(and(...whereParts));
+    let userFriends = [];
+    let reverseFriends = [];
+    let pendingRequests = [];
 
-    // Also get friends where current user is friendId (accepted friendships)
-    const reverseFriends = await db
-      .select({
-        id: friends.id,
-        userId: friends.userId,
-        friendId: friends.friendId,
-        status: friends.status,
-        createdAt: friends.createdAt,
-        friend: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          displayName: users.displayName,
-          photoURL: users.photoURL,
-          customStatus: users.customStatus,
-          lastSeen: users.lastSeen,
-        },
-      })
-      .from(friends)
-      .leftJoin(users, eq(friends.userId, users.id))
-      .where(and(eq(friends.friendId, userId), eq(friends.status, 'accepted')));
+    try {
+      userFriends = await db
+        .select({
+          id: friends.id,
+          userId: friends.userId,
+          friendId: friends.friendId,
+          status: friends.status,
+          createdAt: friends.createdAt,
+          friend: {
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            displayName: users.displayName,
+            photoURL: users.photoURL,
+            customStatus: users.customStatus,
+            lastSeen: users.lastSeen,
+          },
+        })
+        .from(friends)
+        .leftJoin(users, eq(friends.friendId, users.id))
+        .where(and(...whereParts));
 
-    // Also get pending requests sent to this user
-    const pendingRequests = await db
-      .select({
-        id: friends.id,
-        userId: friends.userId,
-        friendId: friends.friendId,
-        status: friends.status,
-        createdAt: friends.createdAt,
-        requester: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          displayName: users.displayName,
-          photoURL: users.photoURL,
-          customStatus: users.customStatus,
-          lastSeen: users.lastSeen,
-        },
-      })
-      .from(friends)
-      .leftJoin(users, eq(friends.userId, users.id))
-      .where(and(eq(friends.friendId, userId), eq(friends.status, 'pending')));
+      // Also get friends where current user is friendId (accepted friendships)
+      reverseFriends = await db
+        .select({
+          id: friends.id,
+          userId: friends.userId,
+          friendId: friends.friendId,
+          status: friends.status,
+          createdAt: friends.createdAt,
+          friend: {
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            displayName: users.displayName,
+            photoURL: users.photoURL,
+            customStatus: users.customStatus,
+            lastSeen: users.lastSeen,
+          },
+        })
+        .from(friends)
+        .leftJoin(users, eq(friends.userId, users.id))
+        .where(and(eq(friends.friendId, userId), eq(friends.status, 'accepted')));
+
+      // Also get pending requests sent to this user
+      pendingRequests = await db
+        .select({
+          id: friends.id,
+          userId: friends.userId,
+          friendId: friends.friendId,
+          status: friends.status,
+          createdAt: friends.createdAt,
+          requester: {
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            displayName: users.displayName,
+            photoURL: users.photoURL,
+            customStatus: users.customStatus,
+            lastSeen: users.lastSeen,
+          },
+        })
+        .from(friends)
+        .leftJoin(users, eq(friends.userId, users.id))
+        .where(and(eq(friends.friendId, userId), eq(friends.status, 'pending')));
+    } catch (dbError) {
+      console.error('Database error fetching friends:', dbError);
+      // Return empty arrays if friends table doesn't exist or has issues
+      return NextResponse.json({ 
+        friends: [],
+        pendingRequests: [],
+      });
+    }
 
     // Merge and dedupe - for reverse friends, swap to make current user the "owner"
     const allFriends = [
@@ -111,7 +129,7 @@ export async function GET(request: NextRequest) {
 
     const uniqueByRequesterId = new Map<string, (typeof pendingRequests)[number]>();
     for (const row of pendingRequests) {
-      const key = row.requester?.id ?? row.userId;
+      const key = (row as any).requester?.id ?? row.userId;
       if (!uniqueByRequesterId.has(key)) uniqueByRequesterId.set(key, row);
     }
 
@@ -138,7 +156,19 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = (session.user as any).id;
-    const { friendId } = await request.json();
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 401 });
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    const { friendId } = body;
 
     if (!friendId) {
       return NextResponse.json(
@@ -154,6 +184,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if the friend user exists
+    const [targetUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, friendId));
+
+    if (!targetUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
     // Check if friendship already exists
     const existingFriendship = await db
       .select()
@@ -166,10 +209,23 @@ export async function POST(request: NextRequest) {
       );
 
     if (existingFriendship.length > 0) {
-      return NextResponse.json(
-        { error: 'Friendship already exists or pending' },
-        { status: 400 }
-      );
+      const existing = existingFriendship[0];
+      if (existing.status === 'pending') {
+        return NextResponse.json(
+          { error: 'Friend request already pending' },
+          { status: 400 }
+        );
+      } else if (existing.status === 'accepted') {
+        return NextResponse.json(
+          { error: 'Already friends with this user' },
+          { status: 400 }
+        );
+      } else {
+        return NextResponse.json(
+          { error: 'Friendship already exists' },
+          { status: 400 }
+        );
+      }
     }
 
     // Create friend request
@@ -180,24 +236,31 @@ export async function POST(request: NextRequest) {
         friendId,
         status: 'pending',
       })
-      // requires a unique constraint on (user_id, friend_id) to be fully effective
-      .onConflictDoNothing()
       .returning();
 
     if (inserted.length === 0) {
       return NextResponse.json(
-        { error: 'Friendship already exists or pending' },
-        { status: 400 }
+        { error: 'Failed to create friend request' },
+        { status: 500 }
       );
     }
 
     const [newFriendship] = inserted;
 
     return NextResponse.json({ friendship: newFriendship }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating friend request:', error);
+    
+    // Check for unique constraint violation
+    if (error?.code === '23505' || error?.message?.includes('unique')) {
+      return NextResponse.json(
+        { error: 'Friend request already exists' },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to send friend request' },
+      { error: 'Failed to send friend request. Please try again.' },
       { status: 500 }
     );
   }

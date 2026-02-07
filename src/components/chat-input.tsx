@@ -256,7 +256,7 @@ export default function ChatInput() {
       >
         <div className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 md:gap-1 z-10 pointer-events-auto">
           {/* Plus/attachment button - triggers file picker */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="hidden sm:block pointer-events-auto">
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
             <Button 
               variant="ghost" 
               size="icon" 

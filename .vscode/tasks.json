@@ -10,6 +10,20 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Run Next.js app (3001)",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"next",
+				"dev",
+				"-p",
+				"3001"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

@@ -175,6 +175,7 @@ function ThreadSummary() {
 
 export default function ChatHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [serverId, setServerId] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -250,11 +251,20 @@ export default function ChatHeader() {
             />
           </div>
           
-          {/* Video call button - hidden on mobile */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
+          {/* Video call button */}
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:text-primary hover:bg-white/10"
+                  onClick={() => {
+                    if (!serverId || !channelId) return;
+                    const url = `/call?serverId=${serverId}&channelId=${channelId}&type=video`;
+                    router.push(url);
+                  }}
+                >
                   <Video className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
@@ -264,11 +274,20 @@ export default function ChatHeader() {
             </Tooltip>
           </motion.div>
           
-          {/* Voice call button - hidden on mobile */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
+          {/* Voice call button */}
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:text-primary hover:bg-white/10"
+                  onClick={() => {
+                    if (!serverId || !channelId) return;
+                    const url = `/call?serverId=${serverId}&channelId=${channelId}&type=voice`;
+                    router.push(url);
+                  }}
+                >
                   <Phone className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>

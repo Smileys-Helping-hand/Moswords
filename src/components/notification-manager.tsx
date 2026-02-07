@@ -38,6 +38,17 @@ export default function NotificationManager() {
 
   const currentUserId = session?.user ? (session.user as any).id : null;
 
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission();
+      } catch (e) {
+        // ignore permission errors
+      }
+    }
+  }, []);
+
   /**
    * Check if user is currently viewing a specific channel/conversation
    */
@@ -124,6 +135,41 @@ export default function NotificationManager() {
         : message.content,
       duration: 5000,
     });
+
+    // Show system notification when possible (helps on mobile)
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        const body = message.content.length > 140
+          ? `${message.content.substring(0, 140)}...`
+          : message.content;
+        const tag = `msg-${message.id}`;
+        const payload = {
+          body,
+          icon: '/icon-192.png',
+          tag,
+          data: {
+            url: message.channelId
+              ? `/channels/${message.channelId}`
+              : message.groupChatId
+                ? `/group/${message.groupChatId}`
+                : message.senderId
+                  ? `/dm/${message.senderId}`
+                  : '/',
+          },
+        } as NotificationOptions;
+
+        // Prefer service worker notification if available
+        if (navigator.serviceWorker?.ready) {
+          navigator.serviceWorker.ready.then((reg) => {
+            reg.showNotification(notificationTitle, payload);
+          }).catch(() => {
+            new Notification(notificationTitle, payload);
+          });
+        } else {
+          new Notification(notificationTitle, payload);
+        }
+      }
+    }
   }, [currentUserId, isViewingChannel, toast, addUnread]);
 
   /**
@@ -168,6 +214,8 @@ export default function NotificationManager() {
   useEffect(() => {
     if (!currentUserId) return;
 
+    requestNotificationPermission();
+
     // Initial check
     checkForNewMessages();
 
@@ -179,7 +227,7 @@ export default function NotificationManager() {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [currentUserId, checkForNewMessages]);
+  }, [currentUserId, checkForNewMessages, requestNotificationPermission]);
 
   /**
    * Update last checked time when pathname changes (user navigates)

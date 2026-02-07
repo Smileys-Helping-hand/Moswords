@@ -65,7 +65,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="font-body antialiased overflow-x-hidden max-w-full">
+      <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
         <AuthProvider>
           <UnreadProvider>
             {children}
