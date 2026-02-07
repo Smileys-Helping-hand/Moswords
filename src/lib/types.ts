@@ -53,6 +53,8 @@ export interface Message {
   reactions: { emoji: string; count: number; reacted: boolean }[];
   isFlagged?: boolean;
   toxicityReason?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio' | 'file';
 }
 
 export interface Quest {

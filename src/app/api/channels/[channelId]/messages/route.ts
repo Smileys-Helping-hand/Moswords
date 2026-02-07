@@ -22,7 +22,17 @@ export async function GET(
     // Get messages with user info
     const channelMessages = await db
       .select({
-        message: messages,
+        message: {
+          id: messages.id,
+          content: messages.content,
+          channelId: messages.channelId,
+          userId: messages.userId,
+          mediaUrl: messages.mediaUrl,
+          mediaType: messages.mediaType,
+          createdAt: messages.createdAt,
+          updatedAt: messages.updatedAt,
+          deleted: messages.deleted,
+        },
         user: {
           id: users.id,
           name: users.name,
@@ -61,7 +71,7 @@ export async function POST(
 
     const userId = (session.user as any).id;
     const { channelId } = await context.params;
-    const { content } = await request.json();
+    const { content, mediaUrl, mediaType } = await request.json();
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
@@ -70,40 +80,53 @@ export async function POST(
       );
     }
 
-    // AI moderation (fail-open handled by API)
-    try {
-      const baseUrl = request.nextUrl.origin;
-      const modRes = await fetch(`${baseUrl}/api/ai/moderate-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // forward cookies for session auth on internal fetch
-          cookie: request.headers.get('cookie') ?? '',
-        },
-        body: JSON.stringify({ text: content.trim() }),
-      });
-      if (modRes.ok) {
-        const mod = await modRes.json();
-        if (mod?.isToxic) {
-          return NextResponse.json(
-            { error: 'Message flagged by auto-moderation', toxicityReason: mod.toxicityReason },
-            { status: 400 }
-          );
+    // Skip AI moderation for media messages (they just have placeholder text)
+    if (!mediaUrl) {
+      // AI moderation (fail-open handled by API)
+      try {
+        const baseUrl = request.nextUrl.origin;
+        const modRes = await fetch(`${baseUrl}/api/ai/moderate-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // forward cookies for session auth on internal fetch
+            cookie: request.headers.get('cookie') ?? '',
+          },
+          body: JSON.stringify({ text: content.trim() }),
+        });
+        if (modRes.ok) {
+          const mod = await modRes.json();
+          if (mod?.isToxic) {
+            return NextResponse.json(
+              { error: 'Message flagged by auto-moderation', toxicityReason: mod.toxicityReason },
+              { status: 400 }
+            );
+          }
         }
+      } catch {
+        // fail open
       }
-    } catch {
-      // fail open
     }
 
-    // Create message
+    // Create message with optional media fields
     const [newMessage] = await db
       .insert(messages)
       .values({
         content: content.trim(),
         channelId,
         userId,
+        ...(mediaUrl && { mediaUrl }),
+        ...(mediaType && { mediaType }),
       })
-      .returning();
+      .returning({
+        id: messages.id,
+        content: messages.content,
+        channelId: messages.channelId,
+        userId: messages.userId,
+        mediaUrl: messages.mediaUrl,
+        mediaType: messages.mediaType,
+        createdAt: messages.createdAt,
+      });
 
     return NextResponse.json({ message: newMessage }, { status: 201 });
   } catch (error) {

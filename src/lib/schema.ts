@@ -91,6 +91,8 @@ export const messages = pgTable('messages', {
   content: text('content').notNull(),
   channelId: uuid('channel_id').notNull().references(() => channels.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mediaUrl: text('media_url'),
+  mediaType: text('media_type'), // 'image', 'video', 'audio', 'file'
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deleted: boolean('deleted').notNull().default(false),
@@ -102,6 +104,8 @@ export const directMessages = pgTable('direct_messages', {
   content: text('content').notNull(),
   senderId: uuid('sender_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   receiverId: uuid('receiver_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mediaUrl: text('media_url'),
+  mediaType: text('media_type'), // 'image', 'video', 'audio', 'file'
   createdAt: timestamp('created_at').notNull().defaultNow(),
   read: boolean('read').notNull().default(false),
   archived: boolean('archived').notNull().default(false),
@@ -161,6 +165,8 @@ export const groupChatMessages = pgTable('group_chat_messages', {
   content: text('content').notNull(),
   groupChatId: uuid('group_chat_id').notNull().references(() => groupChats.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mediaUrl: text('media_url'),
+  mediaType: text('media_type'), // 'image', 'video', 'audio', 'file'
   createdAt: timestamp('created_at').notNull().defaultNow(),
   deleted: boolean('deleted').notNull().default(false),
 });

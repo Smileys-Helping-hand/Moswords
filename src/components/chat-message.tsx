@@ -1,10 +1,16 @@
 import type { Message } from '@/lib/types';
 import UserAvatar from './user-avatar';
 import { Button } from './ui/button';
-import { ShieldAlert, MoreVertical, Reply } from 'lucide-react';
+import { ShieldAlert, MoreVertical, Reply, X, ZoomIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { format, isToday, isYesterday, parseISO, isValid } from 'date-fns';
+import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from './ui/dialog';
 
 interface ChatMessageProps {
   message: Message;
@@ -113,7 +119,80 @@ export default function ChatMessage({ message, showAvatar }: ChatMessageProps) {
             <p className="text-xs text-muted-foreground">{formatMessageTimestamp(message.timestamp)}</p>
           </div>
         )}
-        <p className="text-base text-foreground/90">{message.content}</p>
+        
+        {/* Media content */}
+        {message.mediaUrl && message.mediaType === 'image' && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <motion.div 
+                className="relative mt-2 rounded-lg overflow-hidden cursor-pointer group max-w-md"
+                whileHover={{ scale: 1.01 }}
+              >
+                <Image
+                  src={message.mediaUrl}
+                  alt="Shared image"
+                  width={400}
+                  height={300}
+                  className="rounded-lg object-cover w-full h-auto max-h-80"
+                  unoptimized
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <ZoomIn className="w-8 h-8 text-white" />
+                </div>
+              </motion.div>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
+              <Image
+                src={message.mediaUrl}
+                alt="Shared image"
+                width={1200}
+                height={800}
+                className="rounded-lg object-contain w-full max-h-[90vh]"
+                unoptimized
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+        
+        {message.mediaUrl && message.mediaType === 'video' && (
+          <div className="mt-2 max-w-md">
+            <video
+              src={message.mediaUrl}
+              controls
+              className="rounded-lg w-full max-h-80"
+              preload="metadata"
+            />
+          </div>
+        )}
+        
+        {message.mediaUrl && message.mediaType === 'audio' && (
+          <div className="mt-2 max-w-md">
+            <audio
+              src={message.mediaUrl}
+              controls
+              className="w-full"
+              preload="metadata"
+            />
+          </div>
+        )}
+        
+        {message.mediaUrl && message.mediaType === 'file' && (
+          <a 
+            href={message.mediaUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg glass-card hover:bg-white/10 transition-colors"
+          >
+            <span className="text-2xl">📎</span>
+            <span className="text-sm text-primary hover:underline">Download file</span>
+          </a>
+        )}
+        
+        {/* Text content - hide placeholder text for media messages */}
+        {(!message.mediaUrl || !['📷 Image', '🎬 Video', '🎵 Audio', '📎 File'].includes(message.content)) && (
+          <p className="text-base text-foreground/90">{message.content}</p>
+        )}
+        
         <AnimatePresence>
           {message.reactions && message.reactions.length > 0 && (
             <motion.div 

@@ -198,6 +198,8 @@ export default function ChatMessages() {
                 },
                 reactions: [],
                 isFlagged: false,
+                mediaUrl: msg.message.mediaUrl || undefined,
+                mediaType: msg.message.mediaType as 'image' | 'video' | 'audio' | 'file' | undefined,
               }}
               showAvatar={showAvatar}
             />

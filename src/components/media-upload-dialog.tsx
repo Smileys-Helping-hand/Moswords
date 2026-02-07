@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, X, Image as ImageIcon, File, Video } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, File, Video, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from './ui/button';
 import {
@@ -16,14 +16,21 @@ import {
 import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
+import { useToast } from '@/hooks/use-toast';
 
-export default function MediaUploadDialog() {
+interface MediaUploadDialogProps {
+  onUploadComplete?: (url: string, type: 'image' | 'video' | 'audio' | 'file') => void;
+}
+
+export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [optimized, setOptimized] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -43,18 +50,51 @@ export default function MediaUploadDialog() {
     if (!file) return;
 
     setUploading(true);
+    setProgress(10);
     
-    // Simulate upload progress
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setProgress(i);
-    }
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-    // TODO: Implement actual upload to Firebase Storage
-    
-    setUploading(false);
-    setIsOpen(false);
-    resetState();
+      setProgress(30);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      setProgress(80);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      setProgress(100);
+
+      toast({
+        title: 'Upload complete!',
+        description: 'Your file has been uploaded successfully.',
+      });
+
+      // Call the callback with the URL and type
+      if (onUploadComplete) {
+        onUploadComplete(data.url, data.type);
+      }
+
+      setIsOpen(false);
+      resetState();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload file. Please try again.',
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const resetState = () => {
