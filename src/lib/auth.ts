@@ -31,7 +31,13 @@ export const authOptions: NextAuthOptions = {
           }
 
           const [user] = await db
-            .select()
+            .select({
+              id: users.id,
+              email: users.email,
+              password: users.password,
+              displayName: users.displayName,
+              photoURL: users.photoURL,
+            })
             .from(users)
             .where(eq(users.email, credentials.email))
             .limit(1);

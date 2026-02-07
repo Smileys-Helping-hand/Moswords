@@ -18,7 +18,14 @@ export async function GET() {
     const userId = (session.user as any).id;
 
     const [user] = await db
-      .select()
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        displayName: users.displayName,
+        photoURL: users.photoURL,
+        customStatus: users.customStatus,
+      })
       .from(users)
       .where(eq(users.id, userId));
 
