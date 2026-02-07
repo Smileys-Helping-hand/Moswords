@@ -192,42 +192,42 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-primary/5 p-8">
+    <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-primary/5 p-4 md:p-8 pb-24 md:pb-8">
       <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6 md:mb-8"
         >
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-3 md:gap-4 mb-4">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.push('/')}
-              className="hover:bg-white/10"
+              className="hover:bg-white/10 shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
-              <h1 className="text-4xl font-bold text-gradient">Profile Settings</h1>
-              <p className="text-muted-foreground">Manage your account and customize your experience</p>
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-4xl font-bold text-gradient truncate">Profile Settings</h1>
+              <p className="text-sm md:text-base text-muted-foreground truncate">Manage your account</p>
             </div>
           </div>
         </motion.div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="glass-card">
-            <TabsTrigger value="profile" className="gap-2">
+        <Tabs defaultValue="profile" className="space-y-4 md:space-y-6">
+          <TabsList className="glass-card grid grid-cols-3 w-full">
+            <TabsTrigger value="profile" className="gap-1 md:gap-2 text-xs md:text-sm">
               <User className="w-4 h-4" />
-              Profile
+              <span className="hidden xs:inline">Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="security" className="gap-2">
+            <TabsTrigger value="security" className="gap-1 md:gap-2 text-xs md:text-sm">
               <Lock className="w-4 h-4" />
-              Security
+              <span className="hidden xs:inline">Security</span>
             </TabsTrigger>
-            <TabsTrigger value="appearance" className="gap-2">
+            <TabsTrigger value="appearance" className="gap-1 md:gap-2 text-xs md:text-sm">
               <Palette className="w-4 h-4" />
-              Appearance
+              <span className="hidden xs:inline">Appearance</span>
             </TabsTrigger>
           </TabsList>
 
@@ -293,7 +293,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="location">Location</Label>
                     <Input

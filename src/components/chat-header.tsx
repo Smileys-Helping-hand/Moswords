@@ -1,6 +1,6 @@
 "use client"
 
-import { Hash, Pin, Users, Sparkles, Video, Phone } from 'lucide-react';
+import { Hash, Pin, Users, Sparkles, Video, Phone, Server } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -21,10 +21,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { useState, useEffect } from 'react';
 import { Skeleton } from './ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import MemberSidebar from './member-sidebar';
+import UserAvatar from './user-avatar';
 
 interface Channel {
   id: string;
@@ -287,22 +297,32 @@ export default function ChatHeader() {
             </Tooltip>
           </motion.div>
           
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          {/* Member List - Sheet on mobile, tooltip on desktop */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
                 <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
                   <Users className="w-5 h-5" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Member List</p>
-              </TooltipContent>
-            </Tooltip>
-          </motion.div>
+              </motion.div>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-72 p-0 glass-panel border-l border-white/10">
+              <SheetHeader className="p-4 border-b border-white/10">
+                <SheetTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  Members
+                </SheetTitle>
+                <SheetDescription>
+                  Server members and their status
+                </SheetDescription>
+              </SheetHeader>
+              <div className="h-[calc(100vh-100px)] overflow-y-auto">
+                <MemberSidebar />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </TooltipProvider>
     </motion.header>
   );
 }
-
-    

@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/user-avatar';
-import { Loader2, MessageSquare, ArrowLeft, Users } from 'lucide-react';
+import { Loader2, MessageSquare, ArrowLeft, Users, UserPlus, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import CreateGroupChatDialog from '@/components/create-group-chat-dialog';
 import FriendsDialog from '@/components/friends-dialog';
+import AddContactDialog from '@/components/add-contact-dialog';
 
 type Conversation = {
   otherUserId: string;
@@ -94,39 +96,45 @@ export default function DMInboxPage() {
 
   return (
     <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 overflow-x-hidden">
+      {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-white/10 p-3 md:p-4 flex items-center justify-between shrink-0"
+        className="glass-panel border-b border-white/10 p-3 shrink-0"
       >
-        <div className="flex items-center gap-2 md:gap-3 min-w-0">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="shrink-0">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            <MessageSquare className="w-5 h-5 text-primary shrink-0" />
-            <h1 className="font-semibold text-base md:text-lg truncate">Messages</h1>
+            <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="shrink-0 w-9 h-9">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-2 min-w-0">
+              <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+              <h1 className="font-bold text-lg truncate">Messages</h1>
+            </div>
           </div>
         </div>
-        <div className="flex gap-1 md:gap-2 shrink-0">
+        
+        {/* Action Buttons - More prominent on mobile */}
+        <div className="flex gap-2">
           <FriendsDialog />
+          <AddContactDialog />
           <CreateGroupChatDialog />
         </div>
       </motion.header>
 
       <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <TabsList className="mx-3 md:mx-4 mt-3 md:mt-4 shrink-0">
-          <TabsTrigger value="dms" className="flex-1 text-xs md:text-sm">
-            <MessageSquare className="w-4 h-4 mr-1 md:mr-2" />
-            <span className="hidden xs:inline">Direct </span>Messages
+        <TabsList className="mx-3 mt-3 shrink-0 grid grid-cols-2 h-11">
+          <TabsTrigger value="dms" className="text-sm font-medium">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Messages
           </TabsTrigger>
-          <TabsTrigger value="groups" className="flex-1 text-xs md:text-sm">
-            <Users className="w-4 h-4 mr-1 md:mr-2" />
+          <TabsTrigger value="groups" className="text-sm font-medium">
+            <Users className="w-4 h-4 mr-2" />
             Groups ({groupChats.length})
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 p-3 md:p-4 pb-24 md:pb-4 smooth-scroll">
+        <ScrollArea className="flex-1 p-3 pb-24 md:pb-4 smooth-scroll">
           <TabsContent value="dms" className="mt-0">
             <div className="max-w-3xl mx-auto space-y-2">
               {conversations.length === 0 ? (

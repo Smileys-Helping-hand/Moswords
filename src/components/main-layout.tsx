@@ -4,6 +4,7 @@ import ChatHeader from './chat-header';
 import ChatMessages from './chat-messages';
 import ChatInput from './chat-input';
 import MemberSidebar from './member-sidebar';
+import MobileServerPicker from './mobile-server-picker';
 
 export default function MainLayout() {
   return (
@@ -16,6 +17,9 @@ export default function MainLayout() {
       </div>
       
       <div className="relative z-10 flex w-full overflow-x-hidden">
+        {/* Mobile Server Picker - Only on mobile */}
+        <MobileServerPicker />
+        
         {/* Server Sidebar - Hidden on mobile */}
         <div className="hidden md:flex">
           <ServerSidebar />
