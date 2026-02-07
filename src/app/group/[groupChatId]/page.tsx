@@ -15,46 +15,19 @@ import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-primary"
-            onClick={() => router.push(`/call?room=group-${groupChatId}&type=voice`)}
-            aria-label="Start voice call"
-          >
-            <Phone className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-primary"
-            onClick={() => router.push(`/call?room=group-${groupChatId}&type=video`)}
-            aria-label="Start video call"
-          >
-            <Video className="w-5 h-5" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Settings className="w-5 h-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="glass-card border-white/20">
-              <DropdownMenuItem onClick={() => setShowMembers(true)}>
-                <Users className="w-4 h-4 mr-2" />
-                View Members
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowAddMember(true)}>
-                <Users className="w-4 h-4 mr-2" />
-                Add Members
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLeaveGroup}>
-                Leave Group
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface Message {
+  id: string;
+  content: string;
+  userId: string;
+  groupChatId: string;
+  createdAt: Date;
+  deleted: boolean;
+  sender?: {
+    id: string;
     email: string;
     name: string | null;
     displayName: string | null;
