@@ -1,3 +1,55 @@
+/***** THEME VARIABLES *****/
+:root {
+  /* Deep Space (Default) */
+  --color-bg: #030014;
+  --color-bg-secondary: #18132a;
+  --color-fg: #f5f5fa;
+  --color-accent: #a259ff;
+  --color-accent-secondary: #00f0ff;
+  --color-danger: #ff3b3b;
+  --color-success: #00e676;
+  --color-border: #2a2340;
+  --color-card: #18132a;
+  --radius-lg: 1.25rem;
+  --radius-md: 0.75rem;
+  --radius-sm: 0.375rem;
+  --blur-amount: 24px;
+}
+.theme-light {
+  --color-bg: #f8f9fb;
+  --color-bg-secondary: #fff;
+  --color-fg: #18132a;
+  --color-accent: #a259ff;
+  --color-accent-secondary: #00f0ff;
+  --color-danger: #e53935;
+  --color-success: #43a047;
+  --color-border: #e0e0e0;
+  --color-card: #fff;
+}
+.theme-cyberpunk {
+  --color-bg: #000;
+  --color-bg-secondary: #1a0033;
+  --color-fg: #fff600;
+  --color-accent: #ff00c8;
+  --color-accent-secondary: #fff600;
+  --color-danger: #ff3b3b;
+  --color-success: #00ffae;
+  --color-border: #ff00c8;
+  --color-card: #1a0033;
+}
+.theme-nord {
+  --color-bg: #2e3440;
+  --color-bg-secondary: #3b4252;
+  --color-fg: #eceff4;
+  --color-accent: #88c0d0;
+  --color-accent-secondary: #b48ead;
+  --color-danger: #bf616a;
+  --color-success: #a3be8c;
+  --color-border: #4c566a;
+  --color-card: #434c5e;
+}
+/***** END THEME VARIABLES *****/
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Source+Code+Pro:wght@400;500;600&display=swap');
 
 @tailwind base;

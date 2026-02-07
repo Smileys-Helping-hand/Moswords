@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import UserAvatar from '@/components/user-avatar';
@@ -15,6 +16,7 @@ import Image from 'next/image';
 import { User, Lock, Palette, Loader2, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import ProfileCustomization from '@/components/profile/ProfileCustomization';
 
 export default function ProfilePage() {
   const { status } = useAuth();
@@ -374,37 +376,22 @@ export default function ProfilePage() {
                 <CardDescription>Customize how your profile looks</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="banner">Banner Image URL</Label>
-                  <Input
-                    id="banner"
-                    value={banner}
-                    onChange={(e) => setBanner(e.target.value)}
-                    placeholder="https://example.com/banner.png"
-                    className="glass-card border-white/20"
-                  />
-                  {banner && (
-                    <div className="mt-2 rounded-lg overflow-hidden h-32 bg-white/5">
-                      <Image
-                        src={banner}
-                        alt="Banner preview"
-                        width={1200}
-                        height={320}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <Button
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                  className="w-full bg-gradient-to-r from-primary to-accent"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Save Appearance
-                </Button>
+                <ProfileCustomization
+                  user={{
+                    banner,
+                    avatarFrame: '', // Add avatarFrame if available in your data
+                    bio,
+                    status: customStatus,
+                  }}
+                  onSave={(data: { banner: string; avatarFrame: string; bio: string; status: string }) => {
+                    const { banner: newBanner, avatarFrame, bio: newBio, status: newStatus } = data;
+                    setBanner(newBanner);
+                    setBio(newBio);
+                    setCustomStatus(newStatus);
+                    // Optionally handle avatarFrame
+                    handleSaveProfile();
+                  }}
+                />
               </CardContent>
             </Card>
           </TabsContent>
