@@ -56,6 +56,112 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== MOBILE TOUCH & GESTURE OPTIMIZATION ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Remove 300ms tap delay on mobile */
+  touch-action: manipulation;
+  /* Prevent overscroll bounce on iOS */
+  overscroll-behavior-y: none;
+  /* Safe area support for notch devices (iPhone 12+, Dynamic Island) */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Ensure minimum touch target size (44px = Apple's standard) */
+button,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+select {
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 16px; /* Prevent iOS auto-zoom on input focus */
+}
+
+/* Text input minimum size */
+input,
+textarea,
+select {
+  font-size: 16px; /* Prevent iOS auto-zoom */
+  border-radius: 8px;
+}
+
+/* Prevent text selection on long press */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ===== MOBILE MODAL BOTTOM SHEET STYLING ===== */
+/* Modals slide up from bottom on mobile */
+@media (max-width: 768px) {
+  /* Dialog/Modal bottom sheet animation */
+  [data-radix-dialog-content] {
+    animation: slideUpFromBottom 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important;
+    bottom: 0 !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 90vh !important;
+    margin: 0 !important;
+  }
+
+  /* Modal overlay on mobile */
+  [data-radix-dialog-overlay] {
+    animation: fadeIn 0.3s ease-out !important;
+  }
+
+  .modal-content {
+    border-radius: 20px 20px 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUpFromBottom 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dialog-content {
+    border-radius: 20px 20px 0 0;
+    max-height: 90vh;
+  }
+}
+
+/* Desktop modals stay centered */
+@media (min-width: 769px) {
+  [data-radix-dialog-content] {
+    border-radius: 12px;
+  }
+}
+
+@keyframes slideUpFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes bounce-in {
   0% {
     transform: scale(0.8) translateY(20px);
