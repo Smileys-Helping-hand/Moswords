@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Use native scrolling for better mobile behavior
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
@@ -210,7 +210,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="h-screen w-full flex flex-col min-h-0 bg-gradient-to-br from-background via-background to-primary/5">
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -246,6 +246,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           <Button
             variant="ghost"
             size="icon"
+            className="text-primary"
             onClick={() => router.push(`/call?room=dm-${userId}&type=voice`)}
             aria-label="Start voice call"
           >
@@ -254,6 +255,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           <Button
             variant="ghost"
             size="icon"
+            className="text-primary"
             onClick={() => router.push(`/call?room=dm-${userId}&type=video`)}
             aria-label="Start video call"
           >
@@ -276,7 +278,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       </motion.header>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="space-y-4 max-w-4xl mx-auto">
           {messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -326,7 +328,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           )}
           <div ref={messagesEndRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="glass-panel border-t border-white/10 p-4">

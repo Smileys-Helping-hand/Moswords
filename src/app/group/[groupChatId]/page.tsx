@@ -6,35 +6,55 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Use native scrolling for better mobile behavior
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { Send, ArrowLeft, Users, Settings, Loader2 } from 'lucide-react';
+import { Send, ArrowLeft, Users, Settings, Loader2, Phone, Video } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-
-interface Message {
-  id: string;
-  content: string;
-  userId: string;
-  groupChatId: string;
-  createdAt: Date;
-  deleted: boolean;
-  sender?: {
-    id: string;
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary"
+            onClick={() => router.push(`/call?room=group-${groupChatId}&type=voice`)}
+            aria-label="Start voice call"
+          >
+            <Phone className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary"
+            onClick={() => router.push(`/call?room=group-${groupChatId}&type=video`)}
+            aria-label="Start video call"
+          >
+            <Video className="w-5 h-5" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Settings className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-card border-white/20">
+              <DropdownMenuItem onClick={() => setShowMembers(true)}>
+                <Users className="w-4 h-4 mr-2" />
+                View Members
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowAddMember(true)}>
+                <Users className="w-4 h-4 mr-2" />
+                Add Members
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLeaveGroup}>
+                Leave Group
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
     email: string;
     name: string | null;
     displayName: string | null;
@@ -318,7 +338,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="h-screen w-full flex flex-col min-h-0 bg-gradient-to-br from-background via-background to-primary/5">
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -342,25 +362,45 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Settings className="w-5 h-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setShowMembers(true)}>
-              View Members
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLeaveGroup} className="text-destructive">
-              Leave Group
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary"
+            onClick={() => router.push(`/call?room=group-${groupChatId}&type=voice`)}
+            aria-label="Start voice call"
+          >
+            <Phone className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary"
+            onClick={() => router.push(`/call?room=group-${groupChatId}&type=video`)}
+            aria-label="Start video call"
+          >
+            <Video className="w-5 h-5" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Settings className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowMembers(true)}>
+                View Members
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLeaveGroup} className="text-destructive">
+                Leave Group
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </motion.header>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -394,7 +434,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           )}
           <div ref={messagesEndRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="glass-panel border-t border-white/10 p-4">
