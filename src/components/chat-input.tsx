@@ -111,42 +111,42 @@ export default function ChatInput() {
   };
 
   return (
-    <div className="p-4 glass-panel border-t border-white/10">
+    <div className="p-4 glass-panel border-t border-white/10 relative z-50">
       <motion.div 
         className="relative"
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-            <Button variant="ghost" size="icon" className="h-10 w-10 hover:text-primary">
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10 pointer-events-auto">
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
+            <Button variant="ghost" size="icon" className="h-10 w-10 hover:text-primary pointer-events-auto">
                 <PlusCircle className="w-5 h-5" />
             </Button>
           </motion.div>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
             <MediaUploadDialog />
           </motion.div>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
             <EmojiPicker onEmojiSelect={handleEmojiSelect} />
           </motion.div>
         </div>
         <Input 
           placeholder={`Message #${channelName}`} 
-          className="pl-36 pr-14 h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all" 
+          className="pl-36 pr-14 h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0" 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           disabled={sending || !activeChannelId}
         />
         <motion.div
-          className="absolute right-2 top-1/2 -translate-y-1/2"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
         >
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-10 w-10 text-primary hover:bg-primary/20"
+            className="h-10 w-10 text-primary hover:bg-primary/20 pointer-events-auto"
             onClick={handleSend}
             disabled={sending || !activeChannelId || !message.trim()}
           >
