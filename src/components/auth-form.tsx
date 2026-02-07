@@ -156,7 +156,14 @@ export default function AuthForm() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
-                  <Input id="signin-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+                  <PasswordInput 
+                    id="signin-password" 
+                    required 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    disabled={loading}
+                    showValidation={false}
+                  />
                 </div>
               </CardContent>
               <CardFooter className="flex-col gap-4">
