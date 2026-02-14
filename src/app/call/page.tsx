@@ -343,13 +343,7 @@ export default function CallPage() {
               </motion.div>
             )}
           </div>
-        </motion.  className="px-4 py-2 bg-muted-foreground/10 rounded text-foreground"
-            onClick={toggleVideo}
-          >
-            {videoEnabled ? 'Stop Video' : 'Start Video'}
-          </button>
-          <button className="px-4 py-2 bg-red-600 rounded text-white" onClick={() => router.push('/')}>Leave</button>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

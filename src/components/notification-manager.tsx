@@ -160,14 +160,8 @@ export default function NotificationManager() {
       },
       vibrate: [200, 100, 200],
       requireInteraction: false,
-    });     }).catch(() => {
-            new Notification(notificationTitle, payload);
-          });
-        } else {
-          new Notification(notificationTitle, payload);
-        }
-      }
-    }
+    });
+  }
   }, [currentUserId, isViewingChannel, toast, addUnread]);
 
   /**

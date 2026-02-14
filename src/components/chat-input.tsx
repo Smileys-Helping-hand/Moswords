@@ -102,7 +102,17 @@ export default function ChatInput() {
   const handleFileSelection = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({
-        variant: 'destructive',(e: React.ClipboardEvent) => {
+        variant: 'destructive',
+        title: 'Invalid file type',
+        description: 'Please select an image file.',
+      });
+      return;
+    }
+    uploadImage(file);
+  }, [toast, uploadImage]);
+
+  // Handle paste for images
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 

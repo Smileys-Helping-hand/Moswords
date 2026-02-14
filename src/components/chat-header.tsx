@@ -280,14 +280,12 @@ export default function ChatHeader() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Starten lg:block w-64">
-            <Input
-              placeholder={`Search in #${currentChannel?.name || 'channel'}`}
-              className="glass-card border-white/20 h-9 focus:border-primary transition-all"
-            />
-          </div>
+                <p>Start a video call</p>
+              </TooltipContent>
+            </Tooltip>
+          </motion.div>
           
-          {/* Video call button */}
+          {/* Voice call button */}
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -297,7 +295,7 @@ export default function ChatHeader() {
                   className="hover:text-primary hover:bg-white/10"
                   onClick={() => {
                     if (!serverId || !channelId) return;
-                    const url = `/call?serverId=${serverId}&channelId=${channelId}&type=video`;
+                    const url = `/call?serverId=${serverId}&channelId=${channelId}&type=voice`;
                     router.push(url);
                   }}
                 >
