@@ -334,57 +334,56 @@ export default function ChatInput() {
                 <EmojiPicker onEmojiSelect={handleEmojiSelect} />
               </motion.div>
             </div>
-            <Input 
-          ref={inputRef}
-          placeholder={uploading ? 'Sending...' : imagePreview ? 'Add a caption (optional)' : `Message #${channelName}`} 
-          className="pl-20 sm:pl-28 md:pl-36 pr-12 md:pr-14 h-11 md:h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0 text-sm md:text-base" 
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          onPaste={handlePaste}
-          disabled={uploading || !activeChannelId}
-        />
-        <motion.div
-          className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
-            onClick={handleSend}
-            disabled={uploading || !activeChannelId || (!message.trim() && !imagePreview)}
-          >
-              <SendHorizonal className="w-4 h-4 md:w-5 md:h-5" />
-          </Button>
-        </motion.div>
-        
-        {/* Upload indicator */}
-        <AnimatePresence>
-          {uploading && (
+            <Input
+              ref={inputRef}
+              placeholder={uploading ? 'Sending...' : imagePreview ? 'Add a caption (optional)' : `Message #${channelName}`}
+              className="pl-20 sm:pl-28 md:pl-36 pr-12 md:pr-14 h-11 md:h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0 text-sm md:text-base"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              onPaste={handlePaste}
+              disabled={uploading || !activeChannelId}
+            />
             <motion.div
-              className="mt-2 text-xs text-primary px-2"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
+              className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <span className="flex items-center gap-2">
-                <motion.span
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                >
-                  ⏳
-                </motion.span>
-                Uploading and sending...
-              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
+                onClick={handleSend}
+                disabled={uploading || !activeChannelId || (!message.trim() && !imagePreview)}
+              >
+                <SendHorizonal className="w-4 h-4 md:w-5 md:h-5" />
+              </Button>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+
+          {/* Upload indicator */}
+          <AnimatePresence>
+            {uploading && (
+              <motion.div
+                className="mt-2 text-xs text-primary px-2"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <span className="flex items-center gap-2">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  >
+                    ⏳
+                  </motion.span>
+                  Uploading and sending...
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </form>
+      </div>
     </div>
   );
 }
