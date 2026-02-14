@@ -98,48 +98,6 @@ export default function ChatInput() {
     }
   }, [toast]);
 
-  // Handle file selection (from button or drag & drop)
-  const handleFileSelection = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid file type',
-        description: 'Please select an image file.',
-      });
-      return;
-    }
-    uploadImage(file);
-  }, [toast, uploadImage]);
-
-  // Handle paste for images
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          handleFileSelection(file);
-        }
-        break;
-      }
-    }
-  }, [handleFileSelection]);
-
-  // Handle file input change
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileSelection(file);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  }, [handleFileSelection]);
-
   // Handle paste for images
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
