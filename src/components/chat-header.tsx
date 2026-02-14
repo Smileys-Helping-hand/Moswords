@@ -265,25 +265,49 @@ export default function ChatHeader() {
     setCallToken(null);
     setCallServerUrl(null);
   };
-/Voice call button */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="hover:text-primary hover:bg-white/10"
-                  onClick={handleStartCall}
-                  disabled={isLoadingCall || !channelId}
-                >
-                  <Video className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Start a video call</p>
-              </TooltipContent>
-            </Tooltip>
-          </motion.div>
+
+  return (
+    <>
+      <TooltipProvider>
+        <motion.header
+          className="h-14 border-b border-white/10 flex items-center justify-between px-4 glass-panel relative z-40"
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+        >
+          {/* Left section with channel info */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Hash className="w-5 h-5 text-primary flex-shrink-0" />
+            <h2 className="text-lg font-semibold truncate">
+              {currentChannel?.name || 'Select a channel'}
+            </h2>
+          </div>
+
+          {/* Right section with action buttons */}
+          <div className="flex items-center gap-1 md:gap-2">
+            <ThreadSummary />
+            
+            {/* Video call button */}
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:text-primary hover:bg-white/10"
+                    onClick={() => {
+                      if (!serverId || !channelId) return;
+                      const url = `/call?serverId=${serverId}&channelId=${channelId}&type=video`;
+                      router.push(url);
+                    }}
+                  >
+                    <Video className="w-5 h-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Start Video Call</p>
+                </TooltipContent>
+              </Tooltip>
+            </motion.div>
           
           {/* Voice call button */}
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>

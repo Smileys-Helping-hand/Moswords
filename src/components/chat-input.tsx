@@ -262,14 +262,79 @@ export default function ChatInput() {
 
         {/* Image Preview */}
         <AnimatePresence>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
-            <MediaUploadDialog onUploadComplete={handleMediaUpload} />
+          {imagePreview && (
+            <motion.div
+              className="mb-3 p-3 glass-card rounded-lg border border-primary/30"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white/20 flex-shrink-0">
+                  <Image
+                    src={imagePreview.url}
+                    alt="Preview"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {imagePreview.file.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(imagePreview.file.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400 flex-shrink-0"
+                  onClick={() => setImagePreview(null)}
+                  disabled={uploading}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Upload Progress */}
+        {(uploading || uploadingPaste) && (
+          <motion.div
+            className="mb-3 p-3 glass-card rounded-lg border border-primary/30 flex items-center gap-3"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <span className="text-sm text-foreground">Uploading...</span>
           </motion.div>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
-            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-          </motion.div>
-        </div>
-        <Input 
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+          <div className="relative">
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex gap-1 z-10">
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:text-primary pointer-events-auto"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || !!imagePreview}
+                >
+                  <PlusCircle className="w-4 h-4" />
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
+                <MediaUploadDialog onUploadComplete={handleMediaUpload} />
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
+                <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+              </motion.div>
+            </div>
+            <Input 
           ref={inputRef}
           placeholder={uploading ? 'Sending...' : imagePreview ? 'Add a caption (optional)' : `Message #${channelName}`} 
           className="pl-20 sm:pl-28 md:pl-36 pr-12 md:pr-14 h-11 md:h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0 text-sm md:text-base" 
