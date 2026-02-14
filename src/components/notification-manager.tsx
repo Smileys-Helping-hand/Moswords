@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { soundEngine } from '@/lib/sound-engine';
 import { useUnread } from '@/providers/unread-provider';
+import { notificationService } from '@/lib/notification-service';
 
 interface Message {
   id: string;
@@ -40,12 +41,19 @@ export default function NotificationManager() {
 
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      try {
-        await Notification.requestPermission();
-      } catch (e) {
-        // ignore permission errors
+    
+    // Initialize notification service and request permission
+    try {
+      const granted = await notificationService.initialize();
+      if (granted) {
+        console.log('Notifications enabled');
+        // Send test notification
+        setTimeout(() => {
+          notificationService.sendTestNotification();
+        }, 1000);
       }
+    } catch (error) {
+      console.error('Failed to initialize notifications:', error);
     }
   }, []);
 
@@ -129,40 +137,26 @@ export default function NotificationManager() {
 
     // Show toast notification
     toast({
-      title: notificationTitle,
-      description: message.content.length > 100 
-        ? `${message.content.substring(0, 100)}...` 
+      title: notificationTitle,using notification service
+    notificationService.showNotification(notificationTitle, {
+      body: message.content.length > 140
+        ? `${message.content.substring(0, 140)}...`
         : message.content,
-      duration: 5000,
-    });
-
-    // Show system notification when possible (helps on mobile)
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        const body = message.content.length > 140
-          ? `${message.content.substring(0, 140)}...`
-          : message.content;
-        const tag = `msg-${message.id}`;
-        const payload = {
-          body,
-          icon: '/icon-192.png',
-          tag,
-          data: {
-            url: message.channelId
-              ? `/channels/${message.channelId}`
-              : message.groupChatId
-                ? `/group/${message.groupChatId}`
-                : message.senderId
-                  ? `/dm/${message.senderId}`
-                  : '/',
-          },
-        } as NotificationOptions;
-
-        // Prefer service worker notification if available
-        if (navigator.serviceWorker?.ready) {
-          navigator.serviceWorker.ready.then((reg) => {
-            reg.showNotification(notificationTitle, payload);
-          }).catch(() => {
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: `msg-${message.id}`,
+      data: {
+        url: message.channelId
+          ? `/servers/${message.channelId.split('-')[0]}/channels/${message.channelId}`
+          : message.groupChatId
+            ? `/group/${message.groupChatId}`
+            : message.senderId
+              ? `/dm/${message.senderId}`
+              : '/',
+      },
+      vibrate: [200, 100, 200],
+      requireInteraction: false,
+    });     }).catch(() => {
             new Notification(notificationTitle, payload);
           });
         } else {

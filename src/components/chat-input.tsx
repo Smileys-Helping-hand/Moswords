@@ -1,6 +1,6 @@
 "use client"
 
-import { PlusCircle, SendHorizonal, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, SendHorizonal, X, Upload } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -9,17 +9,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import EmojiPicker from './emoji-picker';
 import MediaUploadDialog from './media-upload-dialog';
 import { usePathname } from 'next/navigation';
+import { useChatContext } from '@/providers/chat-provider';
+import { useDropzone } from 'react-dropzone';
+import Image from 'next/image';
+
+interface ImagePreview {
+  file: File;
+  url: string;
+  uploadedUrl?: string;
+}
 
 export default function ChatInput() {
   const pathname = usePathname();
   const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
-  const [channelName, setChannelName] = useState('general');
-  const [uploadingPaste, setUploadingPaste] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [channelName, setChannelName] = useState('general');
+  
+  const { sendMessage } = useChatContext();
 
   const handleEmojiSelect = (emoji: string) => {
     setMessage(prev => prev + emoji);
@@ -61,93 +72,65 @@ export default function ChatInput() {
     fetchChannelName();
   }, [activeChannelId, pathname]);
 
-  const handleSend = async () => {
-    if (!message.trim() || !activeChannelId || sending) return;
-
-    setSending(true);
+  // Upload image to server
+  const uploadImageToServer = useCallback(async (file: File): Promise<string | null> => {
     try {
-      const response = await fetch(`/api/channels/${activeChannelId}/messages`, {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: message.trim() }),
+        body: formData,
       });
 
-      if (!response.ok) {
-        let payload: any = null;
-        try {
-          payload = await response.json();
-        } catch {
-          // ignore
-        }
-        const reason = payload?.toxicityReason;
-        const errorMessage = payload?.error || 'Failed to send message';
-        if (reason) {
-          toast({
-            variant: 'destructive',
-            title: 'Message blocked',
-            description: reason,
-            duration: 12000,
-          });
-          return;
-        }
-        throw new Error(errorMessage);
-      }
-      
-      setMessage('');
+      if (!response.ok) throw new Error('Upload failed');
+
+      const data = await response.json();
+      return data.url;
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Upload error:', error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: (error as Error).message || 'Failed to send message',
+        title: 'Upload failed',
+        description: 'Failed to upload image.',
       });
-    } finally {
-      setSending(false);
+      return null;
     }
-  };
+  }, [toast]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  // Handle file selection (from button or drag & drop)
+  const handleFileSelection = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: 'destructive',(e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
 
-  // Handle media upload completion from dialog
-  const handleMediaUpload = useCallback(async (url: string, type: 'image' | 'video' | 'audio' | 'file') => {
-    if (!activeChannelId) return;
-
-    setSending(true);
-    try {
-      const response = await fetch(`/api/channels/${activeChannelId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          content: type === 'image' ? '📷 Image' : type === 'video' ? '🎬 Video' : type === 'audio' ? '🎵 Audio' : '📎 File',
-          mediaUrl: url,
-          mediaType: type,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send media message');
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          handleFileSelection(file);
+        }
+        break;
       }
-
-      toast({
-        title: 'Media sent!',
-        description: 'Your file has been shared in the channel.',
-      });
-    } catch (error) {
-      console.error('Failed to send media message:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to send media message',
-      });
-    } finally {
-      setSending(false);
     }
-  }, [activeChannelId, toast]);
+  }, [handleFileSelection]);
+
+  // Handle file input change
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelection(file);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [handleFileSelectionhas been shared in the channel.',
+    });
+  }, [activeChannelId, sendMessage, toast]);
 
   // Handle paste for images
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
@@ -208,21 +191,84 @@ export default function ChatInput() {
     });
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      con{...getRootProps()} className="relative">
+      {/* Drag & Drop Overlay */}
+      <AnimatePresence>
+        {isDragActive && (
+          <motion.div
+            className="absolute inset-0 z-[60] bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="text-center">
+              <Upload className="w-16 h-16 text-primary mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gradient mb-2">Drop to Upload</h3>
+              <p className="text-muted-foreground">Release to add image to message</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      <div className="p-2 md:p-4 glass-panel border-t border-white/10 relative z-50">
+        {/* Hidden file input */}
+        <input {...getInputProps()} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
-      await handleMediaUpload(data.url, data.type);
-    } catch (error) {
+        {/* Image Preview */}
+        <AnimatePresence>
+          {imagePreview && (
+            <motion.div
+              className="mb-3 p-3 glass-card rounded-lg border border-primary/30"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white/20 flex-shrink-0">
+                  <Image
+                    src={imagePreview.url}
+                    alt="Preview"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {imagePreview.file.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(imagePreview.file.size / 1024).toFixed(1)} KB
+                  </p>
+                  <p className="text-xs text-primary mt-1">
+                    Add a caption below and press Enter to send
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400 flex-shrink-0"
+                  onClick={handleCancelPreview}
+                  disabled={uploading}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        <motion.div 
+          className="relative"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+      } catch (error) {
       console.error('File upload error:', error);
       toast({
         variant: 'destructive',
@@ -252,17 +298,14 @@ export default function ChatInput() {
       <motion.div 
         className="relative"
         initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-      >
-        <div className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 md:gap-1 z-10 pointer-events-auto">
-          {/* Plus/attachment button - triggers file picker */}
+        animatImage attachment button */}
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
             <Button 
               variant="ghost" 
               size="icon" 
               className="h-8 w-8 md:h-10 md:w-10 hover:text-primary pointer-events-auto"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPaste}
+              disabled={uploading || !!imagePreview}
             >
                 <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
@@ -276,13 +319,13 @@ export default function ChatInput() {
         </div>
         <Input 
           ref={inputRef}
-          placeholder={uploadingPaste ? 'Uploading...' : `Message #${channelName}`} 
+          placeholder={uploading ? 'Sending...' : imagePreview ? 'Add a caption (optional)' : `Message #${channelName}`} 
           className="pl-20 sm:pl-28 md:pl-36 pr-12 md:pr-14 h-11 md:h-12 rounded-xl glass-card border-white/20 focus:border-primary transition-all relative z-0 text-sm md:text-base" 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           onPaste={handlePaste}
-          disabled={sending || uploadingPaste || !activeChannelId}
+          disabled={uploading || !activeChannelId}
         />
         <motion.div
           className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto"
@@ -294,53 +337,35 @@ export default function ChatInput() {
             size="icon" 
             className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
             onClick={handleSend}
-            disabled={sending || uploadingPaste || !activeChannelId || !message.trim()}
+            disabled={uploading || !activeChannelId || (!message.trim() && !imagePreview
+            className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
+            onClick={handleSend}
+            disabled={uploadingPaste || !activeChannelId || !message.trim()}
           >
               <SendHorizonal className="w-4 h-4 md:w-5 md:h-5" />
           </Button>
-        </motion.div>
-      </motion.div>
-      
-      {/* Upload indicator */}
-      <AnimatePresence>
-        {uploadingPaste && (
-          <motion.div
-            className="mt-2 text-xs text-primary px-2"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <span className="flex items-center gap-2">
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              >
-                ⏳
-              </motion.span>
-              Uploading media...
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Typing indicator */}
-      <AnimatePresence>
-        {message.length > 0 && !uploadingPaste && (
-          <motion.div
-            className="mt-2 text-xs text-muted-foreground px-2"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <span className="flex items-center gap-1">
-              <motion.span
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              >
-                ●
-              </motion.span>
-              Someone is typing...
-            </span>
+        {/* Upload indicator */}
+        <AnimatePresence>
+          {uploading && (
+            <motion.div
+              className="mt-2 text-xs text-primary px-2"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              <span className="flex items-center gap-2">
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                >
+                  ⏳
+                </motion.span>
+                Uploading and sending...
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div
           </motion.div>
         )}
       </AnimatePresence>

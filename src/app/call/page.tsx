@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Room, createLocalTracks, LocalVideoTrack } from 'livekit-client';
+import { Button } from '@/components/ui/button';
+import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function CallPage() {
   const params = useSearchParams();
@@ -16,6 +19,7 @@ export default function CallPage() {
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(type === 'video');
+  const [participantCount, setParticipantCount] = useState(0);
   const roomRef = useRef<Room | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteContainerRef = useRef<HTMLDivElement | null>(null);
@@ -76,10 +80,14 @@ export default function CallPage() {
         room.on('participantConnected', participant => {
           const container = remoteContainerRef.current;
           if (!container) return;
+          
+          setParticipantCount(prev => prev + 1);
+          
           const div = document.createElement('div');
-          div.className = 'remote-participant';
+          div.className = 'remote-participant glass-card rounded-xl p-4 border border-white/20';
           div.id = `participant-${participant.identity}`;
           const name = document.createElement('div');
+          name.className = 'text-sm font-medium mb-2 text-white';
           name.textContent = participant.identity;
           div.appendChild(name);
           container.appendChild(div);
@@ -89,6 +97,7 @@ export default function CallPage() {
           participant.on('trackSubscribed', (track: any) => {
             const el = track.attach();
             el.style.maxWidth = '100%';
+            el.className = 'rounded-lg w-full';
             div.appendChild(el);
           });
         });
@@ -97,6 +106,7 @@ export default function CallPage() {
         setMuted(!localTracksRef.current.some(t => t.kind === 'audio'));
 
         room.on('participantDisconnected', (p) => {
+          setParticipantCount(prev => Math.max(0, prev - 1));
           const el = document.getElementById(`participant-${p.identity}`);
           if (el) el.remove();
         });
@@ -195,40 +205,140 @@ export default function CallPage() {
         }
         setVideoEnabled(true);
       } catch (err) {
-        console.error('Failed to enable camera', err);
-      }
-    }
-  };
-
-  return (
-    <div className="min-h-screen p-4 bg-background text-foreground">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold">Call — {roomName}</h1>
-        {error && <div className="text-red-400">{error}</div>}
-        {loading && <div>Connecting...</div>}
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-medium">You</h3>
-            <div className="mt-2">
-              <video ref={localVideoRef} autoPlay playsInline muted className="w-full rounded-lg bg-black/60" />
+        console.error('Failed to bg-gradient-to-br from-background via-background to-primary/5 text-foreground">
+      <div className="max-w-7xl mx-auto p-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-panel rounded-2xl border border-white/10 overflow-hidden"
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gradient">
+                {type === 'video' ? 'Video' : 'Voice'} Call
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Room: {roomName} • {participantCount} {participantCount === 1 ? 'participant' : 'participants'}
+              </p>
             </div>
+            <Button
+              onClick={() => {
+                if (roomRef.current) {
+                  roomRef.current.disconnect();
+                }
+                router.push('/');
+              }}
+              variant="destructive"
+              className="gap-2"
+            >
+              <PhoneOff className="w-4 h-4" />
+              Leave Call
+            </Button>
           </div>
-          <div>
-            <h3 className="font-medium">Participants</h3>
-            <div ref={remoteContainerRef} className="mt-2 space-y-2" />
-          </div>
-        </div>
 
-        <div className="mt-6 flex gap-2">
-          <button
-            className="px-4 py-2 bg-muted-foreground/10 rounded text-foreground"
-            onClick={toggleMute}
-          >
-            {muted ? 'Unmute' : 'Mute'}
-          </button>
-          <button
-            className="px-4 py-2 bg-muted-foreground/10 rounded text-foreground"
+          {/* Content */}
+          <div className="p-6">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mb-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400"
+              >
+                {error}
+              </motion.div>
+            )}
+            
+            {loading && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-3 text-lg">Connecting to call...</span>
+              </div>
+            )}
+
+            {!loading && !error && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Local Video */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="glass-card rounded-xl p-4 border border-white/20"
+                >
+                  <h3 className="font-medium mb-3 text-white flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    You
+                  </h3>
+                  <div className="relative aspect-video bg-black/60 rounded-lg overflow-hidden">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                    {!videoEnabled && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <VideoOff className="w-12 h-12 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Remote Participants */}
+                <div>
+                  <h3 className="font-medium mb-3 text-white">
+                    Participants ({participantCount})
+                  </h3>
+                  <div ref={remoteContainerRef} className="space-y-4">
+                    {participantCount === 0 && (
+                      <div className="glass-card rounded-xl p-8 border border-white/10 text-center">
+                        <p className="text-muted-foreground">Waiting for others to join...</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Controls */}
+            {!loading && !error && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mt-6 flex justify-center gap-4"
+              >
+                <Button
+                  onClick={toggleMute}
+                  variant={muted ? "destructive" : "secondary"}
+                  className="gap-2 min-w-[120px]"
+                >
+                  {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {muted ? 'Unmute' : 'Mute'}
+                </Button>
+                {type === 'video' && (
+                  <Button
+                    onClick={toggleVideo}
+                    variant={videoEnabled ? "secondary" : "destructive"}
+                    className="gap-2 min-w-[140px]"
+                  >
+                    {videoEnabled ? (
+                      <>
+                        <VideoIcon className="w-4 h-4" />
+                        Stop Video
+                      </>
+                    ) : (
+                      <>
+                        <VideoOff className="w-4 h-4" />
+                        Start Video
+                      </>
+                    )}
+                  </Button>
+                )}
+              </motion.div>
+            )}
+          </div>
+        </motion.  className="px-4 py-2 bg-muted-foreground/10 rounded text-foreground"
             onClick={toggleVideo}
           >
             {videoEnabled ? 'Stop Video' : 'Start Video'}

@@ -35,6 +35,8 @@ import { useToast } from '@/hooks/use-toast';
 import { usePathname, useRouter } from 'next/navigation';
 import MemberSidebar from './member-sidebar';
 import UserAvatar from './user-avatar';
+import ActiveCall from './chat/ActiveCall';
+import { getChannelCallToken } from '@/actions/livekit';
 
 interface Channel {
   id: string;
@@ -176,9 +178,14 @@ function ThreadSummary() {
 export default function ChatHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const { toast } = useToast();
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [serverId, setServerId] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
+  const [isInCall, setIsInCall] = useState(false);
+  const [callToken, setCallToken] = useState<string | null>(null);
+  const [callServerUrl, setCallServerUrl] = useState<string | null>(null);
+  const [isLoadingCall, setIsLoadingCall] = useState(false);
 
   useEffect(() => {
     // Extract serverId and channelId from URL: /servers/[serverId]/channels/[channelId]
@@ -211,40 +218,69 @@ export default function ChatHeader() {
         console.error("Failed to fetch channel:", error);
       }
     };
-    
+
     fetchChannelDetails();
   }, [serverId, channelId]);
 
+  const handleStartCall = async () => {
+    if (!channelId) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No channel selected',
+      });
+      return;
+    }
 
-  return (
-    <motion.header 
-      className="flex items-center h-12 md:h-14 px-2 md:px-4 border-b border-white/10 shadow-lg glass-panel z-10"
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-    >
-      <div className="flex items-center gap-1 md:gap-2 min-w-0">
-        <Hash className="w-5 h-5 md:w-6 md:h-6 text-primary shrink-0" />
-        <h2 className="font-bold text-sm md:text-lg truncate">{currentChannel?.name || 'Select a channel'}</h2>
-        <span className="hidden md:inline text-xs text-muted-foreground px-2 py-1 rounded-full glass-card">
-          {Math.floor(Math.random() * 50) + 10} online
-        </span>
-      </div>
+    setIsLoadingCall(true);
+    try {
+      const result = await getChannelCallToken(channelId);
+      
+      if (!result.success || !result.token) {
+        throw new Error(result.error || 'Failed to get call token');
+      }
 
-      <div className="flex-1" />
+      setCallToken(result.token);
+      setCallServerUrl(result.serverUrl);
+      setIsInCall(true);
+      
+      toast({
+        title: 'Starting Call',
+        description: 'Connecting to voice/video call...',
+      });
+    } catch (error) {
+      console.error('Failed to start call:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Call Failed',
+        description: error instanceof Error ? error.message : 'Failed to start call',
+      });
+    } finally {
+      setIsLoadingCall(false);
+    }
+  };
 
-      <TooltipProvider>
-        <div className="flex items-center gap-0.5 md:gap-1">
-            <ThreadSummary />
-          
-          {/* Invite Members Button - Only show if on a server (hidden on mobile) */}
-          {serverId && (
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
-              <InviteMemberModal serverId={serverId} />
-            </motion.div>
-          )}
-
-          {/* Search - Hidden on mobile */}
-          <div className="hidden lg:block w-64">
+  const handleEndCall = () => {
+    setIsInCall(false);
+    setCallToken(null);
+    setCallServerUrl(null);
+  };
+/Voice call button */}
+          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:text-primary hover:bg-white/10"
+                  onClick={handleStartCall}
+                  disabled={isLoadingCall || !channelId}
+                >
+                  <Video className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Starten lg:block w-64">
             <Input
               placeholder={`Search in #${currentChannel?.name || 'channel'}`}
               className="glass-card border-white/20 h-9 focus:border-primary transition-all"
@@ -320,6 +356,17 @@ export default function ChatHeader() {
           <Sheet>
             <SheetTrigger asChild>
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+
+      {/* Active Call Overlay */}
+      {isInCall && callToken && callServerUrl && (
+        <ActiveCall
+          token={callToken}
+          serverUrl={callServerUrl}
+          roomName={`channel-${channelId}`}
+          onDisconnect={handleEndCall}
+          userName={currentChannel?.name}
+        />
+      )}
                 <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
                   <Users className="w-5 h-5" />
                 </Button>

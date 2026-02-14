@@ -98,6 +98,16 @@ export const messages = pgTable('messages', {
   deleted: boolean('deleted').notNull().default(false),
 });
 
+// Message reactions table
+export const messageReactions = pgTable('message_reactions', {
+  id: text('id').primaryKey(),
+  messageId: uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userName: text('user_name').notNull(),
+  emoji: text('emoji').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // Direct messages table
 export const directMessages = pgTable('direct_messages', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -230,13 +240,25 @@ export const channelsRelations = relations(channels, ({ one, many }) => ({
   messages: many(messages),
 }));
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+export const messagesRelations = relations(messages, ({ one, many }) => ({
   channel: one(channels, {
     fields: [messages.channelId],
     references: [channels.id],
   }),
   user: one(users, {
     fields: [messages.userId],
+    references: [users.id],
+  }),
+  reactions: many(messageReactions),
+}));
+
+export const messageReactionsRelations = relations(messageReactions, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageReactions.messageId],
+    references: [messages.id],
+  }),
+  user: one(users, {
+    fields: [messageReactions.userId],
     references: [users.id],
   }),
 }));

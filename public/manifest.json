@@ -1,10 +1,11 @@
 {
   "name": "Moswords - Professional Team Communication",
   "short_name": "Moswords",
-  "description": "Real-time collaboration platform with AI-powered features",
+  "description": "Real-time collaboration platform with AI-powered features, messaging, video calls, and team workspaces",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "background_color": "#030014",
   "theme_color": "#030014",
   "icons": [
@@ -24,7 +25,8 @@
   "categories": [
     "productivity",
     "communication",
-    "business"
+    "business",
+    "social"
   ],
   "screenshots": [],
   "shortcuts": [
@@ -39,6 +41,56 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "Servers",
+      "short_name": "Servers",
+      "description": "Browse your servers",
+      "url": "/servers",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Email Dashboard",
+      "short_name": "Email",
+      "description": "NexusMail Dashboard",
+      "url": "/nexusmail",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "serviceworker": {
+    "src": "/sw.js",
+    "scope": "/",
+    "update_via_cache": "none"
+  },
+  "share_target": {
+    "action": "/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+moswords",
+      "url": "/?action=%s"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }

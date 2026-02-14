@@ -2,12 +2,12 @@
 
 import ChatMessage from './chat-message';
 import { Hash, ArrowDown } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Skeleton } from './ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './ui/button';
 import { usePathname } from 'next/navigation';
+import { useChat } from '@/hooks/use-chat';
 
 interface Channel {
   id: string;
@@ -16,33 +16,10 @@ interface Channel {
   serverId: string;
 }
 
-interface Message {
-  message: {
-    id: string;
-    content: string;
-    channelId: string;
-    userId: string;
-    createdAt: Date;
-  };
-  user: {
-    id: string;
-    name: string | null;
-    displayName: string | null;
-    image: string | null;
-    photoURL: string | null;
-  };
-}
-
 export default function ChatMessages() {
   const pathname = usePathname();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
-  const [loading, setLoading] = useState(true);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Extract channelId from URL
   useEffect(() => {
@@ -54,16 +31,22 @@ export default function ChatMessages() {
     }
   }, [pathname]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Use the new chat hook with optimistic updates
+  const {
+    messages,
+    loading,
+    retryMessage,
+    deleteFailedMessage,
+    scrollToBottom,
+    messagesEndRef,
+    containerRef,
+    handleScroll,
+    hasNewMessages,
+  } = useChat({ 
+    channelId: activeChannelId,
+    enabled: !!activeChannelId 
+  });
 
-  const handleScroll = () => {
-    if (!containerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-    setShowScrollButton(!isNearBottom);
-  };
 
   // Fetch channel details when channelId changes
   useEffect(() => {
@@ -90,35 +73,6 @@ export default function ChatMessages() {
     
     fetchChannelDetails();
   }, [activeChannelId, pathname]);
-
-  useEffect(() => {
-    if (!activeChannelId) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`/api/channels/${activeChannelId}/messages`);
-        if (!response.ok) throw new Error('Failed to fetch messages');
-        const data = await response.json();
-        setMessages(data.messages.reverse());
-      } catch (error) {
-        console.error("Failed to fetch messages:", error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load messages',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
-    return () => clearInterval(interval);
-  }, [activeChannelId, toast]);
 
   if (loading) {
     return (
@@ -181,36 +135,35 @@ export default function ChatMessages() {
       <AnimatePresence>
         {messages.map((msg, index) => {
           const prevMsg = index > 0 ? messages[index - 1] : null;
-          const showAvatar = !prevMsg || prevMsg.user.id !== msg.user.id;
+          const nextMsg = index < messages.length - 1 ? messages[index + 1] : null;
+          
+          // Message grouping logic - within 60 seconds and same author
+          const shouldGroup = prevMsg && 
+            prevMsg.author.uid === msg.author.uid &&
+            Math.abs(new Date(msg.timestamp).getTime() - new Date(prevMsg.timestamp).getTime()) < 60000;
+          
+          const isGroupedWithNext = nextMsg &&
+            nextMsg.author.uid === msg.author.uid &&
+            Math.abs(new Date(nextMsg.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 60000;
           
           return (
             <ChatMessage 
-              key={msg.message.id} 
-              message={{
-                id: msg.message.id,
-                content: msg.message.content,
-                timestamp: msg.message.createdAt,
-                author: {
-                  uid: msg.user.id,
-                  displayName: msg.user.displayName || msg.user.name || 'Unknown',
-                  photoURL: msg.user.photoURL || msg.user.image || '',
-                  imageHint: '',
-                },
-                reactions: [],
-                isFlagged: false,
-                mediaUrl: msg.message.mediaUrl || undefined,
-                mediaType: msg.message.mediaType as 'image' | 'video' | 'audio' | 'file' | undefined,
-              }}
-              showAvatar={showAvatar}
+              key={msg.id}
+              message={msg}
+              showAvatar={!shouldGroup}
+              isGrouped={shouldGroup}
+              isLastInGroup={!isGroupedWithNext}
+              onRetry={msg.status === 'error' && msg.tempId ? () => retryMessage(msg.tempId!) : undefined}
+              onDelete={msg.status === 'error' && msg.tempId ? () => deleteFailedMessage(msg.tempId!) : undefined}
             />
           );
         })}
       </AnimatePresence>
       <div ref={messagesEndRef} className="h-4" />
       
-      {/* Scroll to bottom button */}
+      {/* New Messages badge/button */}
       <AnimatePresence>
-        {showScrollButton && (
+        {hasNewMessages && (
           <motion.div
             className="absolute bottom-4 right-4 z-10"
             initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -219,10 +172,11 @@ export default function ChatMessages() {
           >
             <Button
               onClick={scrollToBottom}
-              size="icon"
-              className="rounded-full glass-card shadow-lg border border-white/20 hover:scale-110 transition-transform"
+              size="default"
+              className="rounded-full glass-card shadow-lg border border-primary/30 hover:scale-105 transition-transform bg-primary/20 hover:bg-primary/30 flex items-center gap-2"
             >
-              <ArrowDown className="w-5 h-5" />
+              <span className="text-sm font-medium">New Messages</span>
+              <ArrowDown className="w-4 h-4" />
             </Button>
           </motion.div>
         )}
