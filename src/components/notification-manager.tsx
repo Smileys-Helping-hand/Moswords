@@ -137,7 +137,11 @@ export default function NotificationManager() {
 
     // Show toast notification
     toast({
-      title: notificationTitle,using notification service
+      title: notificationTitle,
+      description: message.content.length > 50 ? `${message.content.substring(0, 50)}...` : message.content,
+    });
+
+    // Show native notification using notification service
     notificationService.showNotification(notificationTitle, {
       body: message.content.length > 140
         ? `${message.content.substring(0, 140)}...`

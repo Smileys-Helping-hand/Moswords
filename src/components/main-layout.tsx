@@ -45,6 +45,7 @@ export default function MainLayout() {
           </div>
         </main>
       </div>
+      </div>
     </ChatProvider>
   );
 }

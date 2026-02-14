@@ -205,7 +205,12 @@ export default function CallPage() {
         }
         setVideoEnabled(true);
       } catch (err) {
-        console.error('Failed to bg-gradient-to-br from-background via-background to-primary/5 text-foreground">
+        console.error('Failed to enable video:', err);
+      }
+    };
+
+    return (
+      <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 text-foreground">
       <div className="max-w-7xl mx-auto p-4">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
