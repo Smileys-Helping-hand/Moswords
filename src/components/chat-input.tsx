@@ -138,9 +138,7 @@ export default function ChatInput() {
         fileInputRef.current.value = '';
       }
     }
-  }, [handleFileSelectionhas been shared in the channel.',
-    });
-  }, [activeChannelId, sendMessage, toast]);
+  }, [handleFileSelection]);
 
   // Handle paste for images
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {

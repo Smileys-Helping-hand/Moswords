@@ -161,7 +161,6 @@ export default function NotificationManager() {
       vibrate: [200, 100, 200],
       requireInteraction: false,
     });
-  }
   }, [currentUserId, isViewingChannel, toast, addUnread]);
 
   /**
