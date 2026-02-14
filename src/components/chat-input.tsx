@@ -354,13 +354,12 @@ export default function ChatInput() {
             size="icon" 
             className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
             onClick={handleSend}
-            disabled={uploading || !activeChannelId || (!message.trim() && !imagePreview
-            className="h-8 w-8 md:h-10 md:w-10 text-primary hover:bg-primary/20 pointer-events-auto"
-            onClick={handleSend}
-            disabled={uploadingPaste || !activeChannelId || !message.trim()}
+            disabled={uploading || !activeChannelId || (!message.trim() && !imagePreview)}
           >
               <SendHorizonal className="w-4 h-4 md:w-5 md:h-5" />
           </Button>
+        </motion.div>
+        
         {/* Upload indicator */}
         <AnimatePresence>
           {uploading && (

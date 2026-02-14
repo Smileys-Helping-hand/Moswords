@@ -399,8 +399,8 @@ export default function ChatHeader() {
             </SheetContent>
           </Sheet>
         </div>
-      </TooltipProvider>
-    </motion.header>
+      </motion.header>
+    </TooltipProvider>
     
     {/* Active Call Overlay */}
     {isInCall && callToken && callServerUrl && (
