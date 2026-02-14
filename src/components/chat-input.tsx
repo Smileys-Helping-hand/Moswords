@@ -293,31 +293,38 @@ export default function ChatInput() {
   }, [handleMediaUpload, toast]);
 
   return (
-    <div className="p-2 md:p-4 glass-panel border-t border-white/10 relative z-50">
-      {/* Hidden file input for quick image upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-        className="hidden"
-        onChange={handleFileSelect}
-      />
-      
-      <motion.div 
-        className="relative"
-        initial={{ y: 20, opacity: 0 }}
-        animatImage attachment button */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 md:h-10 md:w-10 hover:text-primary pointer-events-auto"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || !!imagePreview}
-            >
-                <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
-            </Button>
+    <div {...getRootProps()} className="relative">
+      {/* Drag & Drop Overlay */}
+      <AnimatePresence>
+        {isDragActive && (
+          <motion.div
+            className="absolute inset-0 z-[60] bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="text-center">
+              <Upload className="w-16 h-16 text-primary mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gradient mb-2">Drop to Upload</h3>
+              <p className="text-muted-foreground">Release to add image to message</p>
+            </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="p-2 md:p-4 glass-panel border-t border-white/10 relative z-50">
+        {/* Hidden file input */}
+        <input {...getInputProps()} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {/* Image Preview */}
+        <AnimatePresence>
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
             <MediaUploadDialog onUploadComplete={handleMediaUpload} />
           </motion.div>

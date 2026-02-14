@@ -354,17 +354,6 @@ export default function ChatHeader() {
           <Sheet>
             <SheetTrigger asChild>
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-
-      {/* Active Call Overlay */}
-      {isInCall && callToken && callServerUrl && (
-        <ActiveCall
-          token={callToken}
-          serverUrl={callServerUrl}
-          roomName={`channel-${channelId}`}
-          onDisconnect={handleEndCall}
-          userName={currentChannel?.name}
-        />
-      )}
                 <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
                   <Users className="w-5 h-5" />
                 </Button>
@@ -388,5 +377,17 @@ export default function ChatHeader() {
         </div>
       </TooltipProvider>
     </motion.header>
+    
+    {/* Active Call Overlay */}
+    {isInCall && callToken && callServerUrl && (
+      <ActiveCall
+        token={callToken}
+        serverUrl={callServerUrl}
+        roomName={`channel-${channelId}`}
+        onDisconnect={handleEndCall}
+        userName={currentChannel?.name}
+      />
+    )}
+    </>
   );
 }
