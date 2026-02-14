@@ -199,84 +199,21 @@ export default function ChatInput() {
     });
 
     try {
-      con{...getRootProps()} className="relative">
-      {/* Drag & Drop Overlay */}
-      <AnimatePresence>
-        {isDragActive && (
-          <motion.div
-            className="absolute inset-0 z-[60] bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="text-center">
-              <Upload className="w-16 h-16 text-primary mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-gradient mb-2">Drop to Upload</h3>
-              <p className="text-muted-foreground">Release to add image to message</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      const formData = new FormData();
+      formData.append('file', file);
 
-      <div className="p-2 md:p-4 glass-panel border-t border-white/10 relative z-50">
-        {/* Hidden file input */}
-        <input {...getInputProps()} />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-        {/* Image Preview */}
-        <AnimatePresence>
-          {imagePreview && (
-            <motion.div
-              className="mb-3 p-3 glass-card rounded-lg border border-primary/30"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-            >
-              <div className="flex items-start gap-3">
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white/20 flex-shrink-0">
-                  <Image
-                    src={imagePreview.url}
-                    alt="Preview"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground mb-1">
-                    {imagePreview.file.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {(imagePreview.file.size / 1024).toFixed(1)} KB
-                  </p>
-                  <p className="text-xs text-primary mt-1">
-                    Add a caption below and press Enter to send
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400 flex-shrink-0"
-                  onClick={handleCancelPreview}
-                  disabled={uploading}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        <motion.div 
-          className="relative"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-      } catch (error) {
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      await handleMediaUpload(data.url, data.type);
+    } catch (error) {
       console.error('File upload error:', error);
       toast({
         variant: 'destructive',
