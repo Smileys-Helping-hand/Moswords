@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, X, Image as ImageIcon, File, Video, Loader2 } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, File, Video, Loader2, Camera, FolderOpen } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from './ui/button';
 import {
@@ -17,6 +17,9 @@ import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useMobileFeatures } from '@/hooks/use-mobile-features';
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 
 interface MediaUploadDialogProps {
   onUploadComplete?: (url: string, type: 'image' | 'video' | 'audio' | 'file') => void;
@@ -30,11 +33,106 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
   const { toast } = useToast();
+  const { isNative, haptic } = useMobileFeatures();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle native camera capture
+  const handleCameraCapture = async () => {
+    if (!isNative) {
+      toast({
+        title: 'Not available',
+        description: 'Camera is only available in the mobile app.',
+      });
+      return;
+    }
+
+    try {
+      await haptic.light();
+      
+      const image = await CapCamera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+      });
+
+      if (image.dataUrl) {
+        // Convert data URL to Blob then File
+        const response = await fetch(image.dataUrl);
+        const blob = await response.blob();
+        const fileName = `camera-${Date.now()}.${image.format || 'jpg'}`;
+        const fileObj = new window.File([blob], fileName, { type: `image/${image.format || 'jpeg'}` });
+        
+        setFile(fileObj);
+        setPreview(image.dataUrl);
+        
+        await haptic.success();
+      }
+    } catch (error: any) {
+      if (error.message !== 'User cancelled photos app') {
+        console.error('Camera error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Camera error',
+          description: 'Failed to capture photo. Please try again.',
+        });
+        await haptic.error();
+      }
+    }
+  };
+
+  // Handle native photo library selection
+  const handlePhotoLibrary = async () => {
+    if (!isNative) {
+      toast({
+        title: 'Not available',
+        description: 'Photo library is only available in the mobile app.',
+      });
+      return;
+    }
+
+    try {
+      await haptic.light();
+      
+      const image = await CapCamera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Photos,
+      });
+
+      if (image.dataUrl) {
+        // Convert data URL to Blob then File
+        const response = await fetch(image.dataUrl);
+        const blob = await response.blob();
+        const fileName = `photo-${Date.now()}.${image.format || 'jpg'}`;
+        const fileObj = new window.File([blob], fileName, { type: `image/${image.format || 'jpeg'}` });
+        
+        setFile(fileObj);
+        setPreview(image.dataUrl);
+        
+        await haptic.success();
+      }
+    } catch (error: any) {
+      if (error.message !== 'User cancelled photos app') {
+        console.error('Photo library error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Photo library error',
+          description: 'Failed to select photo. Please try again.',
+        });
+        await haptic.error();
+      }
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
+
+    if (isNative) {
+      await haptic.light();
+    }
 
     setFile(selectedFile);
 
@@ -48,6 +146,10 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
 
   const handleUpload = async () => {
     if (!file) return;
+
+    if (isNative) {
+      await haptic.medium();
+    }
 
     setUploading(true);
     setProgress(10);
@@ -78,6 +180,10 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
         description: 'Your file has been uploaded successfully.',
       });
 
+      if (isNative) {
+        await haptic.success();
+      }
+
       // Call the callback with the URL and type
       if (onUploadComplete) {
         onUploadComplete(data.url, data.type);
@@ -92,6 +198,10 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
         title: 'Upload failed',
         description: error.message || 'Failed to upload file. Please try again.',
       });
+      
+      if (isNative) {
+        await haptic.error();
+      }
     } finally {
       setUploading(false);
     }
@@ -115,11 +225,11 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="hover:text-primary">
-          <Upload className="w-5 h-5" />
+        <Button variant="ghost" size="icon" className="hover:text-primary h-8 w-8">
+          <Upload className="w-4 h-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="glass-card border-white/20 sm:max-w-md">
+      <DialogContent className="glass-card border-white/20 sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gradient">Upload Media</DialogTitle>
           <DialogDescription>
@@ -129,29 +239,61 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
 
         <div className="space-y-4">
           {!file ? (
-            <motion.label
-              htmlFor="file-upload"
-              className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-white/20 rounded-xl cursor-pointer glass-card hover:bg-white/5 transition-colors"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-12 h-12 mb-3 text-muted-foreground" />
-                <p className="mb-2 text-sm text-foreground">
-                  <span className="font-semibold">Click to upload</span> or drag and drop
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  PNG, JPG, GIF, MP4, or any file up to 10MB
-                </p>
-              </div>
-              <input
-                id="file-upload"
-                type="file"
-                className="hidden"
-                onChange={handleFileChange}
-                accept="image/*,video/*,.pdf,.doc,.docx"
-              />
-            </motion.label>
+            <>
+              {/* Mobile Native Options */}
+              {isNative && (
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <motion.button
+                    type="button"
+                    onClick={handleCameraCapture}
+                    className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Camera className="w-8 h-8 mb-2 text-primary" />
+                    <span className="text-sm font-medium">Camera</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    type="button"
+                    onClick={handlePhotoLibrary}
+                    className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <ImageIcon className="w-8 h-8 mb-2 text-primary" />
+                    <span className="text-sm font-medium">Photos</span>
+                  </motion.button>
+                </div>
+              )}
+
+              {/* File Browser Option */}
+              <motion.label
+                htmlFor="file-upload"
+                className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-white/20 rounded-xl cursor-pointer glass-card hover:bg-white/5 transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <FolderOpen className="w-10 h-10 mb-3 text-muted-foreground" />
+                  <p className="mb-2 text-sm text-foreground">
+                    <span className="font-semibold">{isNative ? 'Browse Files' : 'Click to upload'}</span>
+                    {!isNative && ' or drag and drop'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    PNG, JPG, GIF, MP4, or any file up to 10MB
+                  </p>
+                </div>
+                <input
+                  id="file-upload"
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="image/*,video/*,.pdf,.doc,.docx"
+                />
+              </motion.label>
+            </>
           ) : (
             <motion.div
               className="relative"
@@ -239,7 +381,14 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
               onClick={handleUpload}
               disabled={!file || uploading}
             >
-              Upload
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Upload'
+              )}
             </Button>
           </div>
         </div>
