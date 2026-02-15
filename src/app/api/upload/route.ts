@@ -11,19 +11,8 @@ export const dynamic = 'force-dynamic';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // Allowed MIME types
-const ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-  'video/mp4',
-  'video/webm',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/ogg',
-  'application/pdf',
-];
+// NOTE: Allow all file types for file sharing; size limit still enforced.
+const ALLOWED_TYPES: string[] = [];
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (ALLOWED_TYPES.length > 0 && !ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: 'File type not allowed.' },
         { status: 400 }

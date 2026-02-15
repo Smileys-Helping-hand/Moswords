@@ -19,7 +19,6 @@ import { Switch } from './ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useMobileFeatures } from '@/hooks/use-mobile-features';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Capacitor } from '@capacitor/core';
 
 interface MediaUploadDialogProps {
   onUploadComplete?: (url: string, type: 'image' | 'video' | 'audio' | 'file') => void;
@@ -35,14 +34,23 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
   const { toast } = useToast();
   const { isNative, haptic } = useMobileFeatures();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const acceptAnyFile = true;
+
+  const startUpload = async (selectedFile: File, previewUrl?: string) => {
+    setFile(selectedFile);
+    setPreview(previewUrl || null);
+
+    // Auto-upload immediately after selection
+    await handleUpload(selectedFile);
+  };
 
   // Handle native camera capture
   const handleCameraCapture = async () => {
     if (!isNative) {
-      toast({
-        title: 'Not available',
-        description: 'Camera is only available in the mobile app.',
-      });
+      imageInputRef.current?.click();
       return;
     }
 
@@ -63,8 +71,7 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
         const fileName = `camera-${Date.now()}.${image.format || 'jpg'}`;
         const fileObj = new window.File([blob], fileName, { type: `image/${image.format || 'jpeg'}` });
         
-        setFile(fileObj);
-        setPreview(image.dataUrl);
+        await startUpload(fileObj, image.dataUrl);
         
         await haptic.success();
       }
@@ -84,10 +91,7 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
   // Handle native photo library selection
   const handlePhotoLibrary = async () => {
     if (!isNative) {
-      toast({
-        title: 'Not available',
-        description: 'Photo library is only available in the mobile app.',
-      });
+      imageInputRef.current?.click();
       return;
     }
 
@@ -108,8 +112,7 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
         const fileName = `photo-${Date.now()}.${image.format || 'jpg'}`;
         const fileObj = new window.File([blob], fileName, { type: `image/${image.format || 'jpeg'}` });
         
-        setFile(fileObj);
-        setPreview(image.dataUrl);
+        await startUpload(fileObj, image.dataUrl);
         
         await haptic.success();
       }
@@ -134,18 +137,22 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
       await haptic.light();
     }
 
-    setFile(selectedFile);
-
-    // Generate preview for images
     if (selectedFile.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.onload = async (event) => {
+        const previewUrl = event.target?.result as string | undefined;
+        await startUpload(selectedFile, previewUrl);
+      };
       reader.readAsDataURL(selectedFile);
+      return;
     }
+
+    await startUpload(selectedFile);
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleUpload = async (selectedFile?: File) => {
+    const fileToUpload = selectedFile || file;
+    if (!fileToUpload) return;
 
     if (isNative) {
       await haptic.medium();
@@ -156,7 +163,7 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
     
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', fileToUpload);
 
       setProgress(30);
 
@@ -241,31 +248,51 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
           {!file ? (
             <>
               {/* Mobile Native Options */}
-              {isNative && (
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <motion.button
-                    type="button"
-                    onClick={handleCameraCapture}
-                    className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Camera className="w-8 h-8 mb-2 text-primary" />
-                    <span className="text-sm font-medium">Camera</span>
-                  </motion.button>
-                  
-                  <motion.button
-                    type="button"
-                    onClick={handlePhotoLibrary}
-                    className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <ImageIcon className="w-8 h-8 mb-2 text-primary" />
-                    <span className="text-sm font-medium">Photos</span>
-                  </motion.button>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <motion.button
+                  type="button"
+                  onClick={handleCameraCapture}
+                  className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Camera className="w-8 h-8 mb-2 text-primary" />
+                  <span className="text-sm font-medium">Camera</span>
+                </motion.button>
+                
+                <motion.button
+                  type="button"
+                  onClick={handlePhotoLibrary}
+                  className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <ImageIcon className="w-8 h-8 mb-2 text-primary" />
+                  <span className="text-sm font-medium">Photos</span>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Video className="w-8 h-8 mb-2 text-primary" />
+                  <span className="text-sm font-medium">Video</span>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  onClick={() => audioInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-6 glass-card rounded-xl hover:bg-white/5 transition-colors border-2 border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Upload className="w-8 h-8 mb-2 text-primary" />
+                  <span className="text-sm font-medium">Audio</span>
+                </motion.button>
+              </div>
 
               {/* File Browser Option */}
               <motion.label
@@ -290,7 +317,34 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
                   type="file"
                   className="hidden"
                   onChange={handleFileChange}
-                  accept="image/*,video/*,.pdf,.doc,.docx"
+                  accept={acceptAnyFile ? '*/*' : 'image/*,video/*,audio/*,.pdf,.doc,.docx'}
+                />
+
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  capture="environment"
+                />
+
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="video/*"
+                  capture="environment"
+                />
+
+                <input
+                  ref={audioInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="audio/*"
+                  capture
                 />
               </motion.label>
             </>
@@ -374,11 +428,11 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
               onClick={() => setIsOpen(false)}
               disabled={uploading}
             >
-              Cancel
+              Close
             </Button>
             <Button
               className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-              onClick={handleUpload}
+              onClick={() => handleUpload()}
               disabled={!file || uploading}
             >
               {uploading ? (
@@ -387,7 +441,7 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
                   Uploading...
                 </>
               ) : (
-                'Upload'
+                'Upload Again'
               )}
             </Button>
           </div>
