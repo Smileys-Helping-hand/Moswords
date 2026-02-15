@@ -6,14 +6,16 @@ import { UnreadProvider } from '@/providers/unread-provider';
 import NotificationManager from '@/components/notification-manager';
 import MobileNav from '@/components/mobile-nav';
 import InstallPrompt from '@/components/install-prompt';
+import ClientOnlyProviders from '@/components/client-only-providers';
 
 export const viewport: Viewport = {
   themeColor: '#030014',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5, // Allow zooming for accessibility
+  userScalable: true, // Enable zoom for accessibility
   viewportFit: 'cover',
+  interactiveWidget: 'resizes-content', // Better keyboard handling
 };
 
 export const metadata: Metadata = {
@@ -68,6 +70,7 @@ export default function RootLayout({
       <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
         <AuthProvider>
           <UnreadProvider>
+            <ClientOnlyProviders />
             {children}
             <NotificationManager />
             <MobileNav />

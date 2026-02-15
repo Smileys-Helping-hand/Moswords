@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Moswords</string>
+    <string name="title_activity_main">Moswords</string>
+    <string name="package_name">com.moswords.app</string>
+    <string name="custom_url_scheme">com.moswords.app</string>
+</resources>

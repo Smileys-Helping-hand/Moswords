@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Allow dev server access from mobile devices on local network
+  allowedDevOrigins: ['192.168.31.217', '192.168.31.217:3000'],
   images: {
     remotePatterns: [
       {

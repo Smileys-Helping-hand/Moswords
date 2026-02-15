@@ -1,5 +1,8 @@
 // Service Worker for Moswords PWA
-const CACHE_NAME = 'moswords-v1';
+const CACHE_NAME = 'moswords-v2';
+const RUNTIME_CACHE = 'moswords-runtime-v2';
+const IMAGE_CACHE = 'moswords-images-v2';
+
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -24,11 +27,12 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (!currentCaches.includes(cacheName)) {
             console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -39,7 +43,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - network first, fallback to cache
+// Fetch event - smart caching strategy
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -51,24 +55,64 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // API requests - network first, fallback to cache
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const responseClone = response.clone();
+          if (response.status === 200) {
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request);
+        })
+    );
+    return;
+  }
+
+  // Images - cache first, fallback to network
+  if (request.destination === 'image') {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(request).then((response) => {
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(IMAGE_CACHE).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // All other requests - network first, fallback to cache
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
-        // Clone the response before caching
-        const responseToCache = response.clone();
-        
-        // Only cache successful responses
+        const responseClone = response.clone();
         if (response.status === 200) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
+          caches.open(RUNTIME_CACHE).then((cache) => {
+            cache.put(request, responseClone);
           });
         }
-        
         return response;
       })
       .catch(() => {
-        // If network fails, try cache
-        return caches.match(event.request);
+        return caches.match(request);
       })
   );
 });

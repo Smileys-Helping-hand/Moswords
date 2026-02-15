@@ -1,6 +1,6 @@
 "use client"
 
-import { PlusCircle, SendHorizonal, X, Upload } from 'lucide-react';
+import { PlusCircle, SendHorizonal, X, Upload, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -23,6 +23,7 @@ export default function ChatInput() {
   const pathname = usePathname();
   const [message, setMessage] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadingPaste, setUploadingPaste] = useState(false);
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +72,34 @@ export default function ChatInput() {
     
     fetchChannelName();
   }, [activeChannelId, pathname]);
+
+  // Handle media upload completion
+  const handleMediaUpload = useCallback(async (url: string, type: string) => {
+    try {
+      // Create a synthetic file object for the preview
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const file = new File([blob], 'uploaded-file', { type: blob.type });
+      
+      setImagePreview({
+        file,
+        url,
+        uploadedUrl: url,
+      });
+
+      toast({
+        title: 'Upload complete',
+        description: 'Media uploaded successfully.',
+      });
+    } catch (error) {
+      console.error('Media upload error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload failed',
+        description: 'Failed to process uploaded media.',
+      });
+    }
+  }, [toast]);
 
   // Upload image to server
   const uploadImageToServer = useCallback(async (file: File): Promise<string | null> => {
@@ -186,6 +215,120 @@ export default function ChatInput() {
       }
     }
   }, [handleMediaUpload, toast]);
+
+  // Dropzone configuration for drag & drop
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: async (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        toast({
+          variant: 'destructive',
+          title: 'Invalid file type',
+          description: 'Only images are supported.',
+        });
+        return;
+      }
+
+      setUploadingPaste(true);
+      toast({
+        title: 'Uploading...',
+        description: file.name,
+      });
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+
+        const data = await response.json();
+        await handleMediaUpload(data.url, data.type);
+      } catch (error) {
+        console.error('Drop upload error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Upload failed',
+          description: 'Failed to upload dropped file.',
+        });
+      } finally {
+        setUploadingPaste(false);
+      }
+    },
+    noClick: true,
+    noKeyboard: true,
+    accept: {
+      'image/*': []
+    }
+  });
+
+  // Handle send button click
+  const handleSend = useCallback(async () => {
+    if ((!message.trim() && !imagePreview) || !activeChannelId || uploading) return;
+
+    setUploading(true);
+
+    try {
+      let uploadedUrl = imagePreview?.uploadedUrl;
+      
+      // If image preview exists but hasn't been uploaded yet
+      if (imagePreview && !uploadedUrl) {
+        uploadedUrl = await uploadImageToServer(imagePreview.file);
+        if (!uploadedUrl) {
+          setUploading(false);
+          return;
+        }
+      }
+
+      // Send message with media URL if available
+      await sendMessage({
+        content: message.trim(),
+        channelId: activeChannelId,
+        mediaUrl: uploadedUrl,
+      });
+
+      // Clear message and image preview
+      setMessage('');
+      setImagePreview(null);
+      inputRef.current?.focus();
+
+      toast({
+        title: 'Message sent',
+        description: 'Your message has been sent.',
+      });
+    } catch (error) {
+      console.error('Send error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to send',
+        description: 'Could not send message. Please try again.',
+      });
+    } finally {
+      setUploading(false);
+    }
+  }, [message, imagePreview, activeChannelId, uploading, sendMessage, uploadImageToServer, toast]);
+
+  // Handle form submit
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSend();
+  }, [handleSend]);
+
+  // Handle Enter key press
+  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }, [handleSend]);
 
   return (
     <div {...getRootProps()} className="relative">

@@ -7,6 +7,7 @@ import { signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import UserAvatar from './user-avatar';
 import { useAuth } from '@/hooks/use-auth';
+import { useMobileFeatures } from '@/hooks/use-mobile-features';
 
 const navItems = [
   { id: 'home', label: 'Home', icon: Home, href: '/' },
@@ -20,6 +21,7 @@ export default function MobileNav() {
   const pathname = usePathname();
   const [showMenu, setShowMenu] = useState(false);
   const { session } = useAuth();
+  const { haptic, isNative } = useMobileFeatures();
 
   // Close menu on route change
   useEffect(() => {
@@ -27,6 +29,9 @@ export default function MobileNav() {
   }, [pathname]);
 
   const handleNavigate = (href: string | null) => {
+    // Haptic feedback on tap
+    haptic.light();
+    
     if (href) {
       router.push(href);
       setShowMenu(false);
