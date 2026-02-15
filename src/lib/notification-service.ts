@@ -3,6 +3,9 @@
  * Handles push notification registration and management
  */
 
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
+
 export class NotificationService {
   private static instance: NotificationService;
   private registration: ServiceWorkerRegistration | null = null;
@@ -20,6 +23,16 @@ export class NotificationService {
    * Initialize the service worker and request notification permission
    */
   async initialize(): Promise<boolean> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const permission = await LocalNotifications.requestPermissions();
+        return permission.display === 'granted';
+      } catch (error) {
+        console.error('Local notification permission failed:', error);
+        return false;
+      }
+    }
+
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
       console.warn('Service Workers not supported');
       return false;
@@ -71,6 +84,37 @@ export class NotificationService {
    * Show a local notification
    */
   async showNotification(title: string, options?: NotificationOptions): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const permission = await LocalNotifications.checkPermissions();
+        if (permission.display !== 'granted') {
+          const requested = await LocalNotifications.requestPermissions();
+          if (requested.display !== 'granted') {
+            return;
+          }
+        }
+
+        const notificationId = Math.floor(Date.now() % 2147483647);
+        const body = options?.body || '';
+        const extra = options?.data || {};
+
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: notificationId,
+              title,
+              body,
+              extra,
+              schedule: { at: new Date(Date.now() + 200) },
+            },
+          ],
+        });
+      } catch (error) {
+        console.error('Error showing native notification:', error);
+      }
+      return;
+    }
+
     if (typeof window === 'undefined' || !('Notification' in window)) {
       return;
     }
@@ -85,7 +129,6 @@ export class NotificationService {
     const defaultOptions: NotificationOptions = {
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      vibrate: [200, 100, 200],
       requireInteraction: false,
       ...options,
     };
@@ -122,7 +165,7 @@ export class NotificationService {
         // Subscribe to push
         subscription = await this.registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: this.urlBase64ToUint8Array(vapidPublicKey),
+          applicationServerKey: this.urlBase64ToUint8Array(vapidPublicKey) as unknown as any,
         });
 
         console.log('Push subscription created:', subscription);
@@ -176,6 +219,9 @@ export class NotificationService {
    * Check if notifications are supported and enabled
    */
   isSupported(): boolean {
+    if (Capacitor.isNativePlatform()) {
+      return true;
+    }
     return (
       typeof window !== 'undefined' &&
       'Notification' in window &&
@@ -212,6 +258,15 @@ export class NotificationService {
    * Clear all notifications
    */
   async clearNotifications(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await LocalNotifications.cancel({ notifications: [] });
+      } catch (error) {
+        console.error('Error clearing native notifications:', error);
+      }
+      return;
+    }
+
     if (!this.registration) {
       return;
     }
