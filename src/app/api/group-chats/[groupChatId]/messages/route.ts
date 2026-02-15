@@ -42,10 +42,16 @@ export async function GET(
       .select({
         id: groupChatMessages.id,
         content: groupChatMessages.content,
+        contentNonce: groupChatMessages.contentNonce,
+        isEncrypted: groupChatMessages.isEncrypted,
         userId: groupChatMessages.userId,
         groupChatId: groupChatMessages.groupChatId,
         createdAt: groupChatMessages.createdAt,
         deleted: groupChatMessages.deleted,
+        mediaUrl: groupChatMessages.mediaUrl,
+        mediaType: groupChatMessages.mediaType,
+        mediaEncrypted: groupChatMessages.mediaEncrypted,
+        mediaNonce: groupChatMessages.mediaNonce,
         sender: {
           id: users.id,
           email: users.email,
@@ -88,11 +94,22 @@ export async function POST(
     }
 
     const userId = (session.user as any).id;
-    const { content } = await request.json();
+    const {
+      content,
+      contentNonce,
+      isEncrypted,
+      mediaUrl,
+      mediaType,
+      mediaEncrypted,
+      mediaNonce,
+    } = await request.json();
 
-    if (!content || content.trim().length === 0) {
+    const hasContent = typeof content === 'string' && content.trim().length > 0;
+    const hasMedia = !!mediaUrl;
+
+    if (!hasContent && !hasMedia) {
       return NextResponse.json(
-        { error: 'Message content is required' },
+        { error: 'Message content or media is required' },
         { status: 400 }
       );
     }
@@ -121,7 +138,13 @@ export async function POST(
       .values({
         groupChatId,
         userId,
-        content: content.trim(),
+        content: hasContent ? content.trim() : '',
+        contentNonce: contentNonce || null,
+        isEncrypted: !!isEncrypted,
+        ...(mediaUrl && { mediaUrl }),
+        ...(mediaType && { mediaType }),
+        mediaEncrypted: !!mediaEncrypted,
+        mediaNonce: mediaNonce || null,
       })
       .returning();
 

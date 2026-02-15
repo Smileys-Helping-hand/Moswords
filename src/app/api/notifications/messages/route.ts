@@ -57,9 +57,15 @@ export async function GET(request: NextRequest) {
       results.push(...channelMessages.map(cm => ({
         id: cm.message.id,
         content: cm.message.content,
+        contentNonce: cm.message.contentNonce,
+        isEncrypted: cm.message.isEncrypted,
         userId: cm.message.userId,
         channelId: cm.message.channelId,
         createdAt: cm.message.createdAt.toISOString(),
+        mediaUrl: cm.message.mediaUrl,
+        mediaType: cm.message.mediaType,
+        mediaEncrypted: cm.message.mediaEncrypted,
+        mediaNonce: cm.message.mediaNonce,
         user: cm.user,
       })));
     }
@@ -89,10 +95,16 @@ export async function GET(request: NextRequest) {
       results.push(...dms.map(dm => ({
         id: dm.message.id,
         content: dm.message.content,
+        contentNonce: dm.message.contentNonce,
+        isEncrypted: dm.message.isEncrypted,
         userId: dm.message.senderId,
         senderId: dm.message.senderId,
         receiverId: dm.message.receiverId,
         createdAt: dm.message.createdAt.toISOString(),
+        mediaUrl: dm.message.mediaUrl,
+        mediaType: dm.message.mediaType,
+        mediaEncrypted: dm.message.mediaEncrypted,
+        mediaNonce: dm.message.mediaNonce,
         user: dm.user,
       })));
     }
@@ -122,9 +134,15 @@ export async function GET(request: NextRequest) {
       results.push(...groupMessages.map(gm => ({
         id: gm.message.id,
         content: gm.message.content,
+        contentNonce: gm.message.contentNonce,
+        isEncrypted: gm.message.isEncrypted,
         userId: gm.message.userId,
         groupChatId: gm.message.groupChatId,
         createdAt: gm.message.createdAt.toISOString(),
+        mediaUrl: gm.message.mediaUrl,
+        mediaType: gm.message.mediaType,
+        mediaEncrypted: gm.message.mediaEncrypted,
+        mediaNonce: gm.message.mediaNonce,
         user: gm.user,
       })));
     }

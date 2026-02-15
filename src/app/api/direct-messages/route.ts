@@ -24,9 +24,15 @@ export async function GET() {
       .select({
         id: directMessages.id,
         content: directMessages.content,
+        contentNonce: directMessages.contentNonce,
+        isEncrypted: directMessages.isEncrypted,
         senderId: directMessages.senderId,
         receiverId: directMessages.receiverId,
         createdAt: directMessages.createdAt,
+        mediaUrl: directMessages.mediaUrl,
+        mediaType: directMessages.mediaType,
+        mediaEncrypted: directMessages.mediaEncrypted,
+        mediaNonce: directMessages.mediaNonce,
         sender: {
           id: users.id,
           email: users.email,
@@ -66,11 +72,23 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = (session.user as any).id;
-    const { receiverId, content } = await request.json();
+    const {
+      receiverId,
+      content,
+      contentNonce,
+      isEncrypted,
+      mediaUrl,
+      mediaType,
+      mediaEncrypted,
+      mediaNonce,
+    } = await request.json();
 
-    if (!receiverId || !content) {
+    const hasContent = typeof content === 'string' && content.trim().length > 0;
+    const hasMedia = !!mediaUrl;
+
+    if (!receiverId || (!hasContent && !hasMedia)) {
       return NextResponse.json(
-        { error: 'Receiver and content are required' },
+        { error: 'Receiver and content or media are required' },
         { status: 400 }
       );
     }
@@ -88,7 +106,13 @@ export async function POST(request: NextRequest) {
       .values({
         senderId: userId,
         receiverId,
-        content: content.trim(),
+        content: hasContent ? content.trim() : '',
+        contentNonce: contentNonce || null,
+        isEncrypted: !!isEncrypted,
+        ...(mediaUrl && { mediaUrl }),
+        ...(mediaType && { mediaType }),
+        mediaEncrypted: !!mediaEncrypted,
+        mediaNonce: mediaNonce || null,
       })
       .returning();
 

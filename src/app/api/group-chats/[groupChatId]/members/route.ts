@@ -5,6 +5,33 @@ import { db } from '@/lib/db';
 import { groupChatMembers } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 
+// GET /api/group-chats/[groupChatId]/members - List group members (for E2E key distribution)
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ groupChatId: string }> }
+) {
+  try {
+    const { groupChatId } = await params;
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const members = await db
+      .select({ userId: groupChatMembers.userId })
+      .from(groupChatMembers)
+      .where(eq(groupChatMembers.groupChatId, groupChatId));
+
+    return NextResponse.json({ members });
+  } catch (error) {
+    console.error('Error fetching group members:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch members' },
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/group-chats/[groupChatId]/members - Add member to group
 export async function POST(
   request: NextRequest,

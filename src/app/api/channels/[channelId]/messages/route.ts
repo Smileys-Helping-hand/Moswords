@@ -25,10 +25,14 @@ export async function GET(
         message: {
           id: messages.id,
           content: messages.content,
+          contentNonce: messages.contentNonce,
+          isEncrypted: messages.isEncrypted,
           channelId: messages.channelId,
           userId: messages.userId,
           mediaUrl: messages.mediaUrl,
           mediaType: messages.mediaType,
+          mediaEncrypted: messages.mediaEncrypted,
+          mediaNonce: messages.mediaNonce,
           createdAt: messages.createdAt,
           updatedAt: messages.updatedAt,
           deleted: messages.deleted,
@@ -71,17 +75,28 @@ export async function POST(
 
     const userId = (session.user as any).id;
     const { channelId } = await context.params;
-    const { content, mediaUrl, mediaType } = await request.json();
+    const {
+      content,
+      contentNonce,
+      isEncrypted,
+      mediaUrl,
+      mediaType,
+      mediaEncrypted,
+      mediaNonce,
+    } = await request.json();
 
-    if (!content || content.trim().length === 0) {
+    const hasContent = typeof content === 'string' && content.trim().length > 0;
+    const hasMedia = !!mediaUrl;
+
+    if (!hasContent && !hasMedia) {
       return NextResponse.json(
-        { error: 'Message content is required' },
+        { error: 'Message content or media is required' },
         { status: 400 }
       );
     }
 
     // Skip AI moderation for media messages (they just have placeholder text)
-    if (!mediaUrl) {
+    if (!mediaUrl && !isEncrypted) {
       // AI moderation (fail-open handled by API)
       try {
         const baseUrl = request.nextUrl.origin;
@@ -112,19 +127,27 @@ export async function POST(
     const [newMessage] = await db
       .insert(messages)
       .values({
-        content: content.trim(),
+        content: hasContent ? content.trim() : '',
+        contentNonce: contentNonce || null,
+        isEncrypted: !!isEncrypted,
         channelId,
         userId,
         ...(mediaUrl && { mediaUrl }),
         ...(mediaType && { mediaType }),
+        mediaEncrypted: !!mediaEncrypted,
+        mediaNonce: mediaNonce || null,
       })
       .returning({
         id: messages.id,
         content: messages.content,
+        contentNonce: messages.contentNonce,
+        isEncrypted: messages.isEncrypted,
         channelId: messages.channelId,
         userId: messages.userId,
         mediaUrl: messages.mediaUrl,
         mediaType: messages.mediaType,
+        mediaEncrypted: messages.mediaEncrypted,
+        mediaNonce: messages.mediaNonce,
         createdAt: messages.createdAt,
       });
 

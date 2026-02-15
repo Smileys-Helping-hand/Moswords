@@ -12,11 +12,14 @@ import { usePathname } from 'next/navigation';
 import { useChatContext } from '@/providers/chat-provider';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
+import { encryptFile } from '@/lib/crypto/e2e-client';
 
 interface ImagePreview {
   file: File;
   url: string;
   uploadedUrl?: string;
+  mediaEncrypted?: boolean;
+  mediaNonce?: string;
 }
 
 export default function ChatInput() {
@@ -30,6 +33,7 @@ export default function ChatInput() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [channelName, setChannelName] = useState('general');
+  const memberIdsRef = useRef<string[]>([]);
   
   const { sendMessage } = useChatContext();
 
@@ -73,8 +77,30 @@ export default function ChatInput() {
     fetchChannelName();
   }, [activeChannelId, pathname]);
 
+  const fetchChannelMembers = useCallback(async () => {
+    if (!activeChannelId) return [];
+    if (memberIdsRef.current.length > 0) return memberIdsRef.current;
+
+    try {
+      const response = await fetch(`/api/channels/${activeChannelId}/members`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      const memberIds = (data.members || []).map((member: any) => member.id);
+      memberIdsRef.current = memberIds;
+      return memberIds;
+    } catch (error) {
+      console.error('Failed to fetch channel members:', error);
+      return [];
+    }
+  }, [activeChannelId]);
+
+  const ensureChannelMembers = useCallback(async () => {
+    const memberIds = await fetchChannelMembers();
+    return memberIds;
+  }, [fetchChannelMembers]);
+
   // Handle media upload completion
-  const handleMediaUpload = useCallback(async (url: string, type: string) => {
+  const handleMediaUpload = useCallback(async (url: string, type: string, meta?: { mediaNonce?: string; mediaEncrypted?: boolean }) => {
     try {
       // Create a synthetic file object for the preview
       const response = await fetch(url);
@@ -85,6 +111,8 @@ export default function ChatInput() {
         file,
         url,
         uploadedUrl: url,
+        mediaEncrypted: meta?.mediaEncrypted,
+        mediaNonce: meta?.mediaNonce,
       });
 
       toast({
@@ -102,10 +130,22 @@ export default function ChatInput() {
   }, [toast]);
 
   // Upload image to server
-  const uploadImageToServer = useCallback(async (file: File): Promise<string | null> => {
+  const uploadImageToServer = useCallback(async (file: File): Promise<{ url: string; mediaNonce?: string; mediaEncrypted?: boolean } | null> => {
     try {
+      let uploadFile = file;
+      let mediaNonce: string | undefined;
+      let mediaEncrypted = false;
+
+      if (activeChannelId) {
+        const memberIds = await ensureChannelMembers();
+        const encrypted = await encryptFile('channel', activeChannelId, memberIds, file);
+        uploadFile = encrypted.file;
+        mediaNonce = encrypted.mediaNonce;
+        mediaEncrypted = true;
+      }
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadFile);
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -115,7 +155,7 @@ export default function ChatInput() {
       if (!response.ok) throw new Error('Upload failed');
 
       const data = await response.json();
-      return data.url;
+      return { url: data.url, mediaNonce, mediaEncrypted };
     } catch (error) {
       console.error('Upload error:', error);
       toast({
@@ -125,7 +165,7 @@ export default function ChatInput() {
       });
       return null;
     }
-  }, [toast]);
+  }, [activeChannelId, ensureChannelMembers, toast]);
 
   // Handle paste for images
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
@@ -145,20 +185,14 @@ export default function ChatInput() {
         });
 
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
+          const upload = await uploadImageToServer(file);
+          if (!upload) {
             throw new Error('Upload failed');
           }
-
-          const data = await response.json();
-          await handleMediaUpload(data.url, data.type);
+          await handleMediaUpload(upload.url, file.type, {
+            mediaNonce: upload.mediaNonce,
+            mediaEncrypted: upload.mediaEncrypted,
+          });
         } catch (error) {
           console.error('Paste upload error:', error);
           toast({
@@ -172,7 +206,7 @@ export default function ChatInput() {
         break;
       }
     }
-  }, [handleMediaUpload, toast]);
+  }, [handleMediaUpload, toast, uploadImageToServer]);
 
   // Handle file input change for quick image upload
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,20 +220,14 @@ export default function ChatInput() {
     });
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
+      const upload = await uploadImageToServer(file);
+      if (!upload) {
         throw new Error('Upload failed');
       }
-
-      const data = await response.json();
-      await handleMediaUpload(data.url, data.type);
+      await handleMediaUpload(upload.url, file.type, {
+        mediaNonce: upload.mediaNonce,
+        mediaEncrypted: upload.mediaEncrypted,
+      });
     } catch (error) {
       console.error('File upload error:', error);
       toast({
@@ -214,7 +242,7 @@ export default function ChatInput() {
         fileInputRef.current.value = '';
       }
     }
-  }, [handleMediaUpload, toast]);
+  }, [handleMediaUpload, toast, uploadImageToServer]);
 
   // Dropzone configuration for drag & drop
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -238,20 +266,14 @@ export default function ChatInput() {
       });
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
+        const upload = await uploadImageToServer(file);
+        if (!upload) {
           throw new Error('Upload failed');
         }
-
-        const data = await response.json();
-        await handleMediaUpload(data.url, data.type);
+        await handleMediaUpload(upload.url, file.type, {
+          mediaNonce: upload.mediaNonce,
+          mediaEncrypted: upload.mediaEncrypted,
+        });
       } catch (error) {
         console.error('Drop upload error:', error);
         toast({
@@ -278,22 +300,37 @@ export default function ChatInput() {
 
     try {
       let uploadedUrl = imagePreview?.uploadedUrl;
+      let mediaEncrypted = imagePreview?.mediaEncrypted;
+      let mediaNonce = imagePreview?.mediaNonce;
+      let mediaType: 'image' | 'video' | 'audio' | 'file' | undefined;
       
       // If image preview exists but hasn't been uploaded yet
       if (imagePreview && !uploadedUrl) {
-        uploadedUrl = await uploadImageToServer(imagePreview.file);
-        if (!uploadedUrl) {
+        const upload = await uploadImageToServer(imagePreview.file);
+        if (!upload) {
           setUploading(false);
           return;
         }
+        uploadedUrl = upload.url;
+        mediaEncrypted = upload.mediaEncrypted;
+        mediaNonce = upload.mediaNonce;
+        mediaType = imagePreview.file.type.startsWith('image/')
+          ? 'image'
+          : imagePreview.file.type.startsWith('video/')
+            ? 'video'
+            : imagePreview.file.type.startsWith('audio/')
+              ? 'audio'
+              : 'file';
       }
 
       // Send message with media URL if available
-      await sendMessage({
-        content: message.trim(),
-        channelId: activeChannelId,
-        mediaUrl: uploadedUrl,
-      });
+      await sendMessage(
+        message.trim(),
+        uploadedUrl,
+        mediaType,
+        mediaEncrypted,
+        mediaNonce
+      );
 
       // Clear message and image preview
       setMessage('');
@@ -429,7 +466,12 @@ export default function ChatInput() {
                 </Button>
               </motion.div>
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
-                <MediaUploadDialog onUploadComplete={handleMediaUpload} />
+                <MediaUploadDialog
+                  onUploadComplete={handleMediaUpload}
+                  scope="channel"
+                  scopeId={activeChannelId || undefined}
+                  getRecipientUserIds={ensureChannelMembers}
+                />
               </motion.div>
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="pointer-events-auto">
                 <EmojiPicker onEmojiSelect={handleEmojiSelect} />

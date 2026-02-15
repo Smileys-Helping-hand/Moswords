@@ -89,10 +89,14 @@ export const channels = pgTable('channels', {
 export const messages = pgTable('messages', {
   id: uuid('id').defaultRandom().primaryKey(),
   content: text('content').notNull(),
+  contentNonce: text('content_nonce'),
+  isEncrypted: boolean('is_encrypted').notNull().default(false),
   channelId: uuid('channel_id').notNull().references(() => channels.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   mediaUrl: text('media_url'),
   mediaType: text('media_type'), // 'image', 'video', 'audio', 'file'
+  mediaEncrypted: boolean('media_encrypted').notNull().default(false),
+  mediaNonce: text('media_nonce'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deleted: boolean('deleted').notNull().default(false),
@@ -112,10 +116,14 @@ export const messageReactions = pgTable('message_reactions', {
 export const directMessages = pgTable('direct_messages', {
   id: uuid('id').defaultRandom().primaryKey(),
   content: text('content').notNull(),
+  contentNonce: text('content_nonce'),
+  isEncrypted: boolean('is_encrypted').notNull().default(false),
   senderId: uuid('sender_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   receiverId: uuid('receiver_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   mediaUrl: text('media_url'),
   mediaType: text('media_type'), // 'image', 'video', 'audio', 'file'
+  mediaEncrypted: boolean('media_encrypted').notNull().default(false),
+  mediaNonce: text('media_nonce'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   read: boolean('read').notNull().default(false),
   archived: boolean('archived').notNull().default(false),
@@ -173,13 +181,55 @@ export const groupChatMembers = pgTable('group_chat_members', {
 export const groupChatMessages = pgTable('group_chat_messages', {
   id: uuid('id').defaultRandom().primaryKey(),
   content: text('content').notNull(),
+  contentNonce: text('content_nonce'),
+  isEncrypted: boolean('is_encrypted').notNull().default(false),
   groupChatId: uuid('group_chat_id').notNull().references(() => groupChats.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   mediaUrl: text('media_url'),
   mediaType: text('media_type'), // 'image', 'video', 'audio', 'file'
+  mediaEncrypted: boolean('media_encrypted').notNull().default(false),
+  mediaNonce: text('media_nonce'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   deleted: boolean('deleted').notNull().default(false),
 });
+
+// Device keys for E2E encryption (per device)
+export const deviceKeys = pgTable(
+  'device_keys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: text('device_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    lastSeen: timestamp('last_seen').notNull().defaultNow(),
+  },
+  (t) => ({
+    userDeviceUnique: uniqueIndex('device_keys_user_device_unique').on(t.userId, t.deviceId),
+  })
+);
+
+// Conversation key envelopes per device
+export const conversationKeys = pgTable(
+  'conversation_keys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    scope: text('scope').notNull(), // 'channel' | 'dm' | 'group'
+    scopeId: text('scope_id').notNull(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: text('device_id').notNull(),
+    encryptedKey: text('encrypted_key').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    conversationDeviceUnique: uniqueIndex('conversation_keys_scope_device_unique').on(
+      t.scope,
+      t.scopeId,
+      t.deviceId
+    ),
+  })
+);
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -196,6 +246,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   createdGroupChats: many(groupChats),
   groupChatMemberships: many(groupChatMembers),
   groupChatMessages: many(groupChatMessages),
+  deviceKeys: many(deviceKeys),
+  conversationKeys: many(conversationKeys),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -323,6 +375,20 @@ export const groupChatMessagesRelations = relations(groupChatMessages, ({ one })
   }),
   user: one(users, {
     fields: [groupChatMessages.userId],
+    references: [users.id],
+  }),
+}));
+
+export const deviceKeysRelations = relations(deviceKeys, ({ one }) => ({
+  user: one(users, {
+    fields: [deviceKeys.userId],
+    references: [users.id],
+  }),
+}));
+
+export const conversationKeysRelations = relations(conversationKeys, ({ one }) => ({
+  user: one(users, {
+    fields: [conversationKeys.userId],
     references: [users.id],
   }),
 }));

@@ -15,6 +15,48 @@
       "when": 1770309025074,
       "tag": "0001_new_trish_tilby",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770309026074,
+      "tag": "0001_unique_friend_pairs",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770309027074,
+      "tag": "0002_add_group_chats",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770309028074,
+      "tag": "0003_add_appearance",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770309029074,
+      "tag": "0004_add_media_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770309030074,
+      "tag": "0005_add_message_reactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770309031074,
+      "tag": "0006_e2e_encryption",
+      "breakpoints": true
     }
   ]
 }

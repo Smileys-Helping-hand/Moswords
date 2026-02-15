@@ -6,7 +6,13 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface ChatContextType {
-  sendMessage: (content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'audio' | 'file') => Promise<void>;
+  sendMessage: (
+    content: string,
+    mediaUrl?: string,
+    mediaType?: 'image' | 'video' | 'audio' | 'file',
+    mediaEncrypted?: boolean,
+    mediaNonce?: string
+  ) => Promise<void>;
   channelId: string | null;
 }
 

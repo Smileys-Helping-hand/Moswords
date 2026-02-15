@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, use } from 'react';
+import { useState, useEffect, useRef, use, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -18,15 +18,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  decryptMessage,
+  encryptMessage,
+  getDmScopeId,
+  ensureConversationKey,
+  decryptFile,
+  encryptFile,
+} from '@/lib/crypto/e2e-client';
 
 interface Message {
   id: string;
   content: string;
+  contentNonce?: string | null;
+  isEncrypted?: boolean | null;
   senderId: string;
   receiverId: string;
   createdAt: Date;
   read: boolean;
   archived: boolean;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  mediaEncrypted?: boolean | null;
+  mediaNonce?: string | null;
   sender?: {
     id: string;
     email: string;
@@ -46,7 +60,7 @@ interface User {
 
 export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params);
-  const { status } = useAuth();
+  const { status, session } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -56,6 +70,22 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const [newMessage, setNewMessage] = useState('');
   const previousMessageCount = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaUrlsRef = useRef<string[]>([]);
+  const recipientIdsRef = useRef<string[]>([]);
+
+  const getRecipientIds = useCallback(async () => {
+    if (recipientIdsRef.current.length > 0) return recipientIdsRef.current;
+    const ids = [userId];
+    recipientIdsRef.current = ids;
+    return ids;
+  }, [userId]);
+
+  const revokeMediaUrls = useCallback(() => {
+    for (const url of mediaUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    mediaUrlsRef.current = [];
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -94,13 +124,70 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         const data = await response.json();
         
         // Deduplicate messages by ID
+        revokeMediaUrls();
         const uniqueMessages = Array.from(
           new Map(data.messages.map((m: Message) => [m.id, m])).values()
         ) as Message[];
+
+        const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
+        const recipientIds = await getRecipientIds();
+
+        const decryptedMessages = await Promise.all(
+          uniqueMessages.map(async (msg) => {
+            let content = msg.content;
+            const isEncrypted = !!msg.isEncrypted;
+            if (isEncrypted && msg.contentNonce) {
+              const decrypted = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce);
+              content = decrypted ?? '[Encrypted message]';
+            }
+
+            if (!isEncrypted && content) {
+              try {
+                await ensureConversationKey('dm', scopeId, recipientIds);
+                const encrypted = await encryptMessage('dm', scopeId, recipientIds, content);
+                await fetch('/api/messages/encrypt', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'dm',
+                    id: msg.id,
+                    content: encrypted.ciphertext,
+                    contentNonce: encrypted.nonce,
+                  }),
+                });
+              } catch (error) {
+                console.error('Failed to migrate DM encryption:', error);
+              }
+            }
+
+            let mediaUrl = msg.mediaUrl || undefined;
+            if (msg.mediaEncrypted && msg.mediaNonce && mediaUrl) {
+              try {
+                const mediaResponse = await fetch(mediaUrl);
+                const mediaBuffer = await mediaResponse.arrayBuffer();
+                const decryptedBlob = await decryptFile('dm', scopeId, mediaBuffer, msg.mediaNonce);
+                if (decryptedBlob) {
+                  const decryptedUrl = URL.createObjectURL(decryptedBlob);
+                  mediaUrlsRef.current.push(decryptedUrl);
+                  mediaUrl = decryptedUrl;
+                }
+              } catch (error) {
+                console.error('Failed to decrypt DM media:', error);
+                mediaUrl = undefined;
+              }
+            }
+
+            return {
+              ...msg,
+              content,
+              mediaUrl,
+            } as Message;
+          })
+        );
         
         // Check for new messages and show notification
-        if (uniqueMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
-          const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
+        if (decryptedMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
+          const newMessagesArray = decryptedMessages.slice(previousMessageCount.current);
           const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
           
           // Only notify if the new message is from the other user (not sent by current user)
@@ -112,8 +199,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             });
           }
         }
-        previousMessageCount.current = uniqueMessages.length;
-        setMessages(uniqueMessages);
+        previousMessageCount.current = decryptedMessages.length;
+        setMessages(decryptedMessages);
       } catch (error) {
         console.error('Error fetching conversation:', error);
         toast({
@@ -129,9 +216,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     if (status === 'authenticated') {
       fetchConversation();
       const interval = setInterval(fetchConversation, 3000); // Poll every 3 seconds
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        revokeMediaUrls();
+      };
     }
-  }, [status, userId, router, toast, otherUser]);
+  }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, getRecipientIds]);
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
@@ -139,14 +229,38 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
     setSending(true);
     try {
-      // TODO: Implement file upload to storage service
-      // For now, just send text messages
+      const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
+      const recipientIds = await getRecipientIds();
+      const encrypted = await encryptMessage('dm', scopeId, recipientIds, messageText.trim());
+
+      let mediaUrl: string | undefined;
+      let mediaType: string | undefined;
+      let mediaEncrypted: boolean | undefined;
+      let mediaNonce: string | undefined;
+
       if (files && files.length > 0) {
-        console.log('Files to upload:', files);
-        toast({
-          title: 'File upload',
-          description: 'File upload feature coming soon!',
+        const file = files[0];
+        const encryptedFile = await encryptFile('dm', scopeId, recipientIds, file);
+        const formData = new FormData();
+        formData.append('file', encryptedFile.file);
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
         });
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload file');
+        }
+        const uploadData = await uploadRes.json();
+        mediaUrl = uploadData.url;
+        mediaType = file.type.startsWith('image/')
+          ? 'image'
+          : file.type.startsWith('video/')
+            ? 'video'
+            : file.type.startsWith('audio/')
+              ? 'audio'
+              : 'file';
+        mediaEncrypted = true;
+        mediaNonce = encryptedFile.mediaNonce;
       }
 
       const response = await fetch('/api/direct-messages', {
@@ -154,7 +268,13 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receiverId: userId,
-          content: messageText.trim(),
+          content: encrypted.ciphertext,
+          contentNonce: encrypted.nonce,
+          isEncrypted: true,
+          ...(mediaUrl && { mediaUrl }),
+          ...(mediaType && { mediaType }),
+          ...(mediaEncrypted && { mediaEncrypted }),
+          ...(mediaNonce && { mediaNonce }),
         }),
       });
 

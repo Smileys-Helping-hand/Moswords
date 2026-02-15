@@ -18,13 +18,17 @@ import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useMobileFeatures } from '@/hooks/use-mobile-features';
+import { encryptFile } from '@/lib/crypto/e2e-client';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 interface MediaUploadDialogProps {
-  onUploadComplete?: (url: string, type: 'image' | 'video' | 'audio' | 'file') => void;
+  onUploadComplete?: (url: string, type: 'image' | 'video' | 'audio' | 'file', meta?: { mediaNonce?: string; mediaEncrypted?: boolean }) => void;
+  scope?: 'channel' | 'dm' | 'group';
+  scopeId?: string;
+  getRecipientUserIds?: () => Promise<string[]>;
 }
 
-export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialogProps) {
+export default function MediaUploadDialog({ onUploadComplete, scope, scopeId, getRecipientUserIds }: MediaUploadDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [optimized, setOptimized] = useState(true);
@@ -162,8 +166,20 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
     setProgress(10);
     
     try {
+      let uploadFile = fileToUpload;
+      let mediaNonce: string | undefined;
+      let mediaEncrypted = false;
+
+      if (scope && scopeId && getRecipientUserIds) {
+        const recipients = await getRecipientUserIds();
+        const encrypted = await encryptFile(scope, scopeId, recipients, fileToUpload);
+        uploadFile = encrypted.file;
+        mediaNonce = encrypted.mediaNonce;
+        mediaEncrypted = true;
+      }
+
       const formData = new FormData();
-      formData.append('file', fileToUpload);
+      formData.append('file', uploadFile);
 
       setProgress(30);
 
@@ -193,7 +209,7 @@ export default function MediaUploadDialog({ onUploadComplete }: MediaUploadDialo
 
       // Call the callback with the URL and type
       if (onUploadComplete) {
-        onUploadComplete(data.url, data.type);
+        onUploadComplete(data.url, data.type, { mediaNonce, mediaEncrypted });
       }
 
       setIsOpen(false);

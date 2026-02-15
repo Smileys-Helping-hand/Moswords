@@ -66,7 +66,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
         <AuthProvider>
           <UnreadProvider>

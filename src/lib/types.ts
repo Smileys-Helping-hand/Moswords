@@ -43,6 +43,8 @@ export interface Member {
 export interface Message {
   id: string;
   content: string;
+  contentNonce?: string;
+  isEncrypted?: boolean;
   timestamp: any;
   author: {
     uid: string;
@@ -55,6 +57,8 @@ export interface Message {
   toxicityReason?: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'audio' | 'file';
+  mediaEncrypted?: boolean;
+  mediaNonce?: string;
 }
 
 export interface Quest {

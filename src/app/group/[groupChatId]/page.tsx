@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useState, useRef, use } from 'react';
+import { useEffect, useState, useRef, use, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 // Use native scrolling for better mobile behavior
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
@@ -18,14 +26,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  decryptFile,
+  decryptMessage,
+  encryptFile,
+  encryptMessage,
+} from '@/lib/crypto/e2e-client';
 
 interface Message {
   id: string;
   content: string;
+  contentNonce?: string | null;
+  isEncrypted?: boolean | null;
   userId: string;
   groupChatId: string;
   createdAt: Date;
   deleted: boolean;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  mediaEncrypted?: boolean | null;
+  mediaNonce?: string | null;
   sender?: {
     id: string;
     email: string;
@@ -77,6 +97,25 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   const [addingMember, setAddingMember] = useState(false);
   const previousMessageCount = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaUrlsRef = useRef<string[]>([]);
+  const memberIdsRef = useRef<string[]>([]);
+
+  const fetchMemberIds = useCallback(async () => {
+    if (memberIdsRef.current.length > 0) return memberIdsRef.current;
+    const response = await fetch(`/api/group-chats/${groupChatId}/members`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    const ids = (data.members || []).map((member: any) => member.userId || member.id);
+    memberIdsRef.current = ids;
+    return ids;
+  }, [groupChatId]);
+
+  const revokeMediaUrls = useCallback(() => {
+    for (const url of mediaUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    mediaUrlsRef.current = [];
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,17 +145,70 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
         const messagesRes = await fetch(`/api/group-chats/${groupChatId}/messages`);
         if (!messagesRes.ok) throw new Error('Failed to fetch messages');
         const messagesData = await messagesRes.json();
-        
+
         // Deduplicate messages by ID
+        revokeMediaUrls();
         const uniqueMessages = Array.from(
           new Map(messagesData.messages.map((m: Message) => [m.id, m])).values()
         ) as Message[];
-        
+
+        const memberIds = await fetchMemberIds();
+        const decryptedMessages = await Promise.all(
+          uniqueMessages.map(async (msg) => {
+            let content = msg.content;
+            if (msg.isEncrypted && msg.contentNonce) {
+              const decrypted = await decryptMessage('group', groupChatId, msg.content, msg.contentNonce);
+              content = decrypted ?? '[Encrypted message]';
+            }
+
+            if (!msg.isEncrypted && msg.content) {
+              try {
+                const encrypted = await encryptMessage('group', groupChatId, memberIds, msg.content);
+                await fetch('/api/messages/encrypt', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'group',
+                    id: msg.id,
+                    content: encrypted.ciphertext,
+                    contentNonce: encrypted.nonce,
+                  }),
+                });
+              } catch (error) {
+                console.error('Failed to migrate group encryption:', error);
+              }
+            }
+
+            let mediaUrl = msg.mediaUrl || undefined;
+            if (msg.mediaEncrypted && msg.mediaNonce && mediaUrl) {
+              try {
+                const mediaResponse = await fetch(mediaUrl);
+                const mediaBuffer = await mediaResponse.arrayBuffer();
+                const decryptedBlob = await decryptFile('group', groupChatId, mediaBuffer, msg.mediaNonce);
+                if (decryptedBlob) {
+                  const decryptedUrl = URL.createObjectURL(decryptedBlob);
+                  mediaUrlsRef.current.push(decryptedUrl);
+                  mediaUrl = decryptedUrl;
+                }
+              } catch (error) {
+                console.error('Failed to decrypt group media:', error);
+                mediaUrl = undefined;
+              }
+            }
+
+            return {
+              ...msg,
+              content,
+              mediaUrl,
+            } as Message;
+          })
+        );
+
         // Check for new messages and show notification
-        if (uniqueMessages.length > previousMessageCount.current) {
+        if (decryptedMessages.length > previousMessageCount.current) {
           // Only show notification if we had messages before (not on initial load)
           if (previousMessageCount.current > 0) {
-            const newMessagesArray = uniqueMessages.slice(previousMessageCount.current);
+            const newMessagesArray = decryptedMessages.slice(previousMessageCount.current);
             const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
             
             // Only notify if the new message is from another user
@@ -129,9 +221,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
               });
             }
           }
-          previousMessageCount.current = uniqueMessages.length;
+          previousMessageCount.current = decryptedMessages.length;
         }
-        setMessages(uniqueMessages);
+        setMessages(decryptedMessages);
       } catch (error) {
         console.error('Error fetching group chat:', error);
         toast({
@@ -147,9 +239,12 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     if (status === 'authenticated') {
       fetchData();
       const interval = setInterval(fetchData, 3000);
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        revokeMediaUrls();
+      };
     }
-  }, [status, groupChatId, router, toast, groupChat]);
+  }, [status, groupChatId, router, toast, groupChat, fetchMemberIds, revokeMediaUrls]);
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
@@ -157,14 +252,37 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
 
     setSending(true);
     try {
-      // TODO: Implement file upload to storage service
-      // For now, just send text messages
+      const memberIds = await fetchMemberIds();
+      const encrypted = await encryptMessage('group', groupChatId, memberIds, messageText.trim());
+
+      let mediaUrl: string | undefined;
+      let mediaType: string | undefined;
+      let mediaEncrypted: boolean | undefined;
+      let mediaNonce: string | undefined;
+
       if (files && files.length > 0) {
-        console.log('Files to upload:', files);
-        toast({
-          title: 'File upload',
-          description: 'File upload feature coming soon!',
+        const file = files[0];
+        const encryptedFile = await encryptFile('group', groupChatId, memberIds, file);
+        const formData = new FormData();
+        formData.append('file', encryptedFile.file);
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
         });
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload file');
+        }
+        const uploadData = await uploadRes.json();
+        mediaUrl = uploadData.url;
+        mediaType = file.type.startsWith('image/')
+          ? 'image'
+          : file.type.startsWith('video/')
+            ? 'video'
+            : file.type.startsWith('audio/')
+              ? 'audio'
+              : 'file';
+        mediaEncrypted = true;
+        mediaNonce = encryptedFile.mediaNonce;
       }
 
       const response = await fetch(`/api/group-chats/${groupChatId}/messages`, {
@@ -173,7 +291,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: messageText.trim(),
+          content: encrypted.ciphertext,
+          contentNonce: encrypted.nonce,
+          isEncrypted: true,
+          ...(mediaUrl && { mediaUrl }),
+          ...(mediaType && { mediaType }),
+          ...(mediaEncrypted && { mediaEncrypted }),
+          ...(mediaNonce && { mediaNonce }),
         }),
       });
 
