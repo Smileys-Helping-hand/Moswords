@@ -40,6 +40,12 @@ interface UseChatOptions {
 }
 
 export function useChat({ channelId, enabled = true }: UseChatOptions) {
+  const isProbablyEncryptedContent = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 48) return false;
+    if (/\s/.test(trimmed)) return false;
+    return /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
+  }, []);
   const [messages, setMessages] = useState<OptimisticMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -134,7 +140,8 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
           data.messages.reverse().map(async (msg: any) => {
             let content = msg.message.content as string;
             const contentNonce = msg.message.contentNonce as string | undefined;
-            const isEncrypted = !!msg.message.isEncrypted || !!contentNonce;
+            const looksEncrypted = isProbablyEncryptedContent(content);
+            const isEncrypted = !!msg.message.isEncrypted || !!contentNonce || looksEncrypted;
 
             if (isEncrypted) {
               if (!contentNonce || !canDecrypt) {
@@ -145,7 +152,7 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
               }
             }
 
-            if (!isEncrypted && content && memberIds.length > 0) {
+            if (!isEncrypted && content && memberIds.length > 0 && !looksEncrypted) {
               try {
                 const encrypted = await encryptMessage('channel', channelId, memberIds, content);
                 await fetch('/api/messages/encrypt', {

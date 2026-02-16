@@ -81,6 +81,12 @@ interface Member {
 }
 
 export default function GroupChatPage({ params }: { params: Promise<{ groupChatId: string }> }) {
+  const isProbablyEncryptedContent = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 48) return false;
+    if (/\s/.test(trimmed)) return false;
+    return /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
+  }, []);
   const { groupChatId } = use(params);
   const { status } = useAuth();
   const { toast } = useToast();
@@ -187,7 +193,8 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           uniqueMessages.map(async (msg) => {
             let content = msg.content;
             const contentNonce = msg.contentNonce || undefined;
-            const isEncrypted = !!msg.isEncrypted || !!contentNonce;
+            const looksEncrypted = isProbablyEncryptedContent(content);
+            const isEncrypted = !!msg.isEncrypted || !!contentNonce || looksEncrypted;
             if (isEncrypted) {
               if (!contentNonce || !canDecrypt) {
                 content = '[Encrypted message]';
@@ -197,7 +204,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
               }
             }
 
-            if (!isEncrypted && msg.content) {
+            if (!isEncrypted && msg.content && !looksEncrypted) {
               try {
                 const encrypted = await encryptMessage('group', groupChatId, memberIds, msg.content);
                 await fetch('/api/messages/encrypt', {
