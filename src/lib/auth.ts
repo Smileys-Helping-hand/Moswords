@@ -24,7 +24,7 @@ const providers = [
 
         if (!credentials?.email || !credentials?.password) {
           console.error('Missing email or password');
-          throw new Error('Please enter an email and password');
+          return null;
         }
 
         const [user] = await db
@@ -43,7 +43,7 @@ const providers = [
 
         if (!user || !user.password) {
           console.error('User not found:', credentials.email);
-          throw new Error('No user found with this email');
+          return null;
         }
 
         const passwordMatch = await bcrypt.compare(
@@ -53,7 +53,7 @@ const providers = [
 
         if (!passwordMatch) {
           console.error('Password mismatch for:', credentials.email);
-          throw new Error('Incorrect password');
+          return null;
         }
 
         console.log('Authorization successful for:', credentials.email);
@@ -65,7 +65,7 @@ const providers = [
         };
       } catch (error) {
         console.error('Authorization error:', error);
-        throw error;
+        return null;
       }
     },
   }),
