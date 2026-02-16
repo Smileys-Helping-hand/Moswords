@@ -8,6 +8,7 @@ import {
   decryptFile,
   decryptMessage,
   encryptMessage,
+  ensureConversationKey,
 } from '@/lib/crypto/e2e-client';
 
 export interface OptimisticMessage {
@@ -119,15 +120,29 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
 
         revokeMediaUrls();
 
+        let canDecrypt = false;
+        if (channelId && memberIds.length > 0) {
+          try {
+            await ensureConversationKey('channel', channelId, memberIds);
+            canDecrypt = true;
+          } catch (error) {
+            console.warn('Failed to ensure channel key:', error);
+          }
+        }
+
         const serverMessages: OptimisticMessage[] = await Promise.all(
           data.messages.reverse().map(async (msg: any) => {
             let content = msg.message.content as string;
-            const isEncrypted = !!msg.message.isEncrypted;
             const contentNonce = msg.message.contentNonce as string | undefined;
+            const isEncrypted = !!msg.message.isEncrypted || !!contentNonce;
 
-            if (isEncrypted && contentNonce) {
-              const decrypted = await decryptMessage('channel', channelId, content, contentNonce);
-              content = decrypted ?? '[Encrypted message]';
+            if (isEncrypted) {
+              if (!contentNonce || !canDecrypt) {
+                content = '[Encrypted message]';
+              } else {
+                const decrypted = await decryptMessage('channel', channelId, content, contentNonce);
+                content = decrypted ?? '[Encrypted message]';
+              }
             }
 
             if (!isEncrypted && content && memberIds.length > 0) {

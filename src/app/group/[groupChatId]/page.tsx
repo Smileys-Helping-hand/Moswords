@@ -18,7 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { Send, ArrowLeft, Users, Settings, Loader2, Phone, Video } from 'lucide-react';
+import { Send, ArrowLeft, Users, Settings, Loader2, Phone, Video, ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
@@ -31,6 +31,7 @@ import {
   decryptMessage,
   encryptFile,
   encryptMessage,
+  ensureConversationKey,
 } from '@/lib/crypto/e2e-client';
 
 interface Message {
@@ -91,12 +92,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [availableFriends, setAvailableFriends] = useState<any[]>([]);
   const [addingMember, setAddingMember] = useState(false);
   const previousMessageCount = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const mediaUrlsRef = useRef<string[]>([]);
   const memberIdsRef = useRef<string[]>([]);
 
@@ -117,13 +121,31 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     mediaUrlsRef.current = [];
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
   };
 
+  const checkIfAtBottom = useCallback(() => {
+    if (!containerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const threshold = 150;
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const atBottom = checkIfAtBottom();
+    setIsAtBottom(atBottom);
+    if (atBottom) {
+      setHasNewMessages(false);
+    }
+  }, [checkIfAtBottom]);
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length === 0) return;
+    if (isAtBottom) {
+      scrollToBottom(true);
+    }
+  }, [messages.length, isAtBottom]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -153,15 +175,29 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
         ) as Message[];
 
         const memberIds = await fetchMemberIds();
+        let canDecrypt = false;
+        try {
+          await ensureConversationKey('group', groupChatId, memberIds);
+          canDecrypt = true;
+        } catch (error) {
+          console.warn('Failed to ensure group key:', error);
+        }
+
         const decryptedMessages = await Promise.all(
           uniqueMessages.map(async (msg) => {
             let content = msg.content;
-            if (msg.isEncrypted && msg.contentNonce) {
-              const decrypted = await decryptMessage('group', groupChatId, msg.content, msg.contentNonce);
-              content = decrypted ?? '[Encrypted message]';
+            const contentNonce = msg.contentNonce || undefined;
+            const isEncrypted = !!msg.isEncrypted || !!contentNonce;
+            if (isEncrypted) {
+              if (!contentNonce || !canDecrypt) {
+                content = '[Encrypted message]';
+              } else {
+                const decrypted = await decryptMessage('group', groupChatId, msg.content, contentNonce);
+                content = decrypted ?? '[Encrypted message]';
+              }
             }
 
-            if (!msg.isEncrypted && msg.content) {
+            if (!isEncrypted && msg.content) {
               try {
                 const encrypted = await encryptMessage('group', groupChatId, memberIds, msg.content);
                 await fetch('/api/messages/encrypt', {
@@ -204,6 +240,11 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           })
         );
 
+        const atBottom = checkIfAtBottom();
+        if (!atBottom && decryptedMessages.length > previousMessageCount.current) {
+          setHasNewMessages(true);
+        }
+
         // Check for new messages and show notification
         if (decryptedMessages.length > previousMessageCount.current) {
           // Only show notification if we had messages before (not on initial load)
@@ -244,7 +285,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
         revokeMediaUrls();
       };
     }
-  }, [status, groupChatId, router, toast, groupChat, fetchMemberIds, revokeMediaUrls]);
+  }, [status, groupChatId, router, toast, groupChat, fetchMemberIds, revokeMediaUrls, checkIfAtBottom]);
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
@@ -440,9 +481,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-white/10 p-4 flex items-center justify-between"
+        className="glass-panel border-b border-white/10 p-4 flex flex-wrap items-center justify-between gap-3"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -459,7 +500,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
             size="icon"
@@ -497,7 +538,11 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       </motion.header>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 overflow-y-auto p-4 relative"
+        onScroll={handleScroll}
+      >
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -531,6 +576,22 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {hasNewMessages && (
+          <div className="absolute bottom-4 right-4">
+            <Button
+              size="sm"
+              className="rounded-full glass-card shadow-lg border border-primary/30 hover:scale-105 transition-transform bg-primary/20 hover:bg-primary/30 flex items-center gap-2"
+              onClick={() => {
+                scrollToBottom(true);
+                setHasNewMessages(false);
+              }}
+            >
+              <span className="text-xs font-medium">New messages</span>
+              <ArrowDown className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Input */}

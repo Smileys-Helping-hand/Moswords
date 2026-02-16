@@ -17,11 +17,14 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
-    const livekitUrl = process.env.LIVEKIT_URL;
+    const livekitUrl = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
     if (!apiKey || !apiSecret || !livekitUrl) {
       console.error('LiveKit keys missing');
-      return NextResponse.json({ error: 'LiveKit not configured' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'LiveKit not configured. Set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL.' },
+        { status: 500 }
+      );
     }
 
     const at = new AccessToken(apiKey, apiSecret, { identity });

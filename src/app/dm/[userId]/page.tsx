@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { Send, ArrowLeft, Archive, MoreVertical, Loader2, Phone, Video } from 'lucide-react';
+import { Send, ArrowLeft, Archive, MoreVertical, Loader2, Phone, Video, ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
@@ -68,8 +68,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
   const previousMessageCount = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const mediaUrlsRef = useRef<string[]>([]);
   const recipientIdsRef = useRef<string[]>([]);
 
@@ -87,13 +90,31 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     mediaUrlsRef.current = [];
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
   };
 
+  const checkIfAtBottom = useCallback(() => {
+    if (!containerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const threshold = 150;
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const atBottom = checkIfAtBottom();
+    setIsAtBottom(atBottom);
+    if (atBottom) {
+      setHasNewMessages(false);
+    }
+  }, [checkIfAtBottom]);
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length === 0) return;
+    if (isAtBottom) {
+      scrollToBottom(true);
+    }
+  }, [messages.length, isAtBottom]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -132,18 +153,30 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
         const recipientIds = await getRecipientIds();
 
+        let canDecrypt = false;
+        try {
+          await ensureConversationKey('dm', scopeId, recipientIds);
+          canDecrypt = true;
+        } catch (error) {
+          console.warn('Failed to ensure DM key:', error);
+        }
+
         const decryptedMessages = await Promise.all(
           uniqueMessages.map(async (msg) => {
             let content = msg.content;
-            const isEncrypted = !!msg.isEncrypted;
-            if (isEncrypted && msg.contentNonce) {
-              const decrypted = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce);
-              content = decrypted ?? '[Encrypted message]';
+            const contentNonce = msg.contentNonce || undefined;
+            const isEncrypted = !!msg.isEncrypted || !!contentNonce;
+            if (isEncrypted) {
+              if (!contentNonce || !canDecrypt) {
+                content = '[Encrypted message]';
+              } else {
+                const decrypted = await decryptMessage('dm', scopeId, msg.content, contentNonce);
+                content = decrypted ?? '[Encrypted message]';
+              }
             }
 
             if (!isEncrypted && content) {
               try {
-                await ensureConversationKey('dm', scopeId, recipientIds);
                 const encrypted = await encryptMessage('dm', scopeId, recipientIds, content);
                 await fetch('/api/messages/encrypt', {
                   method: 'POST',
@@ -185,6 +218,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           })
         );
         
+        const atBottom = checkIfAtBottom();
+        if (!atBottom && decryptedMessages.length > previousMessageCount.current) {
+          setHasNewMessages(true);
+        }
+
         // Check for new messages and show notification
         if (decryptedMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
           const newMessagesArray = decryptedMessages.slice(previousMessageCount.current);
@@ -221,7 +259,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         revokeMediaUrls();
       };
     }
-  }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, getRecipientIds]);
+  }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, getRecipientIds, checkIfAtBottom]);
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
@@ -335,9 +373,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-white/10 p-4 flex items-center justify-between"
+        className="glass-panel border-b border-white/10 p-4 flex flex-wrap items-center justify-between gap-3"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Button
             variant="ghost"
             size="icon"
@@ -352,17 +390,17 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 fallback={(otherUser.displayName || otherUser.email).substring(0, 2).toUpperCase()}
                 status="online"
               />
-              <div>
-                <h2 className="font-semibold">
+              <div className="min-w-0">
+                <h2 className="font-semibold truncate">
                   {otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'Anonymous'}
                 </h2>
-                <p className="text-xs text-muted-foreground">{otherUser.email}</p>
+                <p className="text-xs text-muted-foreground truncate hidden sm:block">{otherUser.email}</p>
               </div>
             </>
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
             size="icon"
@@ -398,7 +436,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       </motion.header>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 overflow-y-auto p-4 relative"
+        onScroll={handleScroll}
+      >
         <div className="space-y-4 max-w-4xl mx-auto">
           {messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -448,6 +490,22 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {hasNewMessages && (
+          <div className="absolute bottom-4 right-4">
+            <Button
+              size="sm"
+              className="rounded-full glass-card shadow-lg border border-primary/30 hover:scale-105 transition-transform bg-primary/20 hover:bg-primary/30 flex items-center gap-2"
+              onClick={() => {
+                scrollToBottom(true);
+                setHasNewMessages(false);
+              }}
+            >
+              <span className="text-xs font-medium">New messages</span>
+              <ArrowDown className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Input */}
