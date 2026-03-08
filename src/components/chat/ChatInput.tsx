@@ -33,8 +33,8 @@ const EmojiPicker = dynamic(
   }
 );
 
-// Dynamically import Media + Sticker pickers (client-only)
-const MediaPicker = dynamic(() => import('./MediaPicker'), { ssr: false });
+// Dynamically import GIF + Sticker pickers (client-only)
+const LocalGifPicker = dynamic(() => import('./LocalGifPicker'), { ssr: false });
 const StickerDrawer = dynamic(() => import('./StickerDrawer'), { ssr: false });
 
 interface ChatInputProps {
@@ -265,7 +265,7 @@ export default function ChatInput({
         )}
       </AnimatePresence>
 
-      {/* ── GIF picker ─────────────────────────────────────────────────── */}
+      {/* ── GIF picker (built-in pack, zero Giphy API calls) ───────────── */}
       <AnimatePresence>
         {showGifPicker && onSendGif && (
           <motion.div
@@ -275,7 +275,7 @@ export default function ChatInput({
             transition={{ duration: 0.15 }}
             className="absolute bottom-full mb-2 left-8 z-[100]"
           >
-            <MediaPicker
+            <LocalGifPicker
               onSelect={(url) => {
                 onSendGif(url);
                 setShowGifPicker(false);

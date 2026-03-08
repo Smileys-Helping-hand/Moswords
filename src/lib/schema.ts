@@ -447,3 +447,40 @@ export const emailLogs = pgTable('email_logs', {
   timestamp: timestamp('timestamp').notNull().defaultNow(),
   errorMessage: text('error_message'),
 });
+
+// ===== BUILT-IN GIF LIBRARY =====
+
+/** Curated GIF packs (Reactions, Celebrate, Gestures, Animals, etc.) */
+export const gifPacks = pgTable('gif_packs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  emoji: text('emoji').notNull().default('🎭'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/** Individual GIF items belonging to a pack */
+export const gifItems = pgTable('gif_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  packId: uuid('pack_id').notNull().references(() => gifPacks.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  tags: text('tags').array().notNull().default([]),
+  url: text('url').notNull(),       // animated gif/webp URL (R2 or CDN)
+  thumbUrl: text('thumb_url'),      // optional smaller thumbnail
+  width: integer('width'),
+  height: integer('height'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const gifPacksRelations = relations(gifPacks, ({ many }) => ({
+  items: many(gifItems),
+}));
+
+export const gifItemsRelations = relations(gifItems, ({ one }) => ({
+  pack: one(gifPacks, {
+    fields: [gifItems.packId],
+    references: [gifPacks.id],
+  }),
+}));
