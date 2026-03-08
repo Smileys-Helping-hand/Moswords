@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, MessageSquare, Menu, Inbox, User, Server, Settings, LogOut, X } from 'lucide-react';
+import { MessageSquare, Menu, Inbox, Server, User, Settings, LogOut, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,8 +10,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { useMobileFeatures } from '@/hooks/use-mobile-features';
 
 const navItems = [
-  { id: 'home', label: 'Home', icon: Home, href: '/' },
-  { id: 'messages', label: 'Messages', icon: MessageSquare, href: '/dm' },
+  { id: 'messages', label: 'Chats', icon: MessageSquare, href: '/dm' },
+  { id: 'servers', label: 'Servers', icon: Server, href: '/servers' },
   { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/nexusmail' },
   { id: 'more', label: 'More', icon: Menu, href: null },
 ];

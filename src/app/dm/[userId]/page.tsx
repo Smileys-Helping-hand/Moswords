@@ -20,11 +20,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   decryptMessage,
-  encryptMessage,
   getDmScopeId,
-  ensureConversationKey,
   decryptFile,
-  encryptFile,
 } from '@/lib/crypto/e2e-client';
 import { compressImage } from '@/lib/image-compress';
 import { useWebRTC } from '@/hooks/use-webrtc';
@@ -62,12 +59,7 @@ interface User {
 }
 
 export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
-  const isProbablyEncryptedContent = useCallback((value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length < 48) return false;
-    if (/\s/.test(trimmed)) return false;
-    return /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
-  }, []);
+
   const { userId } = use(params);
   const { status, session } = useAuth();
   const { toast } = useToast();
@@ -127,14 +119,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mediaUrlsRef = useRef<string[]>([]);
-  const recipientIdsRef = useRef<string[]>([]);
-
-  const getRecipientIds = useCallback(async () => {
-    if (recipientIdsRef.current.length > 0) return recipientIdsRef.current;
-    const ids = [userId];
-    recipientIdsRef.current = ids;
-    return ids;
-  }, [userId]);
 
   const revokeMediaUrls = useCallback(() => {
     for (const url of mediaUrlsRef.current) {
@@ -204,47 +188,14 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         ) as Message[];
 
         const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
-        const recipientIds = await getRecipientIds();
-
-        let canDecrypt = false;
-        try {
-          await ensureConversationKey('dm', scopeId, recipientIds);
-          canDecrypt = true;
-        } catch (error) {
-          console.warn('Failed to ensure DM key:', error);
-        }
 
         const decryptedMessages = await Promise.all(
           uniqueMessages.map(async (msg) => {
             let content = msg.content;
-            const contentNonce = msg.contentNonce || undefined;
-            const looksEncrypted = isProbablyEncryptedContent(content);
-            const isEncrypted = !!msg.isEncrypted || !!contentNonce || looksEncrypted;
-            if (isEncrypted) {
-              if (!contentNonce || !canDecrypt) {
-                content = '[Encrypted message]';
-              } else {
-                const decrypted = await decryptMessage('dm', scopeId, msg.content, contentNonce);
-                content = decrypted ?? '[Encrypted message]';
-              }
-            }
-
-            if (!isEncrypted && content && !looksEncrypted) {
-              try {
-                const encrypted = await encryptMessage('dm', scopeId, recipientIds, content);
-                await fetch('/api/messages/encrypt', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    type: 'dm',
-                    id: msg.id,
-                    content: encrypted.ciphertext,
-                    contentNonce: encrypted.nonce,
-                  }),
-                });
-              } catch (error) {
-                console.error('Failed to migrate DM encryption:', error);
-              }
+            // Try to decrypt messages that were previously encrypted with E2E keys
+            if (msg.contentNonce && msg.isEncrypted) {
+              const decrypted = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce);
+              content = decrypted ?? '🔒 Encrypted message';
             }
 
             let mediaUrl = msg.mediaUrl || undefined;
@@ -313,31 +264,25 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         revokeMediaUrls();
       };
     }
-  }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, getRecipientIds, checkIfAtBottom]);
+  }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, checkIfAtBottom]);
 
-  const handleSendMessage = async (text?: string, files?: File[]) => {    const messageText = text || newMessage;
+  const handleSendMessage = async (text?: string, files?: File[]) => {
+    const messageText = text || newMessage;
     if ((!messageText.trim() && (!files || files.length === 0)) || sending) return;
 
     setSending(true);
     try {
-      const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
-      const recipientIds = await getRecipientIds();
-      const encrypted = await encryptMessage('dm', scopeId, recipientIds, messageText.trim());
-
       let mediaUrl: string | undefined;
       let mediaType: string | undefined;
-      let mediaEncrypted: boolean | undefined;
-      let mediaNonce: string | undefined;
 
       if (files && files.length > 0) {
         let file = files[0];
-        // Compress images to save mobile data before encryption
+        // Compress images to save mobile data
         if (file.type.startsWith('image/')) {
           file = await compressImage(file);
         }
-        const encryptedFile = await encryptFile('dm', scopeId, recipientIds, file);
         const formData = new FormData();
-        formData.append('file', encryptedFile.file);
+        formData.append('file', file);
         const uploadRes = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
@@ -354,8 +299,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             : file.type.startsWith('audio/')
               ? 'audio'
               : 'file';
-        mediaEncrypted = true;
-        mediaNonce = encryptedFile.mediaNonce;
       }
 
       const response = await fetch('/api/direct-messages', {
@@ -363,13 +306,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receiverId: userId,
-          content: encrypted.ciphertext,
-          contentNonce: encrypted.nonce,
-          isEncrypted: true,
+          content: messageText.trim(),
+          isEncrypted: false,
           ...(mediaUrl && { mediaUrl }),
           ...(mediaType && { mediaType }),
-          ...(mediaEncrypted && { mediaEncrypted }),
-          ...(mediaNonce && { mediaNonce }),
         }),
       });
 
@@ -502,7 +442,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/dm')}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
