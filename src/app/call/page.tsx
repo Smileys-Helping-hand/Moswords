@@ -54,7 +54,7 @@ export default function CallPage() {
           throw new Error(`Invalid token response: ${details}`);
         }
 
-        const room = new Room({ autoSubscribe: true });
+        const room = new Room({});
         await room.connect(url, tokenString);
         roomRef.current = room;
 

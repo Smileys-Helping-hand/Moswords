@@ -25,7 +25,7 @@ type ConversationRow = {
     name: string | null;
     displayName: string | null;
     photoURL: string | null;
-    lastSeen: string | null;
+    lastSeen: Date | null;
   };
   unreadCount: number;
 };

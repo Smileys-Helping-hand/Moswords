@@ -139,16 +139,16 @@ export async function PATCH(
 // DELETE /api/group-chats/[groupChatId] - Leave or delete group chat
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { groupChatId: string } }
+  { params }: { params: Promise<{ groupChatId: string }> }
 ) {
   try {
+    const { groupChatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
-    const groupChatId = params.groupChatId;
 
     // Check if user is a member
     const [membership] = await db

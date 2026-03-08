@@ -231,8 +231,40 @@ export const conversationKeys = pgTable(
   })
 );
 
-// Relations
-export const usersRelations = relations(users, ({ many, one }) => ({
+// WebRTC Signaling table (used for peer-to-peer calls without a 3rd-party server)
+// Rows are short-lived. Callee polls for signals addressed to them.
+export const rtcSignals = pgTable('rtc_signals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  /** caller or callee who sent this signal */
+  fromUserId: uuid('from_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** recipient of the signal */
+  toUserId: uuid('to_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /**
+   * Signal type:
+   *  call-offer    – initiator sends SDP offer + call metadata
+   *  call-answer   – callee accepts and sends SDP answer
+   *  call-decline  – callee declines the call
+   *  call-cancel   – caller cancels before answer
+   *  call-end      – either side ends an active call
+   *  ice-candidate – trickle ICE
+   */
+  type: text('type').notNull(),
+  /** JSON-serialised SDP or ICE candidate */
+  payload: text('payload').notNull(),
+  /** Logical call session ID — shared between the two peers */
+  callId: text('call_id').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/** User-uploaded custom stickers (background-removed PNGs stored in R2) */
+export const userStickers = pgTable('user_stickers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  imageUrl: text('image_url').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
   ownedServers: many(servers),

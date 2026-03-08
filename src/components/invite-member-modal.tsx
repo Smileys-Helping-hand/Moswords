@@ -170,9 +170,8 @@ export default function InviteMemberModal({ serverId, trigger }: InviteMemberMod
                     >
                       <div className="flex items-center gap-3">
                         <UserAvatar
-                          src={friend.friend.photoURL || undefined}
-                          alt={friend.friend.displayName || friend.friend.email}
-                          size="sm"
+                          src={friend.friend.photoURL || ''}
+                          fallback={friend.friend.displayName?.[0] || 'U'}
                         />
                         <div>
                           <p className="font-medium">

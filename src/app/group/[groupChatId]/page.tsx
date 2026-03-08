@@ -88,7 +88,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     return /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
   }, []);
   const { groupChatId } = use(params);
-  const { status } = useAuth();
+  const { status, session } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -260,7 +260,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
             const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
             
             // Only notify if the new message is from another user
-            if (lastNewMessage && lastNewMessage.sender && lastNewMessage.senderId !== session?.user?.id) {
+            if (lastNewMessage && lastNewMessage.sender && lastNewMessage.sender.id !== (session?.user as any)?.id) {
               toast({
                 title: `👥 New message in ${detailsData.groupChat.name}`,
                 description: `${lastNewMessage.sender.displayName || lastNewMessage.sender.name || 'Someone'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
@@ -547,7 +547,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       {/* Messages */}
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-auto p-4 relative"
+        className="flex-1 min-h-0 overflow-y-auto p-4 relative chat-bg"
         onScroll={handleScroll}
       >
         <div className="max-w-4xl mx-auto space-y-4">

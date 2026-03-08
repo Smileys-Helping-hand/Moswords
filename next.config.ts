@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+// @ts-ignore – next-pwa has no bundled type declarations
 import withPWA from 'next-pwa';
 
 const nextConfig: NextConfig = {
@@ -9,6 +10,7 @@ const nextConfig: NextConfig = {
   // Allow dev server access from mobile devices on local network
   allowedDevOrigins: ['192.168.31.217', '192.168.31.217:3000'],
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

@@ -49,23 +49,48 @@ export default function MobileNav() {
   return (
     <>
       {/* Mobile Bottom Navigation - Only visible on screens < 768px */}
-      <nav className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-gradient-to-t from-background via-background/95 to-transparent border-t border-white/10 backdrop-blur-xl safe-area-bottom">
-        <div className="flex justify-around items-center h-16 px-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavigate(item.href)}
-              className={`flex flex-col items-center justify-center w-16 h-14 rounded-xl transition-all ${
-                isActive(item.href)
-                  ? 'bg-accent text-white'
-                  : 'text-muted-foreground hover:bg-white/10'
-              }`}
-              aria-label={item.label}
-            >
-              <item.icon className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </button>
-          ))}
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-background/90 border-t border-border/60 backdrop-blur-2xl safe-area-bottom shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.3)]">
+        <div className="flex justify-around items-end h-16 px-2 pb-1">
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavigate(item.href)}
+                className="flex flex-col items-center justify-center w-16 h-14 rounded-xl transition-all relative"
+                aria-label={item.label}
+              >
+                {/* Active indicator glow pill */}
+                {active && (
+                  <motion.div
+                    layoutId="nav-active-pill"
+                    className="absolute inset-x-1 inset-y-1 rounded-xl bg-primary/15 border border-primary/25"
+                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                  />
+                )}
+                <item.icon
+                  className={`w-5 h-5 mb-0.5 relative z-10 transition-all duration-150 ${
+                    active ? 'text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]' : 'text-muted-foreground'
+                  }`}
+                />
+                <span
+                  className={`text-[10px] font-semibold relative z-10 transition-colors duration-150 ${
+                    active ? 'text-primary' : 'text-muted-foreground'
+                  }`}
+                >
+                  {item.label}
+                </span>
+                {/* Active dot */}
+                {active && (
+                  <motion.span
+                    layoutId="nav-active-dot"
+                    className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
+                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </nav>
 

@@ -27,10 +27,11 @@ export interface OptimisticMessage {
   isFlagged?: boolean;
   toxicityReason?: string;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'audio' | 'file';
+  mediaType?: 'image' | 'video' | 'audio' | 'file' | 'gif' | 'sticker';
   mediaEncrypted?: boolean;
   mediaNonce?: string;
   status?: 'sending' | 'sent' | 'error';
+  readStatus?: 'sent' | 'delivered' | 'read';
   tempId?: string;
 }
 
@@ -387,7 +388,7 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
     setMessages(prev => prev.filter(m => m.tempId !== tempId));
     
     // Re-send with same content
-    await sendMessage(message.content, message.mediaUrl, message.mediaType, message.mediaEncrypted, message.mediaNonce);
+    await sendMessage(message.content, message.mediaUrl, message.mediaType as any, message.mediaEncrypted, message.mediaNonce);
   }, [messages, sendMessage]);
 
   // Delete failed message

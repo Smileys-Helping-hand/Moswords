@@ -7,6 +7,7 @@ import NotificationManager from '@/components/notification-manager';
 import MobileNav from '@/components/mobile-nav';
 import InstallPrompt from '@/components/install-prompt';
 import ClientOnlyProviders from '@/components/client-only-providers';
+import ClientMobileWrapper from '@/components/ClientMobileWrapper';
 
 export const viewport: Viewport = {
   themeColor: '#030014',
@@ -70,11 +71,13 @@ export default function RootLayout({
       <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
         <AuthProvider>
           <UnreadProvider>
+            <ClientMobileWrapper>
             <ClientOnlyProviders />
             {children}
             <NotificationManager />
             <MobileNav />
             <InstallPrompt />
+            </ClientMobileWrapper>
           </UnreadProvider>
         </AuthProvider>
         <Toaster />

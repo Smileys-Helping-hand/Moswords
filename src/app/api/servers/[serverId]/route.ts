@@ -37,7 +37,7 @@ export async function GET(
       .where(
         and(
           eq(serverMembers.serverId, serverId),
-          eq(serverMembers.userId, session.user.id as string)
+          eq(serverMembers.userId, (session.user as any).id as string)
         )
       )
       .limit(1);

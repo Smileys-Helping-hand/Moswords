@@ -22,7 +22,17 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: true,
     loggingBehavior: 'debug',
   },
+  ios: {
+    contentInset: 'automatic',
+    backgroundColor: '#030014',
+    preferredContentMode: 'mobile',
+  },
   plugins: {
+    StatusBar: {
+      style: 'DARK',
+      backgroundColor: '#030014',
+      overlaysWebView: true,
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       backgroundColor: '#030014',
@@ -32,8 +42,8 @@ const config: CapacitorConfig = {
       splashImmersive: true,
     },
     Keyboard: {
-      resize: 'body',
-      style: 'dark',
+      resize: 'body' as any,
+      style: 'dark' as any,
       resizeOnFullScreen: true,
     },
   },

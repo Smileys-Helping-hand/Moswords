@@ -26,6 +26,9 @@ import {
   decryptFile,
   encryptFile,
 } from '@/lib/crypto/e2e-client';
+import { compressImage } from '@/lib/image-compress';
+import { useWebRTC } from '@/hooks/use-webrtc';
+import CallScreen from '@/components/call/CallScreen';
 
 interface Message {
   id: string;
@@ -69,8 +72,52 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const { status, session } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const currentUserId = (session?.user as any)?.id || (session?.user as any)?.uid;
+
+  // ── WebRTC calling ──────────────────────────────────────────────────────────
+  const {
+    callState,
+    remoteParticipant,
+    localStream,
+    remoteStream,
+    isMuted,
+    isCameraOff,
+    startCall,
+    acceptCall,
+    declineCall,
+    endCall,
+    toggleMute,
+    toggleCamera,
+  } = useWebRTC();
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<User | null>(null);
+
+  const handleVoiceCall = useCallback(() => {
+    if (!otherUser) return;
+    startCall(
+      {
+        userId: otherUser.id,
+        displayName: otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'User',
+        photoURL: otherUser.photoURL,
+      },
+      'voice',
+    );
+  }, [otherUser, startCall]);
+
+  const handleVideoCall = useCallback(() => {
+    if (!otherUser) return;
+    startCall(
+      {
+        userId: otherUser.id,
+        displayName: otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'User',
+        photoURL: otherUser.photoURL,
+      },
+      'video',
+    );
+  }, [otherUser, startCall]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
@@ -268,8 +315,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, getRecipientIds, checkIfAtBottom]);
 
-  const handleSendMessage = async (text?: string, files?: File[]) => {
-    const messageText = text || newMessage;
+  const handleSendMessage = async (text?: string, files?: File[]) => {    const messageText = text || newMessage;
     if ((!messageText.trim() && (!files || files.length === 0)) || sending) return;
 
     setSending(true);
@@ -284,7 +330,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       let mediaNonce: string | undefined;
 
       if (files && files.length > 0) {
-        const file = files[0];
+        let file = files[0];
+        // Compress images to save mobile data before encryption
+        if (file.type.startsWith('image/')) {
+          file = await compressImage(file);
+        }
         const encryptedFile = await encryptFile('dm', scopeId, recipientIds, file);
         const formData = new FormData();
         formData.append('file', encryptedFile.file);
@@ -340,6 +390,58 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   };
 
+  /** Send an unencrypted GIF (public Giphy URL — no sensitive content) */
+  const handleSendGif = async (gifUrl: string) => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const response = await fetch('/api/direct-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receiverId: userId,
+          content: '🎞️ GIF',
+          isEncrypted: false,
+          mediaUrl: gifUrl,
+          mediaType: 'gif',
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to send GIF');
+      const data = await response.json();
+      setMessages((prev) => [...prev, data.message]);
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to send GIF' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /** Send a user sticker (R2 URL, unencrypted PNG) */
+  const handleSendSticker = async (stickerUrl: string) => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const response = await fetch('/api/direct-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receiverId: userId,
+          content: '🎨 Sticker',
+          isEncrypted: false,
+          mediaUrl: stickerUrl,
+          mediaType: 'sticker',
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to send sticker');
+      const data = await response.json();
+      setMessages((prev) => [...prev, data.message]);
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to send sticker' });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleArchive = async () => {
     try {
       const response = await fetch(`/api/conversations/${userId}`, {
@@ -376,11 +478,25 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   return (
     <div className="h-screen w-full flex flex-col min-h-0 bg-gradient-to-br from-background via-background to-primary/5">
+      {/* WebRTC Call Overlay */}
+      <CallScreen
+        callState={callState}
+        remoteParticipant={remoteParticipant}
+        localStream={localStream}
+        remoteStream={remoteStream}
+        isMuted={isMuted}
+        isCameraOff={isCameraOff}
+        onAccept={acceptCall}
+        onDecline={declineCall}
+        onEnd={endCall}
+        onToggleMute={toggleMute}
+        onToggleCamera={toggleCamera}
+      />
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-white/10 p-4 flex flex-wrap items-center justify-between gap-3"
+        className="glass-panel border-b border-border/60 px-3 py-2.5 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm"
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <Button
@@ -412,7 +528,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             variant="ghost"
             size="icon"
             className="text-primary"
-            onClick={() => router.push(`/call?room=dm-${userId}&type=voice`)}
+            onClick={handleVoiceCall}
             aria-label="Start voice call"
           >
             <Phone className="w-5 h-5" />
@@ -421,7 +537,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             variant="ghost"
             size="icon"
             className="text-primary"
-            onClick={() => router.push(`/call?room=dm-${userId}&type=video`)}
+            onClick={handleVideoCall}
             aria-label="Start video call"
           >
             <Video className="w-5 h-5" />
@@ -445,7 +561,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       {/* Messages */}
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-auto p-4 relative"
+        className="flex-1 min-h-0 overflow-y-auto p-4 relative chat-bg"
         onScroll={handleScroll}
       >
         <div className="space-y-4 max-w-4xl mx-auto">
@@ -478,6 +594,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 <ChatMessage
                   key={`${msg.id}-${index}`}
                   showAvatar={showAvatar}
+                  isCurrentUser={msg.senderId === currentUserId}
                   message={{
                     id: msg.id,
                     content: msg.content,
@@ -490,6 +607,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                     },
                     reactions: [],
                     isFlagged: false,
+                    mediaUrl: msg.mediaUrl ?? undefined,
+                    mediaType: (msg.mediaType ?? undefined) as any,
+                    // Derive read receipt from the DM read boolean
+                    readStatus: msg.senderId === currentUserId
+                      ? (msg.read ? 'read' : 'sent')
+                      : undefined,
                   }}
                 />
               );
@@ -521,6 +644,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           value={newMessage}
           onChange={setNewMessage}
           onSend={(text, files) => handleSendMessage(text, files)}
+          onSendGif={handleSendGif}
+          onSendSticker={handleSendSticker}
           placeholder={`Message ${otherUser?.displayName || otherUser?.name || 'user'}...`}
           disabled={sending}
         />

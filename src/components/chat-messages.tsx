@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './ui/button';
 import { usePathname } from 'next/navigation';
 import { useChat } from '@/hooks/use-chat';
+import { useAuth } from '@/hooks/use-auth';
 
 interface Channel {
   id: string;
@@ -18,6 +19,8 @@ interface Channel {
 
 export default function ChatMessages() {
   const pathname = usePathname();
+  const { session } = useAuth();
+  const currentUserId = (session?.user as any)?.id || (session?.user as any)?.uid;
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
 
@@ -97,7 +100,7 @@ export default function ChatMessages() {
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-3 md:p-4 pb-32 space-y-4 md:space-y-6 relative scroll-smooth smooth-scroll"
+      className="flex-1 overflow-y-auto p-3 md:p-4 pb-32 space-y-4 md:space-y-6 relative scroll-smooth smooth-scroll chat-bg"
       onScroll={handleScroll}
     >
       <motion.div 
@@ -142,17 +145,18 @@ export default function ChatMessages() {
             prevMsg.author.uid === msg.author.uid &&
             Math.abs(new Date(msg.timestamp).getTime() - new Date(prevMsg.timestamp).getTime()) < 60000;
           
-          const isGroupedWithNext = nextMsg &&
+          const isGroupedWithNext = !!(nextMsg &&
             nextMsg.author.uid === msg.author.uid &&
-            Math.abs(new Date(nextMsg.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 60000;
+            Math.abs(new Date(nextMsg.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 60000);
           
           return (
             <ChatMessage 
               key={msg.id}
               message={msg}
               showAvatar={!shouldGroup}
-              isGrouped={shouldGroup}
+              isGrouped={!!shouldGroup}
               isLastInGroup={!isGroupedWithNext}
+              isCurrentUser={msg.author.uid === currentUserId}
               onRetry={msg.status === 'error' && msg.tempId ? () => retryMessage(msg.tempId!) : undefined}
               onDelete={msg.status === 'error' && msg.tempId ? () => deleteFailedMessage(msg.tempId!) : undefined}
             />

@@ -11,7 +11,7 @@ const useSecureCookies = isProduction;
 const sameSitePolicy = isProduction ? 'none' : 'lax';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 
-const providers = [
+const providers: any[] = [
   CredentialsProvider({
     name: 'credentials',
     credentials: {
@@ -143,4 +143,4 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   // Required for production deployment on Vercel and mobile browsers
   trustHost: true,
-};
+} as NextAuthOptions;

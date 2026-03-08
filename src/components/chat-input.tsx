@@ -13,6 +13,7 @@ import { useChatContext } from '@/providers/chat-provider';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
 import { encryptFile } from '@/lib/crypto/e2e-client';
+import { compressImage } from '@/lib/image-compress';
 
 interface ImagePreview {
   file: File;
@@ -135,6 +136,11 @@ export default function ChatInput() {
       let uploadFile = file;
       let mediaNonce: string | undefined;
       let mediaEncrypted = false;
+
+      // Compress images before encryption & upload (saves data on mobile)
+      if (file.type.startsWith('image/')) {
+        uploadFile = await compressImage(file);
+      }
 
       if (activeChannelId) {
         const memberIds = await ensureChannelMembers();

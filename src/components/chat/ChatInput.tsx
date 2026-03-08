@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { Send, Smile, Plus, Mic, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import dynamic from 'next/dynamic';
+import { Theme } from 'emoji-picker-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
@@ -32,10 +33,18 @@ const EmojiPicker = dynamic(
   }
 );
 
+// Dynamically import Media + Sticker pickers (client-only)
+const MediaPicker = dynamic(() => import('./MediaPicker'), { ssr: false });
+const StickerDrawer = dynamic(() => import('./StickerDrawer'), { ssr: false });
+
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: (text: string, files?: File[]) => void;
+  /** Called when the user selects a GIF — passes the Giphy original URL */
+  onSendGif?: (gifUrl: string) => void;
+  /** Called when the user taps a sticker from their tray */
+  onSendSticker?: (stickerUrl: string) => void;
   placeholder?: string;
   disabled?: boolean;
   maxRows?: number;
@@ -50,11 +59,15 @@ export default function ChatInput({
   value,
   onChange,
   onSend,
+  onSendGif,
+  onSendSticker,
   placeholder = "Type a message...",
   disabled = false,
   maxRows = 5,
 }: ChatInputProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showStickerDrawer, setShowStickerDrawer] = useState(false);
   const [files, setFiles] = useState<FilePreview[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
@@ -148,7 +161,7 @@ export default function ChatInput({
     }
   };
 
-  // Close emoji picker when clicking outside
+  // Close any picker when clicking outside the input cockpit
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -239,7 +252,7 @@ export default function ChatInput({
             <div className="bg-black/80 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
               <EmojiPicker
                 onEmojiClick={handleEmojiClick}
-                theme="dark"
+                theme={Theme.DARK}
                 searchPlaceHolder="Search emoji..."
                 width={350}
                 height={400}
@@ -248,6 +261,48 @@ export default function ChatInput({
                 lazyLoadEmojis={true}
               />
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── GIF picker ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showGifPicker && onSendGif && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute bottom-full mb-2 left-8 z-[100]"
+          >
+            <MediaPicker
+              onSelect={(url) => {
+                onSendGif(url);
+                setShowGifPicker(false);
+              }}
+              onClose={() => setShowGifPicker(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Sticker tray ───────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showStickerDrawer && onSendSticker && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute bottom-full mb-2 left-16 z-[100]"
+          >
+            <StickerDrawer
+              onSend={(url) => {
+                onSendSticker(url);
+                setShowStickerDrawer(false);
+              }}
+              onClose={() => setShowStickerDrawer(false)}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -305,7 +360,11 @@ export default function ChatInput({
                     "shrink-0 hover:bg-white/10 transition-all rounded-xl",
                     showEmojiPicker ? "text-[#00F0FF] bg-white/10" : "hover:text-white"
                   )}
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => {
+                    setShowEmojiPicker(!showEmojiPicker);
+                    setShowGifPicker(false);
+                    setShowStickerDrawer(false);
+                  }}
                 >
                   <Smile className="w-5 h-5" />
                 </Button>
@@ -314,6 +373,56 @@ export default function ChatInput({
                 <p>Add emoji</p>
               </TooltipContent>
             </Tooltip>
+
+            {/* GIF button */}
+            {onSendGif && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'shrink-0 hover:bg-white/10 transition-all rounded-xl text-xs font-black px-1',
+                      showGifPicker ? 'text-[#00F0FF] bg-white/10' : 'hover:text-white text-white/60',
+                    )}
+                    onClick={() => {
+                      setShowGifPicker(!showGifPicker);
+                      setShowEmojiPicker(false);
+                      setShowStickerDrawer(false);
+                    }}
+                  >
+                    GIF
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Send a GIF</p></TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Sticker button */}
+            {onSendSticker && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'shrink-0 hover:bg-white/10 transition-all rounded-xl text-base',
+                      showStickerDrawer ? 'text-[#00F0FF] bg-white/10' : 'hover:text-white text-white/60',
+                    )}
+                    onClick={() => {
+                      setShowStickerDrawer(!showStickerDrawer);
+                      setShowEmojiPicker(false);
+                      setShowGifPicker(false);
+                    }}
+                  >
+                    🎨
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>My Stickers</p></TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* CENTER INPUT */}

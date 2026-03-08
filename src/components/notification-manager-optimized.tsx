@@ -195,8 +195,8 @@ export default function NotificationManagerOptimized() {
               ? `/dm/${message.senderId}`
               : '/',
       },
-      vibrate: [200, 100, 200],
       requireInteraction: false,
+      ...({ vibrate: [200, 100, 200] } as any),
     });
   }, [currentUserId, isViewingChannel, toast, addUnread]);
 
