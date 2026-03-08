@@ -410,14 +410,39 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   if (loading || status === 'loading') {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="h-[calc(100dvh-4rem)] md:h-full flex flex-col bg-background">
+        {/* Skeleton header */}
+        <div className="px-3 py-2.5 border-b border-border/40 flex items-center gap-3">
+          <div className="skeleton w-9 h-9 rounded-xl md:hidden" />
+          <div className="skeleton w-11 h-11 rounded-full shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="skeleton h-4 w-36 rounded" />
+            <div className="skeleton h-3 w-20 rounded" />
+          </div>
+          <div className="skeleton w-9 h-9 rounded-xl" />
+          <div className="skeleton w-9 h-9 rounded-xl" />
+        </div>
+        {/* Skeleton messages */}
+        <div className="flex-1 p-4 chat-bg space-y-4">
+          {[80, 60, 200, 100, 140, 80, 120].map((w, i) => (
+            <div key={i} className={`flex items-end gap-2 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
+              {i % 2 === 0 && <div className="skeleton w-8 h-8 rounded-full shrink-0" />}
+              <div className={`skeleton h-10 rounded-2xl`} style={{ width: w }} />
+            </div>
+          ))}
+        </div>
+        {/* Skeleton input */}
+        <div className="p-4 border-t border-border/40 flex items-center gap-2">
+          <div className="skeleton w-9 h-9 rounded-xl" />
+          <div className="skeleton flex-1 h-10 rounded-xl" />
+          <div className="skeleton w-9 h-9 rounded-xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full flex flex-col min-h-0 bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="h-[calc(100dvh-4rem)] md:h-full flex flex-col min-h-0 bg-background">
       {/* WebRTC Call Overlay */}
       <CallScreen
         callState={callState}
@@ -436,28 +461,38 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-panel border-b border-border/60 px-3 py-2.5 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm"
+        className="bg-background/95 backdrop-blur-sm border-b border-border/50 px-3 py-2.5 flex items-center justify-between gap-2 shadow-sm shrink-0"
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {/* Back arrow — mobile only, desktop has sidebar */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.push('/dm')}
+            className="md:hidden shrink-0 h-9 w-9"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           {otherUser && (
             <>
-              <UserAvatar
-                src={otherUser.photoURL || ''}
-                fallback={(otherUser.displayName || otherUser.email).substring(0, 2).toUpperCase()}
-                status="online"
-              />
-              <div className="min-w-0">
-                <h2 className="font-semibold truncate">
-                  {otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'Anonymous'}
+              <div className="relative shrink-0 cursor-pointer">
+                <UserAvatar
+                  src={otherUser.photoURL || ''}
+                  fallback={(otherUser.displayName || otherUser.name || otherUser.email || 'U').substring(0, 2).toUpperCase()}
+                  status={otherUser.lastSeen === 'online' ? 'online' : 'offline'}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-semibold text-sm leading-tight truncate">
+                  {otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'User'}
                 </h2>
-                <p className="text-xs text-muted-foreground truncate hidden sm:block">{otherUser.email}</p>
+                <p className="text-[11px] leading-tight truncate text-muted-foreground">
+                  {otherUser.lastSeen === 'online' ? (
+                    <span className="text-green-400 font-medium">Online</span>
+                  ) : (
+                    'tap for info'
+                  )}
+                </p>
               </div>
             </>
           )}
@@ -578,8 +613,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         )}
       </div>
 
-      {/* Input */}
-      <div className="glass-panel border-t border-white/10 p-4">
+      {/* Input — extra bottom space on mobile to clear fixed nav */}
+      <div className="bg-background/95 backdrop-blur-sm border-t border-border/50 px-4 pt-3 pb-3 shrink-0">
         <ChatInput
           value={newMessage}
           onChange={setNewMessage}

@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import UserAvatar from '@/components/user-avatar';
 import {
@@ -13,6 +12,7 @@ import {
   Users,
   Check,
   CheckCheck,
+  Settings,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,6 +21,7 @@ import FriendsDialog from '@/components/friends-dialog';
 import SponsoredChatRow from '@/components/ads/SponsoredChatRow';
 import { MOCK_ADS } from '@/lib/mock-ads';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
+import { signOut } from 'next-auth/react';
 
 type Conversation = {
   otherUserId: string;
@@ -171,11 +172,11 @@ export default function ConversationListPanel({ compact = false }: ConversationL
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-border/30 shrink-0 bg-background/98 backdrop-blur-xl">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-bold tracking-tight">Messages</h1>
-          <div className="flex items-center gap-1">
+      {/* ── Header ── */}
+      <div className="px-4 pt-3 pb-2.5 border-b border-border/20 shrink-0 bg-background">
+        <div className="flex items-center justify-between mb-2.5">
+          <h1 className="text-[22px] font-bold tracking-tight">Messages</h1>
+          <div className="flex items-center gap-0.5">
             <FriendsDialog />
             <CreateGroupChatDialog />
           </div>
@@ -186,30 +187,30 @@ export default function ConversationListPanel({ compact = false }: ConversationL
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search conversations..."
-            className="pl-9 h-10 bg-muted/50 border-transparent focus:border-primary/50 rounded-xl text-sm"
+            placeholder="Search"
+            className="pl-9 h-9 bg-muted/60 border-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-full text-sm"
           />
         </div>
       </div>
 
       <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <TabsList className="mx-4 mt-3 mb-1 shrink-0 grid grid-cols-2 h-9 bg-muted/40">
-          <TabsTrigger value="dms" className="text-xs font-semibold gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5" />
+        <TabsList className="mx-3 mt-2 mb-1 shrink-0 grid grid-cols-2 h-8 bg-muted/50 rounded-lg">
+          <TabsTrigger value="dms" className="text-xs font-semibold gap-1 rounded-md">
+            <MessageSquare className="w-3 h-3" />
             Chats
             {conversations.reduce((n, c) => n + (c.unreadCount > 0 ? 1 : 0), 0) > 0 && (
-              <span className="ml-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              <span className="ml-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
                 {conversations.reduce((n, c) => n + (c.unreadCount > 0 ? 1 : 0), 0)}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="groups" className="text-xs font-semibold gap-1.5">
-            <Users className="w-3.5 h-3.5" />
+          <TabsTrigger value="groups" className="text-xs font-semibold gap-1 rounded-md">
+            <Users className="w-3 h-3" />
             Groups ({groupChats.length})
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 overflow-y-auto pb-24 md:pb-4">
+        <ScrollArea className="flex-1 overflow-y-auto pb-20 md:pb-2">
           {/* —— DMs tab —— */}
           <TabsContent value="dms" className="mt-0 px-2">
             <AnimatePresence initial={false}>
@@ -392,6 +393,33 @@ export default function ConversationListPanel({ compact = false }: ConversationL
           </TabsContent>
         </ScrollArea>
       </Tabs>
+
+      {/* ── Profile strip at bottom (desktop only) — like WhatsApp's bottom bar ── */}
+      <div className="hidden md:flex items-center gap-3 px-4 py-3 border-t border-border/20 bg-background shrink-0">
+        <div
+          className="cursor-pointer shrink-0"
+          onClick={() => router.push('/profile')}
+          title="View profile"
+        >
+          <UserAvatar
+            src={session?.user?.image || ''}
+            fallback={(session?.user?.name || session?.user?.email || 'U').substring(0, 2).toUpperCase()}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate leading-tight">
+            {session?.user?.name || 'Me'}
+          </p>
+          <p className="text-[11px] text-green-400 font-medium leading-tight">Online</p>
+        </div>
+        <button
+          onClick={() => router.push('/profile')}
+          className="p-2 rounded-xl hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground"
+          title="Settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
