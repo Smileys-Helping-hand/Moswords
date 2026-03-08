@@ -189,13 +189,29 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
         const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
 
+        // Detect base64 ciphertext that may have been stored without proper flags
+        const looksLikeCiphertext = (s: string) => {
+          if (!s || s.length < 20) return false;
+          const stripped = s.replace(/[\s\n\r]/g, '');
+          const b64Chars = (stripped.match(/[A-Za-z0-9+/=]/g) || []).length;
+          return b64Chars / stripped.length > 0.97 && stripped.length > 30 && !s.includes(' ');
+        };
+
         const decryptedMessages = await Promise.all(
           uniqueMessages.map(async (msg) => {
             let content = msg.content;
             // Try to decrypt messages that were previously encrypted with E2E keys
-            if (msg.contentNonce && msg.isEncrypted) {
-              const decrypted = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce);
-              content = decrypted ?? '🔒 Encrypted message';
+            if (msg.isEncrypted || msg.contentNonce) {
+              if (msg.contentNonce) {
+                const decrypted = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce);
+                content = decrypted ?? '🔒 Encrypted message';
+              } else {
+                // isEncrypted true but no nonce — key was lost
+                content = '🔒 Encrypted message';
+              }
+            } else if (looksLikeCiphertext(msg.content)) {
+              // Fallback: content looks like base64 ciphertext but flags weren't set properly
+              content = '🔒 Encrypted message';
             }
 
             let mediaUrl = msg.mediaUrl || undefined;
@@ -539,7 +555,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         className="flex-1 min-h-0 overflow-y-auto p-4 relative chat-bg"
         onScroll={handleScroll}
       >
-        <div className="space-y-4 max-w-4xl mx-auto">
+        <div className="space-y-0 max-w-4xl mx-auto">
           {messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p>No messages yet</p>
