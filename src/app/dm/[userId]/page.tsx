@@ -18,11 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  decryptMessage,
-  getDmScopeId,
-  decryptFile,
-} from '@/lib/crypto/e2e-client';
+// E2E crypto imports removed — decryption disabled, all new messages are plain text
 import { compressImage } from '@/lib/image-compress';
 import { useWebRTC } from '@/hooks/use-webrtc';
 import CallScreen from '@/components/call/CallScreen';
@@ -187,9 +183,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           new Map(data.messages.map((m: Message) => [m.id, m])).values()
         ) as Message[];
 
-        const scopeId = getDmScopeId(userId, (session?.user as any)?.id || '');
-
-        // Detect base64 ciphertext that may have been stored without proper flags
+        // Synchronously map messages — no async crypto (E2E disabled, keys are gone)
         const looksLikeCiphertext = (s: string) => {
           if (!s || s.length < 20) return false;
           const stripped = s.replace(/[\s\n\r]/g, '');
@@ -197,47 +191,15 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           return b64Chars / stripped.length > 0.97 && stripped.length > 30 && !s.includes(' ');
         };
 
-        const decryptedMessages = await Promise.all(
-          uniqueMessages.map(async (msg) => {
-            let content = msg.content;
-            // Try to decrypt messages that were previously encrypted with E2E keys
-            if (msg.isEncrypted || msg.contentNonce) {
-              if (msg.contentNonce) {
-                const decrypted = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce);
-                content = decrypted ?? '🔒 Encrypted message';
-              } else {
-                // isEncrypted true but no nonce — key was lost
-                content = '🔒 Encrypted message';
-              }
-            } else if (looksLikeCiphertext(msg.content)) {
-              // Fallback: content looks like base64 ciphertext but flags weren't set properly
-              content = '🔒 Encrypted message';
-            }
-
-            let mediaUrl = msg.mediaUrl || undefined;
-            if (msg.mediaEncrypted && msg.mediaNonce && mediaUrl) {
-              try {
-                const mediaResponse = await fetch(mediaUrl);
-                const mediaBuffer = await mediaResponse.arrayBuffer();
-                const decryptedBlob = await decryptFile('dm', scopeId, mediaBuffer, msg.mediaNonce);
-                if (decryptedBlob) {
-                  const decryptedUrl = URL.createObjectURL(decryptedBlob);
-                  mediaUrlsRef.current.push(decryptedUrl);
-                  mediaUrl = decryptedUrl;
-                }
-              } catch (error) {
-                console.error('Failed to decrypt DM media:', error);
-                mediaUrl = undefined;
-              }
-            }
-
-            return {
-              ...msg,
-              content,
-              mediaUrl,
-            } as Message;
-          })
-        );
+        const decryptedMessages = uniqueMessages.map((msg) => {
+          let content = msg.content;
+          if (msg.isEncrypted || msg.contentNonce) {
+            content = '🔒 Encrypted message';
+          } else if (looksLikeCiphertext(msg.content)) {
+            content = '🔒 Encrypted message';
+          }
+          return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
+        });
         
         const atBottom = checkIfAtBottom();
         if (!atBottom && decryptedMessages.length > previousMessageCount.current) {
@@ -426,7 +388,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   if (loading || status === 'loading') {
     return (
-      <div className="h-[calc(100dvh-4rem)] md:h-full flex flex-col bg-background">
+      <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-background">
         {/* Skeleton header */}
         <div className="px-3 py-2.5 border-b border-border/40 flex items-center gap-3">
           <div className="skeleton w-9 h-9 rounded-xl md:hidden" />
@@ -458,7 +420,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   }
 
   return (
-    <div className="h-[calc(100dvh-4rem)] md:h-full flex flex-col min-h-0 bg-background">
+    <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen min-h-0 bg-background">
       {/* WebRTC Call Overlay */}
       <CallScreen
         callState={callState}

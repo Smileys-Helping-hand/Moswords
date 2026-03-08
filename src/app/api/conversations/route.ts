@@ -18,6 +18,7 @@ type ConversationRow = {
     createdAt: Date;
     read: boolean;
     archived: boolean;
+    isEncrypted: boolean | null;
   };
   otherUser?: {
     id: string;
@@ -49,6 +50,7 @@ export async function GET() {
         createdAt: directMessages.createdAt,
         read: directMessages.read,
         archived: directMessages.archived,
+        isEncrypted: directMessages.isEncrypted,
       })
       .from(directMessages)
       .where(
@@ -74,6 +76,7 @@ export async function GET() {
             createdAt: msg.createdAt,
             read: msg.read,
             archived: msg.archived,
+            isEncrypted: msg.isEncrypted,
           },
           unreadCount: 0,
         });

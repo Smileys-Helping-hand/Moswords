@@ -41,6 +41,7 @@ type Conversation = {
     createdAt: string;
     read: boolean;
     archived: boolean;
+    isEncrypted?: boolean | null;
   };
   unreadCount: number;
 };
@@ -54,8 +55,9 @@ type GroupChat = {
   userRole: string;
 };
 
-/** Detect if a message preview looks like encrypted ciphertext */
-function getPreviewText(content: string): string {
+/** Detect if a message preview is encrypted */
+function getPreviewText(content: string, isEncrypted?: boolean | null): string {
+  if (isEncrypted) return '🔒 Encrypted message';
   if (
     content.length > 20 &&
     /^[A-Za-z0-9+/=_-]+$/.test(content) &&
@@ -210,7 +212,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 overflow-y-auto pb-20 md:pb-2">
+        <ScrollArea className="flex-1 min-h-0 overflow-hidden pb-20 md:pb-2">
           {/* —— DMs tab —— */}
           <TabsContent value="dms" className="mt-0 px-2">
             <AnimatePresence initial={false}>
@@ -233,7 +235,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                   const isSentByMe = c.lastMessage.senderId === currentUserId;
                   const isUnread = c.unreadCount > 0 && !isSentByMe;
                   const activePath = pathname === `/dm/${c.otherUserId}`;
-                  const preview = getPreviewText(c.lastMessage.content);
+                  const preview = getPreviewText(c.lastMessage.content, c.lastMessage.isEncrypted);
 
                   const row = (
                     <motion.button
