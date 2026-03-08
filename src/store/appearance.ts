@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type Theme = 'default' | 'light' | 'cyberpunk' | 'nord';
+export type Theme = 'default' | 'light' | 'cyberpunk' | 'nord' | 'aurora' | 'galaxy' | 'sunset' | 'neon';
 
 interface AppearanceState {
   theme: Theme;
@@ -22,7 +22,10 @@ export const useAppearance = create<AppearanceState>()(
       density: 'comfy',
       
       setTheme: (theme) => {
-        document.body.classList.remove('theme-light', 'theme-cyberpunk', 'theme-nord');
+        document.body.classList.remove(
+          'theme-light', 'theme-cyberpunk', 'theme-nord',
+          'theme-aurora', 'theme-galaxy', 'theme-sunset', 'theme-neon',
+        );
         if (theme !== 'default') document.body.classList.add(`theme-${theme}`);
         set({ theme });
       },

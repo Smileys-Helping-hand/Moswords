@@ -18,7 +18,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-// E2E crypto imports removed — decryption disabled, all new messages are plain text
+import {
+  decryptMessage,
+  ensureConversationKey,
+  getDmScopeId,
+} from '@/lib/crypto/e2e-client';
 import { compressImage } from '@/lib/image-compress';
 import { useWebRTC } from '@/hooks/use-webrtc';
 import CallScreen from '@/components/call/CallScreen';
@@ -52,6 +56,7 @@ interface User {
   name: string | null;
   displayName: string | null;
   photoURL: string | null;
+  lastSeen?: string | null;
 }
 
 export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
@@ -166,14 +171,17 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
     const fetchConversation = async () => {
       try {
-        // Always fetch the other user's profile (conversation may be empty)
-        const otherRes = await fetch(`/api/users/${userId}`);
+        // Fetch profile + messages in parallel for faster load
+        const [otherRes, response] = await Promise.all([
+          fetch(`/api/users/${userId}`),
+          fetch(`/api/conversations/${userId}`),
+        ]);
+
         if (otherRes.ok) {
           const otherData = await otherRes.json();
           setOtherUser(otherData.user);
         }
 
-        const response = await fetch(`/api/conversations/${userId}`);
         if (!response.ok) throw new Error('Failed to fetch conversation');
         const data = await response.json();
         
@@ -183,7 +191,16 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           new Map(data.messages.map((m: Message) => [m.id, m])).values()
         ) as Message[];
 
-        // Synchronously map messages — no async crypto (E2E disabled, keys are gone)
+        // Try to establish the DM conversation key for decryption
+        const scopeId = getDmScopeId(currentUserId, userId);
+        let canDecrypt = false;
+        try {
+          await ensureConversationKey('dm', scopeId, [userId]);
+          canDecrypt = true;
+        } catch {
+          // Key not available — messages will show as locked
+        }
+
         const looksLikeCiphertext = (s: string) => {
           if (!s || s.length < 20) return false;
           const stripped = s.replace(/[\s\n\r]/g, '');
@@ -191,15 +208,25 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           return b64Chars / stripped.length > 0.97 && stripped.length > 30 && !s.includes(' ');
         };
 
-        const decryptedMessages = uniqueMessages.map((msg) => {
-          let content = msg.content;
-          if (msg.isEncrypted || msg.contentNonce) {
-            content = '🔒 Encrypted message';
-          } else if (looksLikeCiphertext(msg.content)) {
-            content = '🔒 Encrypted message';
-          }
-          return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
-        });
+        // Decrypt all messages in parallel for speed
+        const decryptedMessages = await Promise.all(
+          uniqueMessages.map(async (msg) => {
+            let content = msg.content;
+            const isEncrypted = msg.isEncrypted || !!msg.contentNonce || looksLikeCiphertext(msg.content);
+            if (isEncrypted) {
+              if (canDecrypt && msg.contentNonce) {
+                const plain = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce).catch(() => null);
+                content = plain ?? '🔒 Encrypted message';
+              } else if (canDecrypt && looksLikeCiphertext(msg.content)) {
+                // Nonce-less old message — cannot decrypt without nonce
+                content = '🔒 Encrypted message';
+              } else {
+                content = '🔒 Encrypted message';
+              }
+            }
+            return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
+          })
+        );
         
         const atBottom = checkIfAtBottom();
         if (!atBottom && decryptedMessages.length > previousMessageCount.current) {
@@ -236,9 +263,18 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
     if (status === 'authenticated') {
       fetchConversation();
-      const interval = setInterval(fetchConversation, 3000); // Poll every 3 seconds
+      // Poll faster when visible, slower when tab is in background
+      const getInterval = () => document.hidden ? 10000 : 4000;
+      let interval = setInterval(fetchConversation, getInterval());
+      const onVisibilityChange = () => {
+        clearInterval(interval);
+        if (!document.hidden) fetchConversation();
+        interval = setInterval(fetchConversation, getInterval());
+      };
+      document.addEventListener('visibilitychange', onVisibilityChange);
       return () => {
         clearInterval(interval);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
         revokeMediaUrls();
       };
     }

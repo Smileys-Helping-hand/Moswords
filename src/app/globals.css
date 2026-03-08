@@ -51,6 +51,112 @@
   --color-border: #4c566a;
   --color-card: #434c5e;
 }
+
+/* ---- ANIMATED THEMES ---- */
+
+.theme-aurora {
+  --color-bg: #0a0e1a;
+  --color-bg-secondary: #0f1428;
+  --color-fg: #e8f0fe;
+  --color-accent: #7c4dff;
+  --color-accent-secondary: #00e5ff;
+  --color-danger: #ff1744;
+  --color-success: #00e676;
+  --color-border: #1a2040;
+  --color-card: #0f1428;
+  --background: 225 50% 8%;
+  --foreground: 220 80% 95%;
+  --card: 225 45% 11%;
+  --card-foreground: 220 80% 95%;
+  --primary: 264 100% 65%;
+  --primary-foreground: 0 0% 100%;
+  --border: 225 35% 18%;
+  --input: 225 35% 18%;
+  --muted: 225 35% 15%;
+  --muted-foreground: 225 20% 60%;
+  --bubble-out: 264 80% 30%;
+  --bubble-out-fg: 0 0% 98%;
+  --bubble-in: 225 40% 15%;
+  --bubble-in-fg: 220 60% 90%;
+}
+
+.theme-galaxy {
+  --color-bg: #05050f;
+  --color-bg-secondary: #0a0a20;
+  --color-fg: #c8d8ff;
+  --color-accent: #6eb5ff;
+  --color-accent-secondary: #c77dff;
+  --color-danger: #ff4d6d;
+  --color-success: #52b788;
+  --color-border: #14142a;
+  --color-card: #0a0a20;
+  --background: 240 60% 4%;
+  --foreground: 225 70% 88%;
+  --card: 240 55% 8%;
+  --card-foreground: 225 70% 88%;
+  --primary: 210 100% 71%;
+  --primary-foreground: 0 0% 100%;
+  --border: 240 40% 12%;
+  --input: 240 40% 12%;
+  --muted: 240 40% 10%;
+  --muted-foreground: 240 20% 55%;
+  --bubble-out: 240 70% 25%;
+  --bubble-out-fg: 0 0% 97%;
+  --bubble-in: 240 50% 10%;
+  --bubble-in-fg: 225 60% 88%;
+}
+
+.theme-sunset {
+  --color-bg: #1a0a0f;
+  --color-bg-secondary: #2a1018;
+  --color-fg: #ffe0cc;
+  --color-accent: #ff6b35;
+  --color-accent-secondary: #ff9f1c;
+  --color-danger: #c9184a;
+  --color-success: #52b788;
+  --color-border: #3a1820;
+  --color-card: #2a1018;
+  --background: 340 50% 7%;
+  --foreground: 20 80% 90%;
+  --card: 340 45% 11%;
+  --card-foreground: 20 80% 90%;
+  --primary: 22 100% 60%;
+  --primary-foreground: 0 0% 100%;
+  --border: 340 35% 18%;
+  --input: 340 35% 18%;
+  --muted: 340 30% 15%;
+  --muted-foreground: 340 20% 58%;
+  --bubble-out: 22 70% 28%;
+  --bubble-out-fg: 20 80% 97%;
+  --bubble-in: 340 35% 13%;
+  --bubble-in-fg: 20 60% 88%;
+}
+
+.theme-neon {
+  --color-bg: #000000;
+  --color-bg-secondary: #050510;
+  --color-fg: #ffffff;
+  --color-accent: #ff00ff;
+  --color-accent-secondary: #00ffff;
+  --color-danger: #ff003c;
+  --color-success: #00ff88;
+  --color-border: #1a0a2e;
+  --color-card: #050510;
+  --background: 270 100% 2%;
+  --foreground: 0 0% 100%;
+  --card: 270 90% 5%;
+  --card-foreground: 0 0% 100%;
+  --primary: 300 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --border: 270 60% 12%;
+  --input: 270 60% 12%;
+  --muted: 270 50% 8%;
+  --muted-foreground: 270 30% 55%;
+  --bubble-out: 300 80% 25%;
+  --bubble-out-fg: 0 0% 100%;
+  --bubble-in: 270 60% 10%;
+  --bubble-in-fg: 270 30% 95%;
+}
 /***** END THEME VARIABLES *****/
 
 @tailwind base;
@@ -402,6 +508,103 @@ html, body {
     background-size: 20px 20px;
   }
 
+  /* ── Aurora animated background ── */
+  .theme-aurora .chat-bg {
+    background-color: #080c1a;
+    background-image: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .theme-aurora .chat-bg::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      #7c4dff22 0deg,
+      #00e5ff18 60deg,
+      #00e67612 120deg,
+      #7c4dff22 180deg,
+      #c77dff18 240deg,
+      #00e5ff14 300deg,
+      #7c4dff22 360deg
+    );
+    animation: aurora-spin 18s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .theme-aurora .chat-bg > * { position: relative; z-index: 1; }
+
+  /* ── Galaxy animated background ── */
+  .theme-galaxy .chat-bg {
+    background-color: #03030c;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.7) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(2px 2px at 10% 55%, rgba(110,181,255,0.6) 0%, transparent 100%),
+      radial-gradient(2px 2px at 70% 40%, rgba(199,125,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.8) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 85%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(circle at 50% 50%, #0a0a2033 0%, transparent 70%);
+    background-size: 300px 300px, 200px 200px, 250px 250px, 350px 350px,
+                     280px 280px, 320px 320px, 150px 150px, 400px 400px, 100% 100%;
+    animation: galaxy-drift 40s ease-in-out infinite alternate;
+  }
+
+  /* ── Sunset animated background ── */
+  .theme-sunset .chat-bg {
+    background-color: #130508;
+    background-image: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .theme-sunset .chat-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      160deg,
+      #ff6b3520 0%,
+      #ff9f1c10 25%,
+      transparent 50%,
+      #c9184a14 75%,
+      #7b2d8b18 100%
+    );
+    animation: sunset-shift 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  .theme-sunset .chat-bg > * { position: relative; z-index: 1; }
+
+  /* ── Neon animated background ── */
+  .theme-neon .chat-bg {
+    background-color: #000000;
+    background-image:
+      linear-gradient(90deg, #ff00ff08 1px, transparent 1px),
+      linear-gradient(0deg, #ff00ff08 1px, transparent 1px),
+      linear-gradient(90deg, #00ffff05 1px, transparent 1px),
+      linear-gradient(0deg, #00ffff05 1px, transparent 1px);
+    background-size: 40px 40px, 40px 40px, 80px 80px, 80px 80px;
+    position: relative;
+  }
+  .theme-neon .chat-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, #ff00ff12 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, #00ffff10 0%, transparent 50%);
+    animation: neon-pulse 5s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  .theme-neon .chat-bg > * { position: relative; z-index: 1; }
+  /* Neon glowing borders on cards */
+  .theme-neon .glass-card,
+  .theme-neon .glass-panel {
+    box-shadow: 0 0 8px #ff00ff30, 0 0 16px #ff00ff15;
+  }
+
   /* ── Skeleton shimmer ── */
   .skeleton {
     @apply rounded-md bg-muted relative overflow-hidden;
@@ -479,4 +682,35 @@ html, body {
   50%       { opacity: 0.55; }
 }
 .status-pulse { animation: status-pulse 2s ease-in-out infinite; }
+
+/* ── Animated theme keyframes ── */
+@keyframes aurora-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes galaxy-drift {
+  0%   { background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0 0; }
+  100% { background-position: 100px 80px, -60px 50px, 80px -40px, -50px 90px, 70px -60px, -80px 40px, 50px 70px, -30px -50px, 0 0; }
+}
+
+@keyframes sunset-shift {
+  0%   { opacity: 0.6; transform: scale(1) rotate(-5deg); }
+  100% { opacity: 1;   transform: scale(1.1) rotate(5deg); }
+}
+
+@keyframes neon-pulse {
+  0%   { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* ── Neon sidebar/header glow on neon theme ── */
+.theme-neon header,
+.theme-neon aside,
+.theme-neon nav {
+  border-color: #ff00ff40 !important;
+}
+.theme-neon button:focus-visible {
+  outline-color: #ff00ff;
+}
 

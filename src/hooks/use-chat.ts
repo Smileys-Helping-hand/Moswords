@@ -238,9 +238,17 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
     };
 
     fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
+    const getInterval = () => document.hidden ? 10000 : 4000;
+    let interval = setInterval(fetchMessages, getInterval());
+    const onVisibilityChange = () => {
+      clearInterval(interval);
+      if (!document.hidden) fetchMessages();
+      interval = setInterval(fetchMessages, getInterval());
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       revokeMediaUrls();
     };
   }, [channelId, enabled, toast, checkIfAtBottom, fetchChannelMembers, revokeMediaUrls]);
