@@ -13,11 +13,23 @@ import {
   Check,
   CheckCheck,
   Settings,
+  MoreVertical,
+  BellOff,
+  Bell,
+  Archive,
+  Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CreateGroupChatDialog from '@/components/create-group-chat-dialog';
 import FriendsDialog from '@/components/friends-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import SponsoredChatRow from '@/components/ads/SponsoredChatRow';
 import { MOCK_ADS } from '@/lib/mock-ads';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
@@ -94,6 +106,41 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
   const [search, setSearch] = useState('');
+
+  // Mute state stored in localStorage
+  const [mutedIds, setMutedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!currentUserId) return;
+    try {
+      const raw = localStorage.getItem(`muted_convos_${currentUserId}`);
+      if (raw) setMutedIds(new Set(JSON.parse(raw)));
+    } catch {}
+  }, [currentUserId]);
+
+  const toggleMute = (otherUserId: string) => {
+    setMutedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(otherUserId)) next.delete(otherUserId); else next.add(otherUserId);
+      try { localStorage.setItem(`muted_convos_${currentUserId}`, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
+  const handleArchiveConvo = async (otherUserId: string) => {
+    await fetch(`/api/conversations/${otherUserId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: true }),
+    });
+    setConversations(prev => prev.filter(c => c.otherUserId !== otherUserId));
+  };
+
+  const handleDeleteConvo = async (otherUserId: string) => {
+    if (!confirm('Delete this conversation? This cannot be undone.')) return;
+    await fetch(`/api/conversations/${otherUserId}`, { method: 'DELETE' });
+    setConversations(prev => prev.filter(c => c.otherUserId !== otherUserId));
+    if (pathname === `/dm/${otherUserId}`) router.push('/dm');
+  };
 
   const load = useCallback(async () => {
     try {
@@ -237,82 +284,127 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                   const activePath = pathname === `/dm/${c.otherUserId}`;
                   const preview = getPreviewText(c.lastMessage.content, c.lastMessage.isEncrypted);
 
+                  const isMuted = mutedIds.has(c.otherUserId);
+
                   const row = (
-                    <motion.button
+                    <motion.div
                       key={c.otherUserId}
                       layout
                       initial={{ opacity: 0, x: -12 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -12 }}
                       transition={{ duration: 0.15, delay: index * 0.02 }}
-                      onClick={() => router.push(`/dm/${c.otherUserId}`)}
-                      className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-150 group flex items-center gap-3 ${
-                        activePath
-                          ? 'bg-primary/15 border border-primary/30'
-                          : 'hover:bg-muted/60 active:bg-muted/80 border border-transparent'
-                      }`}
+                      className="relative group/row"
                     >
-                      {/* Avatar */}
-                      <div className="relative shrink-0">
-                        <UserAvatar
-                          src={c.otherUser?.photoURL || ''}
-                          fallback={(
-                            c.otherUser?.displayName ||
-                            c.otherUser?.name ||
-                            c.otherUser?.email ||
-                            'U'
-                          )
-                            .substring(0, 2)
-                            .toUpperCase()}
-                          status={c.otherUser?.lastSeen === 'online' ? 'online' : 'offline'}
-                        />
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p
-                            className={`truncate text-sm ${
-                              isUnread ? 'font-bold text-foreground' : 'font-medium text-foreground/80'
-                            }`}
-                          >
-                            {c.otherUser?.displayName ||
+                      <button
+                        onClick={() => router.push(`/dm/${c.otherUserId}`)}
+                        className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-150 flex items-center gap-3 pr-10 ${
+                          activePath
+                            ? 'bg-primary/15 border border-primary/30'
+                            : 'hover:bg-muted/60 active:bg-muted/80 border border-transparent'
+                        }`}
+                      >
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                          <UserAvatar
+                            src={c.otherUser?.photoURL || ''}
+                            fallback={(
+                              c.otherUser?.displayName ||
                               c.otherUser?.name ||
-                              c.otherUser?.email}
-                          </p>
-                          <span
-                            className={`text-[11px] shrink-0 tabular-nums ${
-                              isUnread ? 'text-primary font-semibold' : 'text-muted-foreground'
-                            }`}
-                          >
-                            {formatConvoTime(c.lastMessage.createdAt)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1 min-w-0">
-                            {isSentByMe &&
-                              (c.lastMessage.read ? (
-                                <CheckCheck className="w-3.5 h-3.5 text-primary shrink-0" />
-                              ) : (
-                                <Check className="w-3 h-3 text-muted-foreground shrink-0" />
-                              ))}
-                            <p
-                              className={`text-xs truncate ${
-                                isUnread ? 'text-foreground/80 font-medium' : 'text-muted-foreground'
-                              }`}
-                            >
-                              {isSentByMe ? 'You: ' : ''}
-                              {preview}
-                            </p>
-                          </div>
-                          {c.unreadCount > 0 && !isSentByMe && (
-                            <div className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 shrink-0 shadow-sm">
-                              {c.unreadCount > 99 ? '99+' : c.unreadCount}
-                            </div>
+                              c.otherUser?.email ||
+                              'U'
+                            )
+                              .substring(0, 2)
+                              .toUpperCase()}
+                            status={c.otherUser?.lastSeen === 'online' ? 'online' : 'offline'}
+                          />
+                          {isMuted && (
+                            <BellOff className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-muted-foreground bg-background rounded-full p-px" />
                           )}
                         </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <p
+                              className={`truncate text-sm ${
+                                isUnread ? 'font-bold text-foreground' : 'font-medium text-foreground/80'
+                              }`}
+                            >
+                              {c.otherUser?.displayName ||
+                                c.otherUser?.name ||
+                                c.otherUser?.email}
+                            </p>
+                            <span
+                              className={`text-[11px] shrink-0 tabular-nums ${
+                                isUnread ? 'text-primary font-semibold' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {formatConvoTime(c.lastMessage.createdAt)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1 min-w-0">
+                              {isSentByMe &&
+                                (c.lastMessage.read ? (
+                                  <CheckCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+                                ) : (
+                                  <Check className="w-3 h-3 text-muted-foreground shrink-0" />
+                                ))}
+                              <p
+                                className={`text-xs truncate ${
+                                  isUnread ? 'text-foreground/80 font-medium' : 'text-muted-foreground'
+                                }`}
+                              >
+                                {isSentByMe ? 'You: ' : ''}
+                                {preview}
+                              </p>
+                            </div>
+                            {c.unreadCount > 0 && !isSentByMe && (
+                              <div className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 shrink-0 shadow-sm">
+                                {c.unreadCount > 99 ? '99+' : c.unreadCount}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Three-dot action menu — visible on hover */}
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                              onClick={e => e.stopPropagation()}
+                              aria-label="Conversation options"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="glass-card border-white/20 w-44">
+                            <DropdownMenuItem onClick={() => toggleMute(c.otherUserId)}>
+                              {isMuted ? (
+                                <><Bell className="w-4 h-4 mr-2" />Unmute</>
+                              ) : (
+                                <><BellOff className="w-4 h-4 mr-2" />Mute</>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleArchiveConvo(c.otherUserId)}>
+                              <Archive className="w-4 h-4 mr-2" />
+                              Archive
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteConvo(c.otherUserId)}
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete chat
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                    </motion.button>
+                    </motion.div>
                   );
 
                   const items: React.ReactNode[] = [row];

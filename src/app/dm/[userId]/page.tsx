@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { ArrowLeft, Archive, MoreVertical, Phone, Video, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Archive, MoreVertical, Phone, Video, ArrowDown, BellOff, Bell, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -478,6 +479,50 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   };
 
+  // Mute stored in localStorage — no DB migration needed
+  const getMuteKey = () => `muted_${currentUserId}_${userId}`;
+  const [isMutedConvo, setIsMutedConvo] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(`muted_${userId}`) === '1';
+  });
+
+  const handleMute = () => {
+    const key = getMuteKey();
+    if (isMutedConvo) {
+      localStorage.removeItem(key);
+      setIsMutedConvo(false);
+      toast({ title: 'Notifications enabled', description: `You will receive notifications from this chat` });
+    } else {
+      localStorage.setItem(key, '1');
+      setIsMutedConvo(true);
+      toast({ title: 'Conversation muted', description: `You won't be notified about new messages` });
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    if (!confirm('Delete this entire conversation? This cannot be undone.')) return;
+    try {
+      const response = await fetch(`/api/conversations/${userId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete');
+      toast({ title: 'Conversation deleted' });
+      router.push('/dm');
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete conversation' });
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      const response = await fetch(`/api/messages/${messageId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete message');
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete message' });
+    }
+  };
+
   if (loading || status === 'loading') {
     return (
       <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-background">
@@ -593,10 +638,25 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 <MoreVertical className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="glass-card border-white/20">
+            <DropdownMenuContent align="end" className="glass-card border-white/20 min-w-[180px]">
+              <DropdownMenuItem onClick={handleMute}>
+                {isMutedConvo ? (
+                  <><Bell className="w-4 h-4 mr-2" />Unmute</>  
+                ) : (
+                  <><BellOff className="w-4 h-4 mr-2" />Mute notifications</>
+                )}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleArchive}>
                 <Archive className="w-4 h-4 mr-2" />
-                Archive Conversation
+                Archive conversation
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDeleteChat}
+                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete conversation
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -640,6 +700,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                   key={`${msg.id}-${index}`}
                   showAvatar={showAvatar}
                   isCurrentUser={msg.senderId === currentUserId}
+                  onDeleteMessage={handleDeleteMessage}
                   message={{
                     id: msg.id,
                     content: msg.content,

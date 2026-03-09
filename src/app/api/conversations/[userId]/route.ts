@@ -136,12 +136,19 @@ export async function PATCH(
 
     const currentUserId = (session.user as any).id;
     const { userId: otherUserId } = await context.params;
-    const { archived } = await request.json();
+    const body = await request.json();
 
-    // Archive all messages in this conversation
+    const updatePayload: Record<string, unknown> = {};
+    if (typeof body.archived === 'boolean') updatePayload.archived = body.archived;
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+    }
+
+    // Apply update to all messages in this conversation
     await db
       .update(directMessages)
-      .set({ archived })
+      .set(updatePayload as any)
       .where(
         or(
           and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
@@ -149,13 +156,47 @@ export async function PATCH(
         )
       );
 
-    return NextResponse.json({ 
-      message: archived ? 'Conversation archived' : 'Conversation unarchived'
-    });
+    return NextResponse.json({ message: 'Conversation updated' });
   } catch (error) {
-    console.error('Error archiving conversation:', error);
+    console.error('Error updating conversation:', error);
     return NextResponse.json(
-      { error: 'Failed to archive conversation' },
+      { error: 'Failed to update conversation' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/conversations/[userId] - Delete all messages in a conversation
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const currentUserId = (session.user as any).id;
+    const { userId: otherUserId } = await context.params;
+
+    // Delete messages sent by the current user only (soft-delete from their view)
+    // To fully delete the conversation the other user's messages are also removed
+    await db
+      .delete(directMessages)
+      .where(
+        or(
+          and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
+          and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
+        )
+      );
+
+    return NextResponse.json({ message: 'Conversation deleted' });
+  } catch (error) {
+    console.error('Error deleting conversation:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete conversation' },
       { status: 500 }
     );
   }

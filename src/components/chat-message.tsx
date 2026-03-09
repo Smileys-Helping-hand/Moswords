@@ -1,10 +1,10 @@
 "use client";
 
-import { memo } from 'react';
+import { memo, useState, useRef, useCallback } from 'react';
 import type { OptimisticMessage } from '@/hooks/use-chat';
 import UserAvatar from './user-avatar';
 import { Button } from './ui/button';
-import { ShieldAlert, RefreshCw, X, ZoomIn, Check, CheckCheck, Clock } from 'lucide-react';
+import { ShieldAlert, RefreshCw, X, ZoomIn, Check, CheckCheck, Clock, Copy, Trash2, SmilePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, isToday, isYesterday, parseISO, isValid } from 'date-fns';
 import Image from 'next/image';
@@ -19,6 +19,7 @@ interface ChatMessageProps {
   isCurrentUser?: boolean;
   onRetry?: () => void;
   onDelete?: () => void;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
 function formatBubbleTime(timestamp: unknown): string {
@@ -74,10 +75,43 @@ function ChatMessage({
   isCurrentUser = false,
   onRetry,
   onDelete,
+  onDeleteMessage,
 }: ChatMessageProps) {
   const isSending = message.status === 'sending';
   const isError = message.status === 'error';
   const timeStr = formatBubbleTime(message.timestamp);
+
+  const [showActions, setShowActions] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopy = useCallback(() => {
+    if (!message.content) return;
+    navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [message.content]);
+
+  const handlePointerDown = useCallback(() => {
+    longPressTimer.current = setTimeout(() => setShowActions(true), 500);
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowActions(prev => !prev);
+  }, []);
+
+  const handleDeleteMsg = useCallback(() => {
+    if (onDeleteMessage && message.id) {
+      onDeleteMessage(message.id);
+    }
+    setShowActions(false);
+  }, [onDeleteMessage, message.id]);
 
   // ── GIF — no bubble background, just the animated image ─────────────────
   if (message.mediaType === 'gif' && message.mediaUrl) {
@@ -193,13 +227,17 @@ function ChatMessage({
   return (
     <motion.div
       className={cn(
-        'flex items-end gap-2 px-3',
+        'flex items-end gap-2 px-3 group/msg',
         isGrouped ? 'mt-0.5' : showAvatar ? 'mt-3' : 'mt-0.5',
         isCurrentUser ? 'flex-row-reverse' : 'flex-row',
       )}
       initial={{ opacity: 0, y: 5, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
       layout
     >
       {/* ── Avatar column ── */}
@@ -358,6 +396,59 @@ function ChatMessage({
             )}
           </div>
         </div>
+
+        {/* ── Context action bar (right-click / long-press) ── */}
+        <AnimatePresence>
+          {showActions && (
+            <motion.div
+              className={cn(
+                'flex items-center gap-0.5 mt-1 px-1',
+                isCurrentUser ? 'justify-end' : 'justify-start',
+              )}
+              initial={{ opacity: 0, scale: 0.8, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -4 }}
+              transition={{ duration: 0.12 }}
+            >
+              <div className="flex items-center gap-0.5 bg-card/95 backdrop-blur-sm border border-border/60 rounded-full shadow-lg px-1 py-0.5">
+                <button
+                  className="p-1.5 rounded-full hover:bg-muted/70 transition-colors text-muted-foreground hover:text-foreground"
+                  title="Copy"
+                  onClick={handleCopy}
+                >
+                  {copied ? (
+                    <Check className="w-3.5 h-3.5 text-green-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                <button
+                  className="p-1.5 rounded-full hover:bg-muted/70 transition-colors text-muted-foreground hover:text-foreground"
+                  title="React"
+                  onClick={() => setShowActions(false)}
+                >
+                  <SmilePlus className="w-3.5 h-3.5" />
+                </button>
+                {isCurrentUser && onDeleteMessage && (
+                  <button
+                    className="p-1.5 rounded-full hover:bg-destructive/20 transition-colors text-muted-foreground hover:text-destructive"
+                    title="Delete message"
+                    onClick={handleDeleteMsg}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  className="p-1.5 rounded-full hover:bg-muted/70 transition-colors text-muted-foreground hover:text-foreground"
+                  title="Close"
+                  onClick={() => setShowActions(false)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Retry / delete on error ── */}
         {isError && (onRetry || onDelete) && (
