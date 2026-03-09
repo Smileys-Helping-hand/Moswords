@@ -1,351 +1,487 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Room, createLocalTracks, LocalVideoTrack } from 'livekit-client';
-import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import {
+  LiveKitRoom,
+  useTracks,
+  useParticipants,
+  useLocalParticipant,
+  VideoTrack,
+  RoomAudioRenderer,
+  isTrackReference,
+} from '@livekit/components-react';
+import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
+import { Track } from 'livekit-client';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mic, MicOff, Video, VideoOff, PhoneOff, Users, Loader2, AlertCircle,
+} from 'lucide-react';
+
+// ─── Main export with Suspense for useSearchParams ───────────────────────────
 
 export default function CallPage() {
+  return (
+    <Suspense fallback={<FullscreenLoader label="Loading…" />}>
+      <CallPageContent />
+    </Suspense>
+  );
+}
+
+// ─── Token fetch + LiveKitRoom wrapper ────────────────────────────────────────
+
+function CallPageContent() {
   const params = useSearchParams();
   const router = useRouter();
   const rawRoom = params.get('room') || params.get('serverId') || 'default-room';
   const roomName = rawRoom && rawRoom.trim().length > 0 ? rawRoom : 'default-room';
-  const channelId = params.get('channelId') || '';
   const type = params.get('type') || 'video';
+  const backTo = params.get('from') || '/';
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [muted, setMuted] = useState(false);
-  const [videoEnabled, setVideoEnabled] = useState(type === 'video');
-  const [participantCount, setParticipantCount] = useState(0);
-  const roomRef = useRef<Room | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteContainerRef = useRef<HTMLDivElement | null>(null);
-  const localTracksRef = useRef<Array<any>>([]);
+  const [livekitToken, setLivekitToken] = useState('');
+  const [livekitUrl, setLivekitUrl] = useState('');
+  const [fetching, setFetching] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
   useEffect(() => {
-    let mounted = true;
-    const join = async () => {
-      setLoading(true);
+    let cancelled = false;
+    const getToken = async () => {
       try {
-        const res = await fetch(`/api/call/token?t=${Date.now()}`, {
+        const res = await fetch('/api/call/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
           body: JSON.stringify({ room: roomName }),
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const apiError = typeof data?.error === 'string' ? data.error : 'Failed to get token';
-          throw new Error(apiError);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to get token');
+        if (!cancelled) {
+          setLivekitToken(data.token);
+          setLivekitUrl(data.url);
         }
-        const { token, url } = data;
-        const tokenString = typeof token === 'string'
-          ? token
-          : (typeof data?.accessToken === 'string' ? data.accessToken : '')
-            || (typeof token?.token === 'string' ? token.token : '')
-            || (typeof token?.jwt === 'string' ? token.jwt : '')
-            || (typeof token?.accessToken === 'string' ? token.accessToken : '')
-            || '';
-        if (!tokenString || !url) {
-          const details = JSON.stringify({ tokenType: typeof token, hasUrl: !!url });
-          throw new Error(`Invalid token response: ${details}`);
-        }
-
-        const room = new Room({});
-        await room.connect(url, tokenString);
-        roomRef.current = room;
-
-        // create and publish local tracks
-        const tracks = await createLocalTracks({ audio: true, video: type === 'video' });
-        for (const t of tracks) {
-          await room.localParticipant.publishTrack(t);
-          localTracksRef.current.push(t);
-          if (t.kind === 'video' && localVideoRef.current) {
-            const el = (t as LocalVideoTrack).attach();
-            el.style.maxWidth = '100%';
-            el.style.width = '320px';
-            try {
-              localVideoRef.current.replaceWith(el);
-            } catch (e) {
-              // ignore if replace fails
-            }
-            localVideoRef.current = el as HTMLVideoElement;
-          }
-        }
-
-        // render remote participants
-        room.on('participantConnected', participant => {
-          const container = remoteContainerRef.current;
-          if (!container) return;
-          
-          setParticipantCount(prev => prev + 1);
-          
-          const div = document.createElement('div');
-          div.className = 'remote-participant glass-card rounded-xl p-4 border border-white/20';
-          div.id = `participant-${participant.identity}`;
-          const name = document.createElement('div');
-          name.className = 'text-sm font-medium mb-2 text-white';
-          name.textContent = participant.identity;
-          div.appendChild(name);
-          container.appendChild(div);
-          participant.on('trackPublished', () => {
-            // subscribe handled by autoSubscribe
-          });
-          participant.on('trackSubscribed', (track: any) => {
-            const el = track.attach();
-            el.style.maxWidth = '100%';
-            el.className = 'rounded-lg w-full';
-            div.appendChild(el);
-          });
-        });
-
-        // Update muted state if no audio track
-        setMuted(!localTracksRef.current.some(t => t.kind === 'audio'));
-
-        room.on('participantDisconnected', (p) => {
-          setParticipantCount(prev => Math.max(0, prev - 1));
-          const el = document.getElementById(`participant-${p.identity}`);
-          if (el) el.remove();
-        });
       } catch (err: any) {
-        console.error('Call join error:', err);
-        if (mounted) setError(err.message || 'Failed to join call');
+        if (!cancelled) setFetchError(err.message || 'Failed to join call');
       } finally {
-        if (mounted) setLoading(false);
+        if (!cancelled) setFetching(false);
       }
     };
+    getToken();
+    return () => { cancelled = true; };
+  }, [roomName]);
 
-    join();
+  const handleDisconnect = useCallback(() => {
+    router.push(backTo);
+  }, [router, backTo]);
 
-    return () => {
-      mounted = false;
-      const room = roomRef.current;
-      if (room) {
-        room.disconnect();
-      }
-    };
-  }, [roomName, type]);
-
-  const toggleMute = async () => {
-    const room = roomRef.current;
-    if (!room) return;
-
-    if (muted) {
-      // create audio track and publish
-      try {
-        const [audio] = await createLocalTracks({ audio: true, video: false });
-        if (audio) {
-          await room.localParticipant.publishTrack(audio);
-          localTracksRef.current.push(audio);
-          setMuted(false);
-        }
-      } catch (err) {
-        console.error('Failed to enable microphone', err);
-      }
-    } else {
-      // unpublish and stop audio tracks
-      try {
-        const audioTracks = localTracksRef.current.filter(t => t.kind === 'audio');
-        for (const t of audioTracks) {
-          try {
-            room.localParticipant.unpublishTrack(t);
-          } catch (e) {}
-          try { t.stop(); } catch (e) {}
-        }
-        localTracksRef.current = localTracksRef.current.filter(t => t.kind !== 'audio');
-        setMuted(true);
-      } catch (err) {
-        console.error('Failed to mute', err);
-      }
-    }
-  };
-
-  const toggleVideo = async () => {
-    const room = roomRef.current;
-    if (!room) return;
-
-    if (videoEnabled) {
-      // disable video
-      const videoTracks = localTracksRef.current.filter(t => t.kind === 'video');
-      for (const t of videoTracks) {
-        try { room.localParticipant.unpublishTrack(t); } catch (e) {}
-        try { t.stop(); } catch (e) {}
-      }
-      localTracksRef.current = localTracksRef.current.filter(t => t.kind !== 'video');
-      // remove local video element
-      if (localVideoRef.current) {
-        try { localVideoRef.current.remove(); } catch (e) {}
-        const placeholder = document.createElement('video');
-        placeholder.autoplay = true;
-        placeholder.muted = true;
-        placeholder.playsInline = true;
-        placeholder.className = 'w-full rounded-lg bg-black/60';
-        if (localVideoRef.current.parentElement) {
-          localVideoRef.current.parentElement.appendChild(placeholder);
-        }
-      }
-      setVideoEnabled(false);
-    } else {
-      // enable video
-      try {
-        const [, video] = await createLocalTracks({ audio: false, video: true });
-        if (video) {
-          await room.localParticipant.publishTrack(video);
-          localTracksRef.current.push(video);
-          if (localVideoRef.current) {
-            const el = (video as LocalVideoTrack).attach();
-            el.style.maxWidth = '100%';
-            el.style.width = '320px';
-            try { localVideoRef.current.replaceWith(el); } catch (e) {}
-            localVideoRef.current = el as HTMLVideoElement;
-          }
-        }
-        setVideoEnabled(true);
-      } catch (err) {
-        console.error('Failed to enable video:', err);
-      }
-    }
-  };
+  if (fetching) return <FullscreenLoader label="Joining call…" />;
+  if (fetchError) return <ErrorScreen error={fetchError} onBack={handleDisconnect} />;
 
   return (
-      <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 text-foreground">
-      <div className="max-w-7xl mx-auto p-4">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-panel rounded-2xl border border-white/10 overflow-hidden"
-        >
-          {/* Header */}
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gradient">
-                {type === 'video' ? 'Video' : 'Voice'} Call
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Room: {roomName} • {participantCount} {participantCount === 1 ? 'participant' : 'participants'}
-              </p>
+    <LiveKitRoom
+      token={livekitToken}
+      serverUrl={livekitUrl}
+      connect={true}
+      audio={true}
+      video={type === 'video'}
+      onDisconnected={handleDisconnect}
+      className="fixed inset-0 bg-black"
+    >
+      <RoomAudioRenderer />
+      <CallRoomUI roomName={roomName} type={type} onLeave={handleDisconnect} />
+    </LiveKitRoom>
+  );
+}
+
+// ─── Room UI (requires LiveKitRoom context) ───────────────────────────────────
+
+function CallRoomUI({
+  roomName,
+  type,
+  onLeave,
+}: {
+  roomName: string;
+  type: string;
+  onLeave: () => void;
+}) {
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const participants = useParticipants();
+  const [elapsed, setElapsed] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Running call timer
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((v) => v + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-hide controls after 4 s of inactivity
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setControlsVisible(false), 4000);
+  }, []);
+
+  useEffect(() => {
+    revealControls();
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [revealControls]);
+
+  // All camera track refs (local + remote)
+  const allCameraTracks = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: true }],
+    { onlySubscribed: false },
+  );
+  const remoteTrackRefs = allCameraTracks.filter((t) => !t.participant.isLocal);
+  const localTrackRef = allCameraTracks.find((t) => t.participant.isLocal);
+
+  const remoteCount = participants.filter((p) => !p.isLocal).length;
+  const isSolo = remoteCount === 0;
+  const isOneOnOne = remoteCount === 1;
+
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const ss = (s % 60).toString().padStart(2, '0');
+    return `${m}:${ss}`;
+  };
+
+  const displayName = roomName.replace(/^group-/, '').replace(/-/g, ' ');
+
+  return (
+    <div
+      className="fixed inset-0 bg-black overflow-hidden"
+      onClick={revealControls}
+      onTouchStart={revealControls}
+    >
+      {/* ── Main area ─────────────────────────────────── */}
+      <AnimatePresence mode="wait">
+        {isSolo ? (
+          <motion.div
+            key="waiting"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0"
+          >
+            <WaitingScreen roomName={displayName} />
+          </motion.div>
+        ) : isOneOnOne ? (
+          <motion.div
+            key="spotlight"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0"
+          >
+            <SpotlightView trackRef={remoteTrackRefs[0]} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="grid"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0"
+          >
+            <GridView trackRefs={remoteTrackRefs} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Local PiP ─────────────────────────────────── */}
+      <LocalPiP trackRef={localTrackRef} isCameraEnabled={isCameraEnabled} />
+
+      {/* ── Top HUD ───────────────────────────────────── */}
+      <AnimatePresence>
+        {controlsVisible && (
+          <motion.div
+            key="hud"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.2 }}
+            className="absolute top-0 left-0 right-0 z-20 px-5 pt-10 pb-6 bg-gradient-to-b from-black/80 to-transparent pointer-events-none"
+          >
+            <p className="text-white font-semibold text-base capitalize truncate">{displayName}</p>
+            <div className="flex items-center gap-3 mt-0.5">
+              <span className="text-white/60 text-sm tabular-nums">{fmt(elapsed)}</span>
+              <span className="text-white/30">•</span>
+              <div className="flex items-center gap-1.5 text-white/60 text-sm">
+                <Users className="w-3.5 h-3.5" />
+                <span>{participants.length}</span>
+              </div>
+              {!isMicrophoneEnabled && (
+                <>
+                  <span className="text-white/30">•</span>
+                  <div className="flex items-center gap-1 text-amber-400 text-xs">
+                    <MicOff className="w-3 h-3" />
+                    <span>Muted</span>
+                  </div>
+                </>
+              )}
             </div>
-            <Button
-              onClick={() => {
-                if (roomRef.current) {
-                  roomRef.current.disconnect();
-                }
-                router.push('/');
-              }}
-              variant="destructive"
-              className="gap-2"
-            >
-              <PhoneOff className="w-4 h-4" />
-              Leave Call
-            </Button>
-          </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Content */}
-          <div className="p-6">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mb-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400"
-              >
-                {error}
-              </motion.div>
-            )}
-            
-            {loading && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <span className="ml-3 text-lg">Connecting to call...</span>
-              </div>
-            )}
+      {/* ── Controls bar ──────────────────────────────── */}
+      <AnimatePresence>
+        {controlsVisible && (
+          <motion.div
+            key="controls"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.2 }}
+            className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-10 pt-6 bg-gradient-to-t from-black/90 to-transparent"
+          >
+            <div className="flex items-center justify-center gap-5">
+              <CallControlBtn
+                label={isMicrophoneEnabled ? 'Mute' : 'Unmute'}
+                icon={isMicrophoneEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                active={!isMicrophoneEnabled}
+                onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+              />
+              {type === 'video' && (
+                <CallControlBtn
+                  label={isCameraEnabled ? 'Camera off' : 'Camera on'}
+                  icon={isCameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                  active={!isCameraEnabled}
+                  onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
+                />
+              )}
+              <CallControlBtn
+                label="Leave"
+                icon={<PhoneOff className="w-5 h-5" />}
+                variant="danger"
+                onClick={onLeave}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
-            {!loading && !error && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Local Video */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="glass-card rounded-xl p-4 border border-white/20"
-                >
-                  <h3 className="font-medium mb-3 text-white flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    You
-                  </h3>
-                  <div className="relative aspect-video bg-black/60 rounded-lg overflow-hidden">
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                    {!videoEnabled && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <VideoOff className="w-12 h-12 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
+// ─── Spotlight: fills screen with one remote participant ──────────────────────
 
-                {/* Remote Participants */}
-                <div>
-                  <h3 className="font-medium mb-3 text-white">
-                    Participants ({participantCount})
-                  </h3>
-                  <div ref={remoteContainerRef} className="space-y-4">
-                    {participantCount === 0 && (
-                      <div className="glass-card rounded-xl p-8 border border-white/10 text-center">
-                        <p className="text-muted-foreground">Waiting for others to join...</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+function SpotlightView({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) {
+  const hasVideo = isTrackReference(trackRef) && !trackRef.publication?.isMuted;
+  const identity = trackRef.participant.identity;
 
-            {/* Controls */}
-            {!loading && !error && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mt-6 flex justify-center gap-4"
-              >
-                <Button
-                  onClick={toggleMute}
-                  variant={muted ? "destructive" : "secondary"}
-                  className="gap-2 min-w-[120px]"
-                >
-                  {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  {muted ? 'Unmute' : 'Mute'}
-                </Button>
-                {type === 'video' && (
-                  <Button
-                    onClick={toggleVideo}
-                    variant={videoEnabled ? "secondary" : "destructive"}
-                    className="gap-2 min-w-[140px]"
-                  >
-                    {videoEnabled ? (
-                      <>
-                        <VideoIcon className="w-4 h-4" />
-                        Stop Video
-                      </>
-                    ) : (
-                      <>
-                        <VideoOff className="w-4 h-4" />
-                        Start Video
-                      </>
-                    )}
-                  </Button>
-                )}
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
+  return (
+    <div className="absolute inset-0 bg-neutral-900 flex items-center justify-center">
+      {hasVideo ? (
+        <VideoTrack
+          trackRef={trackRef}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        <PulsingParticipantAvatar identity={identity} size="lg" />
+      )}
+      {/* Name badge */}
+      <div className="absolute bottom-28 left-5 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
+        <span className="text-white text-sm font-medium">{identity}</span>
       </div>
+    </div>
+  );
+}
+
+// ─── Grid: 2–6 remote participants ───────────────────────────────────────────
+
+function GridView({ trackRefs }: { trackRefs: TrackReferenceOrPlaceholder[] }) {
+  const count = trackRefs.length;
+  const cols = count <= 2 ? 'grid-cols-1 sm:grid-cols-2' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3';
+
+  return (
+    <div className={`absolute inset-0 grid ${cols} gap-1 p-1`}>
+      {trackRefs.map((trackRef, i) => {
+        const hasVideo = isTrackReference(trackRef) && !trackRef.publication?.isMuted;
+        const identity = trackRef.participant.identity;
+        return (
+          <motion.div
+            key={trackRef.participant.sid}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.05 }}
+            className="relative bg-neutral-900 rounded-xl overflow-hidden"
+          >
+            {hasVideo ? (
+              <VideoTrack
+                trackRef={trackRef}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <PulsingParticipantAvatar identity={identity} size="sm" />
+              </div>
+            )}
+            <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full">
+              <span className="text-white text-xs font-medium">{identity}</span>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Draggable local PiP ──────────────────────────────────────────────────────
+
+function LocalPiP({
+  trackRef,
+  isCameraEnabled,
+}: {
+  trackRef?: TrackReferenceOrPlaceholder;
+  isCameraEnabled: boolean;
+}) {
+  return (
+    <motion.div
+      drag
+      dragMomentum={false}
+      dragElastic={0.08}
+      initial={{ x: 0, y: 0 }}
+      className="absolute bottom-28 right-4 z-30 w-[100px] h-[140px] md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 cursor-grab active:cursor-grabbing touch-none"
+      whileTap={{ scale: 0.97 }}
+    >
+      {isCameraEnabled && trackRef && isTrackReference(trackRef) ? (
+        <VideoTrack
+          trackRef={trackRef}
+          className="w-full h-full object-cover [transform:scaleX(-1)]"
+        />
+      ) : (
+        <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+          <VideoOff className="w-5 h-5 text-white/30" />
+        </div>
+      )}
+      <div className="absolute bottom-1 left-0 right-0 text-center text-[9px] text-white/60 font-medium">
+        You
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Waiting screen (no other participants yet) ───────────────────────────────
+
+function WaitingScreen({ roomName }: { roomName: string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-neutral-900 to-black gap-5">
+      <motion.div
+        className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center"
+        animate={{ scale: [1, 1.08, 1], opacity: [0.8, 1, 0.8] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <Users className="w-9 h-9 text-primary/80" />
+      </motion.div>
+      <div className="text-center px-8">
+        <p className="text-white font-semibold text-lg capitalize">{roomName}</p>
+        <motion.p
+          className="text-white/50 text-sm mt-1"
+          animate={{ opacity: [1, 0.4, 1] }}
+          transition={{ duration: 1.8, repeat: Infinity }}
+        >
+          Waiting for others to join…
+        </motion.p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pulsing avatar for camera-off participants ───────────────────────────────
+
+function PulsingParticipantAvatar({ identity, size }: { identity: string; size: 'sm' | 'lg' }) {
+  const sz = size === 'lg' ? 96 : 56;
+  const rings = size === 'lg' ? [1, 2, 3] : [1, 2];
+  const ringBase = size === 'lg' ? 30 : 20;
+
+  return (
+    <div className="relative flex items-center justify-center">
+      {rings.map((i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full border border-primary/25"
+          style={{ width: sz + i * ringBase, height: sz + i * ringBase }}
+          animate={{ scale: [1, 1.08, 1], opacity: [0.4, 0.1, 0.4] }}
+          transition={{ duration: 2, repeat: Infinity, delay: i * 0.35, ease: 'easeInOut' }}
+        />
+      ))}
+      <div
+        className="relative z-10 rounded-full overflow-hidden ring-2 ring-primary/40 shadow-xl bg-neutral-700 flex items-center justify-center"
+        style={{ width: sz, height: sz }}
+      >
+        <span className="text-white font-bold" style={{ fontSize: sz * 0.35 }}>
+          {identity.slice(0, 2).toUpperCase()}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Control button ───────────────────────────────────────────────────────────
+
+function CallControlBtn({
+  label,
+  icon,
+  onClick,
+  variant = 'default',
+  active = false,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  variant?: 'default' | 'danger';
+  active?: boolean;
+}) {
+  const colors =
+    variant === 'danger'
+      ? 'bg-red-500 hover:bg-red-400 text-white'
+      : active
+        ? 'bg-white/25 text-white hover:bg-white/35'
+        : 'bg-white/10 text-white/80 hover:bg-white/20';
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button
+        onClick={onClick}
+        aria-label={label}
+        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 ${colors}`}
+      >
+        {icon}
+      </button>
+      <span className="text-white/60 text-[11px] font-medium">{label}</span>
+    </div>
+  );
+}
+
+// ─── Fullscreen loading spinner ───────────────────────────────────────────────
+
+function FullscreenLoader({ label }: { label: string }) {
+  return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
+      <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      <p className="text-white/60 text-sm">{label}</p>
+    </div>
+  );
+}
+
+// ─── Error screen ─────────────────────────────────────────────────────────────
+
+function ErrorScreen({ error, onBack }: { error: string; onBack: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6 px-8">
+      <AlertCircle className="w-14 h-14 text-red-400" />
+      <div className="text-center">
+        <p className="text-white font-semibold text-lg">Couldn't join call</p>
+        <p className="text-white/50 text-sm mt-1">{error}</p>
+      </div>
+      <button
+        onClick={onBack}
+        className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
+      >
+        Go back
+      </button>
     </div>
   );
 }

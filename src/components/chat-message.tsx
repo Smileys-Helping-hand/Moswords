@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from 'react';
 import type { OptimisticMessage } from '@/hooks/use-chat';
 import UserAvatar from './user-avatar';
 import { Button } from './ui/button';
@@ -66,7 +67,7 @@ function ReadReceiptIcon({
   return <Check className="w-3 h-3 opacity-60 shrink-0" aria-label="Sent" />;
 }
 
-export default function ChatMessage({
+function ChatMessage({
   message,
   showAvatar,
   isGrouped = false,
@@ -416,3 +417,5 @@ export default function ChatMessage({
     </motion.div>
   );
 }
+
+export default memo(ChatMessage);
