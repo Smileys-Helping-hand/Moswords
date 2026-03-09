@@ -208,7 +208,7 @@ function ChatMessage({
 
   // ── Bubble styling ─────────────────────────────────────────────────
   const bubbleCls = cn(
-    'relative max-w-full min-w-[80px] text-sm shadow-md transition-opacity duration-150',
+    'relative max-w-full min-w-[104px] text-sm shadow-md transition-opacity duration-150',
     isCurrentUser
       ? cn(
           'bg-[hsl(var(--bubble-out))] text-[hsl(var(--bubble-out-fg))]',
@@ -373,10 +373,9 @@ function ChatMessage({
             <div className="px-3 pt-2.5">
               <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
                 {message.content}
-                {/* Invisible spacer so timestamp never overlaps the last text line */}
-                <span className="inline-block opacity-0 ml-1 text-[10px] select-none" aria-hidden>
-                  {timeStr}
-                  {isCurrentUser && '\u00A0\u00A0\u2713'}
+                {/* Invisible trailing spacer so timestamp row never overlaps the last text line */}
+                <span className="inline-block opacity-0 ml-1 text-[10px] select-none pointer-events-none" aria-hidden>
+                  {timeStr}{isCurrentUser && '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0'}
                 </span>
               </p>
             </div>
@@ -385,12 +384,12 @@ function ChatMessage({
           {/* ── Timestamp + Read Receipts (always inside bubble, bottom-right) ── */}
           <div
             className={cn(
-              'flex items-center justify-end gap-1 px-3 pb-1.5',
+              'flex items-center justify-end gap-1 px-3 pb-2',
               !isMediaPlaceholder ? 'pt-0' : 'pt-1.5',
               isCurrentUser ? 'text-white/65' : 'text-foreground/55',
             )}
           >
-            <span className="text-[10px] leading-none tabular-nums font-medium">{timeStr}</span>
+            <span className="text-[10px] leading-tight tabular-nums font-medium whitespace-nowrap">{timeStr}</span>
             {isCurrentUser && (
               <ReadReceiptIcon status={message.status} readStatus={message.readStatus} />
             )}

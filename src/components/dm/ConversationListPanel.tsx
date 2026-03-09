@@ -18,6 +18,7 @@ import {
   Bell,
   Archive,
   Trash2,
+  Radio,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -313,7 +314,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                     >
                       <button
                         onClick={() => router.push(`/dm/${c.otherUserId}`)}
-                        className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-150 flex items-center gap-3 pr-10 ${
+                        className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-150 flex items-center gap-3 ${
                           activePath
                             ? 'bg-primary/15 border border-primary/30'
                             : 'hover:bg-muted/60 active:bg-muted/80 border border-transparent'
@@ -351,7 +352,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                                 c.otherUser?.email}
                             </p>
                             <span
-                              className={`text-[11px] shrink-0 tabular-nums ${
+                              className={`text-[11px] shrink-0 tabular-nums whitespace-nowrap ml-1 ${
                                 isUnread ? 'text-primary font-semibold' : 'text-muted-foreground'
                               }`}
                             >
@@ -504,7 +505,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
       </Tabs>
 
       {/* ── Profile strip at bottom (desktop only) — like WhatsApp's bottom bar ── */}
-      <div className="hidden md:flex items-center gap-3 px-4 py-3 border-t border-border/20 bg-background shrink-0">
+      <div className="hidden md:flex items-center gap-2 px-3 py-2.5 border-t border-border/20 bg-background shrink-0">
         <div
           className="cursor-pointer shrink-0"
           onClick={() => router.push('/profile')}
@@ -522,7 +523,14 @@ export default function ConversationListPanel({ compact = false }: ConversationL
           <p className="text-[11px] text-green-400 font-medium leading-tight">Online</p>
         </div>
         <button
-          onClick={() => router.push('/profile')}
+          onClick={() => router.push('/updates')}
+          className="p-2 rounded-xl hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground"
+          title="Status &amp; Updates"
+        >
+          <Radio className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => router.push('/settings')}
           className="p-2 rounded-xl hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground"
           title="Settings"
         >
