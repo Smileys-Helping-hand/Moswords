@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
 import { groupChatMessages, groupChatMembers, users } from '@/lib/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, asc, gt } from 'drizzle-orm';
 
-// GET /api/group-chats/[groupChatId]/messages - Get messages for a group chat
+// GET /api/group-chats/[groupChatId]/messages
+// ?limit=N     — max messages to return on initial load (default 50, max 100)
+// ?after=<id>  — incremental: only messages newer than this message ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ groupChatId: string }> }
@@ -37,41 +40,70 @@ export async function GET(
       );
     }
 
-    // Get messages with sender info
-    const messages = await db
-      .select({
-        id: groupChatMessages.id,
-        content: groupChatMessages.content,
-        contentNonce: groupChatMessages.contentNonce,
-        isEncrypted: groupChatMessages.isEncrypted,
-        userId: groupChatMessages.userId,
-        groupChatId: groupChatMessages.groupChatId,
-        createdAt: groupChatMessages.createdAt,
-        deleted: groupChatMessages.deleted,
-        mediaUrl: groupChatMessages.mediaUrl,
-        mediaType: groupChatMessages.mediaType,
-        mediaEncrypted: groupChatMessages.mediaEncrypted,
-        mediaNonce: groupChatMessages.mediaNonce,
-        sender: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          displayName: users.displayName,
-          photoURL: users.photoURL,
-        },
-      })
-      .from(groupChatMessages)
-      .leftJoin(users, eq(groupChatMessages.userId, users.id))
-      .where(
-        and(
-          eq(groupChatMessages.groupChatId, groupChatId),
-          eq(groupChatMessages.deleted, false)
-        )
-      )
-      .orderBy(desc(groupChatMessages.createdAt))
-      .limit(100);
+    const { searchParams } = new URL(request.url);
+    const afterId = searchParams.get('after');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
 
-    return NextResponse.json({ messages: messages.reverse() });
+    const MSG_SELECT = {
+      id: groupChatMessages.id,
+      content: groupChatMessages.content,
+      contentNonce: groupChatMessages.contentNonce,
+      isEncrypted: groupChatMessages.isEncrypted,
+      userId: groupChatMessages.userId,
+      groupChatId: groupChatMessages.groupChatId,
+      createdAt: groupChatMessages.createdAt,
+      deleted: groupChatMessages.deleted,
+      mediaUrl: groupChatMessages.mediaUrl,
+      mediaType: groupChatMessages.mediaType,
+      mediaEncrypted: groupChatMessages.mediaEncrypted,
+      mediaNonce: groupChatMessages.mediaNonce,
+      sender: {
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        displayName: users.displayName,
+        photoURL: users.photoURL,
+      },
+    } as const;
+
+    const baseWhere = and(
+      eq(groupChatMessages.groupChatId, groupChatId),
+      eq(groupChatMessages.deleted, false),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let messages: any[];
+
+    if (afterId) {
+      const [anchor] = await db
+        .select({ createdAt: groupChatMessages.createdAt })
+        .from(groupChatMessages)
+        .where(eq(groupChatMessages.id, afterId))
+        .limit(1);
+
+      if (anchor) {
+        messages = await db
+          .select(MSG_SELECT)
+          .from(groupChatMessages)
+          .leftJoin(users, eq(groupChatMessages.userId, users.id))
+          .where(and(baseWhere!, gt(groupChatMessages.createdAt, anchor.createdAt)))
+          .orderBy(asc(groupChatMessages.createdAt))
+          .limit(200);
+      } else {
+        messages = [];
+      }
+    } else {
+      const rows = await db
+        .select(MSG_SELECT)
+        .from(groupChatMessages)
+        .leftJoin(users, eq(groupChatMessages.userId, users.id))
+        .where(baseWhere!)
+        .orderBy(desc(groupChatMessages.createdAt))
+        .limit(limit);
+      messages = rows.reverse();
+    }
+
+    return NextResponse.json({ messages });
   } catch (error) {
     console.error('Error fetching group chat messages:', error);
     return NextResponse.json(

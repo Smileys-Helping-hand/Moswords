@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     { rel: 'apple-touch-icon', url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
     { rel: 'shortcut icon', url: '/favicon.ico' },
   ],
-  themeColor: '#030014',
+  metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
   openGraph: {
     title: 'Moswords - Professional Team Communication',
     description: 'Real-time collaboration platform with AI-powered features',

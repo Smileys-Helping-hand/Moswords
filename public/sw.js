@@ -1,10 +1,12 @@
-// Service Worker for Moswords PWA
-const CACHE_NAME = 'moswords-v2';
-const RUNTIME_CACHE = 'moswords-runtime-v2';
-const IMAGE_CACHE = 'moswords-images-v2';
+// Service Worker for Moswords PWA — v3
+// Strategy: WhatsApp-style local-first caching
+const CACHE_NAME = 'moswords-v3';
+const RUNTIME_CACHE = 'moswords-runtime-v3';
+const IMAGE_CACHE = 'moswords-images-v3';
 
 const urlsToCache = [
   '/',
+  '/dm',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -29,16 +31,13 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (!currentCaches.includes(cacheName)) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter((n) => !currentCaches.includes(n))
+          .map((n) => caches.delete(n))
+      )
+    )
   );
   self.clients.claim();
 });
@@ -58,7 +57,28 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API requests - network first, fallback to cache
+  // ── Conversation API: stale-while-revalidate ──────────────────────────────
+  // Return cached response instantly, then update cache in background.
+  // This makes chat open INSTANTLY even on slow connections.
+  if (url.pathname.startsWith('/api/conversations/')) {
+    event.respondWith(
+      caches.open(RUNTIME_CACHE).then(async (cache) => {
+        const cached = await cache.match(request);
+        const networkFetch = fetch(request).then((response) => {
+          if (response.status === 200) {
+            cache.put(request, response.clone());
+          }
+          return response;
+        }).catch(() => null);
+
+        // Return cache immediately if available, otherwise wait for network
+        return cached || networkFetch;
+      })
+    );
+    return;
+  }
+
+  // ── Other API requests: network-first, fallback to cache ─────────────────
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)

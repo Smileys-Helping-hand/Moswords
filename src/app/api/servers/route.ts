@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
 import { servers, serverMembers, channels } from '@/lib/schema';
 import { eq } from 'drizzle-orm';

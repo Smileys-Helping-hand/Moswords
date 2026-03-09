@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+export const dynamic = 'force-dynamic';
 import { summarizeThread } from '@/ai/flows/ai-summarize-thread';
 
 // POST /api/ai/summarize-thread

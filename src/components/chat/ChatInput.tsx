@@ -490,8 +490,8 @@ export default function ChatInput({
           </div>
         </div>
 
-        {/* Helper Text */}
-        <div className="px-4 pb-2 text-xs text-white/40 flex items-center justify-between">
+        {/* Helper Text — desktop only, hidden on mobile to save space */}
+        <div className="hidden md:flex px-4 pb-2 text-xs text-white/40 items-center justify-between">
           <span>
             <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white/60">Enter</kbd> to send · 
             <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white/60 ml-1">Shift+Enter</kbd> for new line

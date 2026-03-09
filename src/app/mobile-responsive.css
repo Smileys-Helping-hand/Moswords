@@ -44,11 +44,11 @@ html {
 
 /* ===== MOBILE-SPECIFIC IMPROVEMENTS ===== */
 @media (max-width: 768px) {
-  /* Larger tap targets on mobile */
-  button, a, .clickable {
-    min-height: 48px;
-    min-width: 48px;
-    padding: 12px 16px;
+  /* Touch-friendly tap targets: ONLY min-height, no padding override.
+     Adding padding here globally breaks styled components like chat input buttons. */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
   }
   
   /* Better spacing for mobile */
@@ -95,12 +95,9 @@ html {
     border-radius: 20px 20px 0 0;
   }
   
-  /* Improve form inputs */
+  /* Prevent iOS zoom on input focus — only font-size, not padding */
   input, textarea, select {
-    width: 100%;
-    font-size: 16px; /* Prevents zoom on iOS */
-    padding: 14px 16px;
-    border-radius: 12px;
+    font-size: 16px !important; /* Prevents zoom on iOS */
   }
   
   /* Better image handling */

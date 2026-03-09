@@ -3,12 +3,37 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { directMessages, users } from '@/lib/schema';
-import { eq, or, and } from 'drizzle-orm';
+import { eq, or, and, gt, desc, asc } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// GET /api/conversations/[userId] - Get conversation with a specific user
+const MESSAGE_SELECT = {
+  id: directMessages.id,
+  content: directMessages.content,
+  contentNonce: directMessages.contentNonce,
+  isEncrypted: directMessages.isEncrypted,
+  senderId: directMessages.senderId,
+  receiverId: directMessages.receiverId,
+  createdAt: directMessages.createdAt,
+  read: directMessages.read,
+  archived: directMessages.archived,
+  mediaUrl: directMessages.mediaUrl,
+  mediaType: directMessages.mediaType,
+  mediaEncrypted: directMessages.mediaEncrypted,
+  mediaNonce: directMessages.mediaNonce,
+  sender: {
+    id: users.id,
+    email: users.email,
+    name: users.name,
+    displayName: users.displayName,
+    photoURL: users.photoURL,
+  },
+} as const;
+
+// GET /api/conversations/[userId]
+// ?limit=N     — how many recent messages to return on initial load (default 50, max 100)
+// ?after=<id>  — incremental polling: only return messages newer than this message ID
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ userId: string }> }
@@ -22,46 +47,70 @@ export async function GET(
 
     const currentUserId = (session.user as any).id;
     const { userId: otherUserId } = await context.params;
+    const { searchParams } = new URL(request.url);
 
-    // Get all messages between these two users
-    const messages = await db
-      .select({
-        id: directMessages.id,
-        content: directMessages.content,
-        senderId: directMessages.senderId,
-        receiverId: directMessages.receiverId,
-        createdAt: directMessages.createdAt,
-        read: directMessages.read,
-        archived: directMessages.archived,
-        sender: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          displayName: users.displayName,
-          photoURL: users.photoURL,
-        },
-      })
-      .from(directMessages)
-      .leftJoin(users, eq(directMessages.senderId, users.id))
-      .where(
-        or(
-          and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
-          and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
-        )
-      )
-      .orderBy(directMessages.createdAt);
+    const afterId = searchParams.get('after'); // incremental polling
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
 
-    // Mark messages as read
-    await db
-      .update(directMessages)
+    const messagesBetween = or(
+      and(
+        eq(directMessages.senderId, currentUserId),
+        eq(directMessages.receiverId, otherUserId),
+      ),
+      and(
+        eq(directMessages.senderId, otherUserId),
+        eq(directMessages.receiverId, currentUserId),
+      ),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let messages: any[] = [];
+
+    if (afterId) {
+      // ── Incremental fetch: only messages newer than afterId ──────────────
+      // First look up the createdAt timestamp of the anchor message so we can
+      // use a range query (avoids a full table scan).
+      const [anchor] = await db
+        .select({ createdAt: directMessages.createdAt })
+        .from(directMessages)
+        .where(eq(directMessages.id, afterId))
+        .limit(1);
+
+      if (anchor) {
+        messages = await db
+          .select(MESSAGE_SELECT)
+          .from(directMessages)
+          .leftJoin(users, eq(directMessages.senderId, users.id))
+          .where(and(messagesBetween!, gt(directMessages.createdAt, anchor.createdAt)))
+          .orderBy(asc(directMessages.createdAt))
+          .limit(200); // Allow up to 200 new messages per poll burst
+      } else {
+        messages = [];
+      }
+    } else {
+      // ── Initial load: most recent N messages ─────────────────────────────
+      const rows = await db
+        .select(MESSAGE_SELECT)
+        .from(directMessages)
+        .leftJoin(users, eq(directMessages.senderId, users.id))
+        .where(messagesBetween!)
+        .orderBy(desc(directMessages.createdAt))
+        .limit(limit);
+      // Reverse so they display oldest→newest in the UI
+      messages = rows.reverse();
+    }
+
+    // Mark received unread messages as read (fire-and-forget, non-blocking)
+    db.update(directMessages)
       .set({ read: true })
       .where(
         and(
           eq(directMessages.receiverId, currentUserId),
           eq(directMessages.senderId, otherUserId),
-          eq(directMessages.read, false)
-        )
-      );
+          eq(directMessages.read, false),
+        ),
+      )
+      .catch(() => {}); // ignore read-receipt errors to not block the response
 
     return NextResponse.json({ messages });
   } catch (error) {

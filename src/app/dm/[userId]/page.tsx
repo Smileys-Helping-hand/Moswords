@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef, use, useCallback } from 'react';
+import { loadCachedMessages, saveMessagesToCache } from '@/lib/message-cache';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 // Use native scrolling for better mobile behavior
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { Send, ArrowLeft, Archive, MoreVertical, Loader2, Phone, Video, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Archive, MoreVertical, Phone, Video, ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
@@ -88,6 +88,13 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<User | null>(null);
 
+  // Refs for incremental polling (avoids stale closure issues)
+  const lastMessageIdRef = useRef<string>('');
+  const hasInitialLoadRef = useRef(false);
+  const otherUserRef = useRef<User | null>(null);
+  const canDecryptRef = useRef(false);
+  const encryptionInitRef = useRef(false);
+
   const handleVoiceCall = useCallback(() => {
     if (!otherUser) return;
     startCall(
@@ -154,103 +161,103 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   }, [messages.length, isAtBottom]);
 
+  // ── Step 1: instant cache load on mount ────────────────────────────────
+  useEffect(() => {
+    if (status !== 'authenticated' || !currentUserId) return;
+    const cached = loadCachedMessages(userId, currentUserId);
+    if (cached && cached.length > 0) {
+      setMessages(cached as unknown as Message[]);
+      setLoading(false);
+      lastMessageIdRef.current = cached[cached.length - 1].id;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, currentUserId, userId]);
+
+  // ── Step 2: initial load + incremental poll ──────────────────────────────
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
       return;
     }
+    if (status !== 'authenticated') return;
 
-    // Mark this conversation as viewed for notification badge
-    const stored = localStorage.getItem('viewedConversations');
-    const viewedSet = stored ? new Set(JSON.parse(stored)) : new Set();
-    viewedSet.add(userId);
-    localStorage.setItem('viewedConversations', JSON.stringify(Array.from(viewedSet)));
-    
-    // Dispatch event to notify other components
-    window.dispatchEvent(new Event('viewedConversationsUpdated'));
+    // Mark conversation as viewed
+    try {
+      const stored = localStorage.getItem('viewedConversations');
+      const viewedSet = stored ? new Set(JSON.parse(stored)) : new Set<string>();
+      viewedSet.add(userId);
+      localStorage.setItem('viewedConversations', JSON.stringify(Array.from(viewedSet)));
+      window.dispatchEvent(new Event('viewedConversationsUpdated'));
+    } catch { /* ignore */ }
 
-    const fetchConversation = async () => {
+    const scopeId = getDmScopeId(currentUserId, userId);
+
+    const initEncryption = async () => {
+      if (encryptionInitRef.current) return;
       try {
-        // Fetch profile + messages in parallel for faster load
+        await ensureConversationKey('dm', scopeId, [userId]);
+        canDecryptRef.current = true;
+      } catch {
+        canDecryptRef.current = false;
+      }
+      encryptionInitRef.current = true;
+    };
+
+    const looksLikeCiphertext = (s: string) => {
+      if (!s || s.length < 20) return false;
+      const stripped = s.replace(/[\s\n\r]/g, '');
+      const b64Chars = (stripped.match(/[A-Za-z0-9+/=]/g) || []).length;
+      return b64Chars / stripped.length > 0.97 && stripped.length > 30 && !s.includes(' ');
+    };
+
+    const decryptOne = async (msg: Message): Promise<Message> => {
+      let content = msg.content;
+      const isEnc = msg.isEncrypted || !!msg.contentNonce || looksLikeCiphertext(msg.content);
+      if (isEnc) {
+        if (canDecryptRef.current && msg.contentNonce) {
+          const plain = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce).catch(() => null);
+          content = plain ?? '🔒 Encrypted message';
+        } else {
+          content = '🔒 Encrypted message';
+        }
+      }
+      return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
+    };
+
+    // ── Initial load: fetch most-recent 50 messages ─────────────────────
+    const initialLoad = async () => {
+      try {
         const [otherRes, response] = await Promise.all([
           fetch(`/api/users/${userId}`),
-          fetch(`/api/conversations/${userId}`),
+          fetch(`/api/conversations/${userId}?limit=50`),
         ]);
 
         if (otherRes.ok) {
           const otherData = await otherRes.json();
           setOtherUser(otherData.user);
+          otherUserRef.current = otherData.user;
         }
 
         if (!response.ok) throw new Error('Failed to fetch conversation');
         const data = await response.json();
-        
-        // Deduplicate messages by ID
+
+        await initEncryption();
         revokeMediaUrls();
-        const uniqueMessages = Array.from(
-          new Map(data.messages.map((m: Message) => [m.id, m])).values()
-        ) as Message[];
 
-        // Try to establish the DM conversation key for decryption
-        const scopeId = getDmScopeId(currentUserId, userId);
-        let canDecrypt = false;
-        try {
-          await ensureConversationKey('dm', scopeId, [userId]);
-          canDecrypt = true;
-        } catch {
-          // Key not available — messages will show as locked
-        }
-
-        const looksLikeCiphertext = (s: string) => {
-          if (!s || s.length < 20) return false;
-          const stripped = s.replace(/[\s\n\r]/g, '');
-          const b64Chars = (stripped.match(/[A-Za-z0-9+/=]/g) || []).length;
-          return b64Chars / stripped.length > 0.97 && stripped.length > 30 && !s.includes(' ');
-        };
-
-        // Decrypt all messages in parallel for speed
-        const decryptedMessages = await Promise.all(
-          uniqueMessages.map(async (msg) => {
-            let content = msg.content;
-            const isEncrypted = msg.isEncrypted || !!msg.contentNonce || looksLikeCiphertext(msg.content);
-            if (isEncrypted) {
-              if (canDecrypt && msg.contentNonce) {
-                const plain = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce).catch(() => null);
-                content = plain ?? '🔒 Encrypted message';
-              } else if (canDecrypt && looksLikeCiphertext(msg.content)) {
-                // Nonce-less old message — cannot decrypt without nonce
-                content = '🔒 Encrypted message';
-              } else {
-                content = '🔒 Encrypted message';
-              }
-            }
-            return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
-          })
+        const decrypted: Message[] = await Promise.all(
+          (data.messages as Message[]).map(decryptOne)
         );
-        
-        const atBottom = checkIfAtBottom();
-        if (!atBottom && decryptedMessages.length > previousMessageCount.current) {
-          setHasNewMessages(true);
-        }
 
-        // Check for new messages and show notification
-        if (decryptedMessages.length > previousMessageCount.current && previousMessageCount.current > 0) {
-          const newMessagesArray = decryptedMessages.slice(previousMessageCount.current);
-          const lastNewMessage = newMessagesArray[newMessagesArray.length - 1];
-          
-          // Only notify if the new message is from the other user (not sent by current user)
-          if (lastNewMessage && lastNewMessage.senderId === userId) {
-            toast({
-              title: '💬 New message',
-              description: `${otherUser?.displayName || otherUser?.name || 'User'}: ${lastNewMessage.content.substring(0, 50)}${lastNewMessage.content.length > 50 ? '...' : ''}`,
-              duration: 3000,
-            });
-          }
+        setMessages(decrypted);
+        saveMessagesToCache(userId, currentUserId, decrypted as any);
+
+        if (decrypted.length > 0) {
+          lastMessageIdRef.current = decrypted[decrypted.length - 1].id;
+          previousMessageCount.current = decrypted.length;
         }
-        previousMessageCount.current = decryptedMessages.length;
-        setMessages(decryptedMessages);
+        hasInitialLoadRef.current = true;
       } catch (error) {
-        console.error('Error fetching conversation:', error);
+        console.error('Error loading conversation:', error);
         toast({
           variant: 'destructive',
           title: 'Error',
@@ -261,24 +268,73 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       }
     };
 
-    if (status === 'authenticated') {
-      fetchConversation();
-      // Poll faster when visible, slower when tab is in background
-      const getInterval = () => document.hidden ? 10000 : 4000;
-      let interval = setInterval(fetchConversation, getInterval());
-      const onVisibilityChange = () => {
-        clearInterval(interval);
-        if (!document.hidden) fetchConversation();
-        interval = setInterval(fetchConversation, getInterval());
-      };
-      document.addEventListener('visibilitychange', onVisibilityChange);
-      return () => {
-        clearInterval(interval);
-        document.removeEventListener('visibilitychange', onVisibilityChange);
-        revokeMediaUrls();
-      };
-    }
-  }, [status, userId, router, toast, otherUser, session, revokeMediaUrls, checkIfAtBottom]);
+    // ── Incremental poll: only fetch messages after lastMessageId ────────
+    const pollNewMessages = async () => {
+      if (!hasInitialLoadRef.current) return;
+      const afterId = lastMessageIdRef.current;
+      if (!afterId) return;
+
+      try {
+        const response = await fetch(`/api/conversations/${userId}?after=${afterId}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.messages || data.messages.length === 0) return;
+
+        if (!encryptionInitRef.current) await initEncryption();
+        const newDecrypted: Message[] = await Promise.all(
+          (data.messages as Message[]).map(decryptOne)
+        );
+
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const trulyNew = newDecrypted.filter((m) => !existingIds.has(m.id));
+          if (trulyNew.length === 0) return prev;
+
+          const merged = [...prev, ...trulyNew];
+          saveMessagesToCache(userId, currentUserId, merged as any);
+
+          // Show "new messages" scroll button if not at bottom
+          if (!checkIfAtBottom()) setHasNewMessages(true);
+
+          return merged;
+        });
+
+        // Update anchor ID
+        lastMessageIdRef.current = data.messages[data.messages.length - 1].id;
+
+        // Toast for incoming messages
+        const lastNew = newDecrypted[newDecrypted.length - 1];
+        if (lastNew && lastNew.senderId === userId) {
+          const u = otherUserRef.current;
+          toast({
+            title: '💬 New message',
+            description: `${u?.displayName || u?.name || 'User'}: ${lastNew.content.substring(0, 50)}${lastNew.content.length > 50 ? '...' : ''}`,
+            duration: 3000,
+          });
+        }
+      } catch {
+        // Silently swallow poll errors to avoid spamming the UI
+      }
+    };
+
+    initialLoad();
+
+    const getInterval = () => (document.hidden ? 10000 : 4000);
+    let intervalId = setInterval(pollNewMessages, getInterval());
+
+    const onVisibilityChange = () => {
+      clearInterval(intervalId);
+      if (!document.hidden) pollNewMessages();
+      intervalId = setInterval(pollNewMessages, getInterval());
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      revokeMediaUrls();
+    };
+  }, [status, userId, router, currentUserId]); // minimal deps — callbacks use refs
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
