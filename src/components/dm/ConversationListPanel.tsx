@@ -34,6 +34,11 @@ import SponsoredChatRow from '@/components/ads/SponsoredChatRow';
 import { MOCK_ADS } from '@/lib/mock-ads';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { signOut } from 'next-auth/react';
+import {
+  loadConversationListIDB,
+  saveConversationListIDB,
+  type CachedConversation,
+} from '@/lib/idb-cache';
 
 type Conversation = {
   otherUserId: string;
@@ -142,7 +147,15 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     if (pathname === `/dm/${otherUserId}`) router.push('/dm');
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isInitial = false) => {
+    // Cache-first: show cached data instantly on initial load
+    if (isInitial && currentUserId) {
+      const cached = await loadConversationListIDB(currentUserId);
+      if (cached && cached.length > 0) {
+        setConversations(cached as any[]);
+        setLoading(false);
+      }
+    }
     try {
       const [convRes, groupRes] = await Promise.all([
         fetch('/api/conversations'),
@@ -150,7 +163,9 @@ export default function ConversationListPanel({ compact = false }: ConversationL
       ]);
       if (convRes.ok) {
         const d = await convRes.json();
-        setConversations(d.conversations ?? []);
+        const convList = d.conversations ?? [];
+        setConversations(convList);
+        if (currentUserId) saveConversationListIDB(currentUserId, convList);
       }
       if (groupRes.ok) {
         const d = await groupRes.json();
@@ -159,7 +174,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -167,8 +182,8 @@ export default function ConversationListPanel({ compact = false }: ConversationL
       return;
     }
     if (status === 'authenticated') {
-      load();
-      const interval = setInterval(load, 5000);
+      load(true);
+      const interval = setInterval(() => load(false), 5000);
       return () => clearInterval(interval);
     }
   }, [status, router, load]);

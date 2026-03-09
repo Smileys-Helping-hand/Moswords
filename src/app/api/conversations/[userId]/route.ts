@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { directMessages, users } from '@/lib/schema';
 import { eq, or, and, gt, desc, asc } from 'drizzle-orm';
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -100,17 +99,33 @@ export async function GET(
       messages = rows.reverse();
     }
 
-    // Mark received unread messages as read (fire-and-forget, non-blocking)
-    db.update(directMessages)
-      .set({ read: true })
-      .where(
-        and(
-          eq(directMessages.receiverId, currentUserId),
-          eq(directMessages.senderId, otherUserId),
-          eq(directMessages.read, false),
-        ),
-      )
-      .catch(() => {}); // ignore read-receipt errors to not block the response
+    // Mark received unread messages as read — but only if the user has read receipts enabled
+    // We check our own privacy_settings column (nullable, default = receipts on)
+    let shouldMarkRead = true;
+    try {
+      const [me] = await db
+        .select({ privacySettings: users.privacySettings })
+        .from(users)
+        .where(eq(users.id, currentUserId))
+        .limit(1);
+      const privacy = me?.privacySettings as any;
+      if (privacy && privacy.readReceipts === false) shouldMarkRead = false;
+    } catch {
+      // column may not exist yet — default to true
+    }
+
+    if (shouldMarkRead) {
+      db.update(directMessages)
+        .set({ read: true })
+        .where(
+          and(
+            eq(directMessages.receiverId, currentUserId),
+            eq(directMessages.senderId, otherUserId),
+            eq(directMessages.read, false),
+          ),
+        )
+        .catch(() => {});
+    }
 
     return NextResponse.json({ messages });
   } catch (error) {

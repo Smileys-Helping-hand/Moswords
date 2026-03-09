@@ -22,6 +22,13 @@ export const users = pgTable('users', {
     accent: string;
     density: 'comfy' | 'compact';
   }>(),
+  privacySettings: jsonb('privacy_settings').$type<{
+    readReceipts: boolean;
+    lastSeenVisibility: 'everyone' | 'contacts' | 'nobody';
+    profilePictureVisibility: 'everyone' | 'contacts' | 'nobody';
+    aboutVisibility: 'everyone' | 'contacts' | 'nobody';
+    statusVisibility: 'everyone' | 'contacts' | 'nobody';
+  }>(),
 });
 
 // Accounts table for OAuth providers
@@ -263,6 +270,32 @@ export const userStickers = pgTable('user_stickers', {
   imageUrl: text('image_url').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+/** WhatsApp-style 24-hour status updates */
+export const userStatuses = pgTable('user_statuses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mediaUrl: text('media_url'), // null for text-only statuses
+  mediaType: text('media_type').notNull().default('image'), // 'image' | 'video' | 'text'
+  caption: text('caption'),
+  backgroundColor: text('background_color').default('#1a1a2e'), // for text statuses
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(), // createdAt + 24h
+});
+
+/** Tracks who has viewed each status */
+export const statusViews = pgTable(
+  'status_views',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    statusId: uuid('status_id').notNull().references(() => userStatuses.id, { onDelete: 'cascade' }),
+    viewerId: uuid('viewer_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    viewedAt: timestamp('viewed_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    statusViewerUnique: uniqueIndex('status_viewer_unique').on(t.statusId, t.viewerId),
+  })
+);
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),

@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { MessageSquare, Menu, Inbox, Server, User, Settings, LogOut, X } from 'lucide-react';
+import { MessageSquare, Menu, Inbox, Server, User, Settings, LogOut, X, Radio } from 'lucide-react';
+
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,8 +12,8 @@ import { useMobileFeatures } from '@/hooks/use-mobile-features';
 
 const navItems = [
   { id: 'messages', label: 'Chats', icon: MessageSquare, href: '/dm' },
+  { id: 'updates', label: 'Updates', icon: Radio, href: '/updates' },
   { id: 'servers', label: 'Servers', icon: Server, href: '/servers' },
-  { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/nexusmail' },
   { id: 'more', label: 'More', icon: Menu, href: null },
 ];
 
@@ -144,15 +145,15 @@ export default function MobileNav() {
                 </button>
                 
                 <button
-                  onClick={() => { router.push('/servers'); setShowMenu(false); }}
+                  onClick={() => { router.push('/nexusmail'); setShowMenu(false); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
                 >
-                  <Server className="w-5 h-5 text-primary" />
-                  <span className="font-medium">Servers</span>
+                  <Inbox className="w-5 h-5 text-primary" />
+                  <span className="font-medium">Inbox</span>
                 </button>
                 
                 <button
-                  onClick={() => { router.push('/profile'); setShowMenu(false); }}
+                  onClick={() => { router.push('/settings'); setShowMenu(false); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
                 >
                   <Settings className="w-5 h-5 text-primary" />
