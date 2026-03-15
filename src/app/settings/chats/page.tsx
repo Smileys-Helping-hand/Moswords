@@ -124,7 +124,7 @@ export default function ChatSettingsPage() {
         <div className="glass-card rounded-2xl border border-white/10 px-4 divide-y divide-white/10">
           <button
             className="w-full flex items-center gap-4 py-4"
-            onClick={() => router.push('/profile')}
+            onClick={() => router.push('/settings/appearance')}
           >
             <Monitor className="w-5 h-5 text-primary shrink-0" />
             <div className="flex-1 text-left">
@@ -135,7 +135,7 @@ export default function ChatSettingsPage() {
           <Separator className="hidden" />
           <button
             className="w-full flex items-center gap-4 py-4"
-            onClick={() => router.push('/profile')}
+            onClick={() => router.push('/settings/appearance')}
           >
             <Palette className="w-5 h-5 text-primary shrink-0" />
             <div className="flex-1 text-left">

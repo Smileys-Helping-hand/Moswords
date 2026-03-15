@@ -40,6 +40,16 @@ import {
   saveConversationListIDB,
   type CachedConversation,
 } from '@/lib/idb-cache';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Conversation = {
   otherUserId: string;
@@ -112,6 +122,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
   const [search, setSearch] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Mute state stored in localStorage
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set());
@@ -142,7 +153,6 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   };
 
   const handleDeleteConvo = async (otherUserId: string) => {
-    if (!confirm('Delete this conversation? This cannot be undone.')) return;
     await fetch(`/api/conversations/${otherUserId}`, { method: 'DELETE' });
     setConversations(prev => prev.filter(c => c.otherUserId !== otherUserId));
     if (pathname === `/dm/${otherUserId}`) router.push('/dm');
@@ -184,8 +194,18 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     }
     if (status === 'authenticated') {
       load(true);
-      const interval = setInterval(() => load(false), 5000);
-      return () => clearInterval(interval);
+      const getDelay = () => (document.hidden ? 15000 : 5000);
+      let interval = setInterval(() => load(false), getDelay());
+      const onVisibility = () => {
+        clearInterval(interval);
+        if (!document.hidden) load(false);
+        interval = setInterval(() => load(false), getDelay());
+      };
+      document.addEventListener('visibilitychange', onVisibility);
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', onVisibility);
+      };
     }
   }, [status, router, load]);
 
@@ -236,6 +256,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   }
 
   return (
+    <>
     <div className="h-full flex flex-col bg-background overflow-hidden">
       {/* ── Header ── */}
       <div className="px-4 pt-3 pb-2.5 border-b border-border/20 shrink-0 bg-background">
@@ -385,8 +406,8 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                         </div>
                       </button>
 
-                      {/* Three-dot action menu — visible on hover */}
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+                      {/* Three-dot action menu — always visible on mobile, hover on desktop */}
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100 md:transition-opacity">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
@@ -411,7 +432,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handleDeleteConvo(c.otherUserId)}
+                              onClick={() => setDeleteTarget(c.otherUserId)}
                               className="text-destructive focus:text-destructive focus:bg-destructive/10"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -538,5 +559,27 @@ export default function ConversationListPanel({ compact = false }: ConversationL
         </button>
       </div>
     </div>
+
+    {/* Delete conversation confirmation */}
+    <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <AlertDialogContent className="glass-card border-white/20">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete the chat history. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive hover:bg-destructive/90"
+            onClick={() => { if (deleteTarget) handleDeleteConvo(deleteTarget); setDeleteTarget(null); }}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

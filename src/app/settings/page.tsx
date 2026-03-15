@@ -15,6 +15,8 @@ import {
   ChevronRight,
   User,
   LogOut,
+  HardDrive,
+  Palette,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -23,13 +25,15 @@ const sections = [
     items: [
       { icon: MessageSquare, label: 'Chats', description: 'Theme, wallpaper, chat history', href: '/settings/chats', color: 'text-green-400' },
       { icon: Shield, label: 'Privacy', description: 'Read receipts, last seen, blocked', href: '/settings/privacy', color: 'text-blue-400' },
-      { icon: Bell, label: 'Notifications', description: 'Message, group and call tones', href: '/profile', color: 'text-yellow-400' },
+      { icon: HardDrive, label: 'Storage & Backup', description: 'Cache, export & import chats', href: '/settings/storage', color: 'text-orange-400' },
+      { icon: Bell, label: 'Notifications', description: 'Message, group and call tones', href: '/settings/notifications', color: 'text-yellow-400' },
+      { icon: Palette, label: 'Appearance', description: 'Themes, accent colours, font size', href: '/settings/appearance', color: 'text-purple-400' },
     ],
   },
   {
     items: [
-      { icon: HelpCircle, label: 'Help', description: 'FAQ, contact us, privacy policy', href: '/profile', color: 'text-muted-foreground' },
-      { icon: Info, label: 'About', description: 'Moswords', href: '/profile', color: 'text-muted-foreground' },
+      { icon: HelpCircle, label: 'Help', description: 'FAQ, contact us, privacy policy', href: '/settings/help', color: 'text-muted-foreground' },
+      { icon: Info, label: 'About', description: 'Moswords', href: '/settings/about', color: 'text-muted-foreground' },
     ],
   },
 ];
@@ -61,7 +65,6 @@ export default function SettingsPage() {
           <UserAvatar
             src={session?.user?.image || ''}
             fallback={(session?.user?.name || 'U').substring(0, 2).toUpperCase()}
-            size="lg"
           />
           <div className="flex-1 min-w-0 text-left">
             <p className="font-semibold truncate">{session?.user?.name || 'Your name'}</p>

@@ -26,6 +26,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   decryptFile,
   decryptMessage,
   encryptFile,
@@ -102,6 +112,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [availableFriends, setAvailableFriends] = useState<any[]>([]);
   const [addingMember, setAddingMember] = useState(false);
   const previousMessageCount = useRef<number>(0);
@@ -285,9 +296,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
 
         lastMessageIdRef.current = data.messages[data.messages.length - 1].id;
 
-        // Toast for new messages from others
+        // Toast for new messages from others — only when not actively reading
         const lastNew = newDecrypted[newDecrypted.length - 1];
-        if (lastNew && lastNew.userId !== currentUserId) {
+        if (lastNew && lastNew.userId !== currentUserId && document.hidden) {
           toast({
             title: `👥 New message in ${groupNameRef.current}`,
             description: `${lastNew.sender?.displayName || lastNew.sender?.name || 'Someone'}: ${lastNew.content.substring(0, 50)}${lastNew.content.length > 50 ? '...' : ''}`,
@@ -389,8 +400,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     }
   };
 
+  const handleDeleteGroupMessage = async (messageId: string) => {
+    try {
+      const response = await fetch(`/api/group-chats/${groupChatId}/messages/${messageId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete message');
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+      toast({ title: 'Message deleted' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete message' });
+    }
+  };
+
   const handleLeaveGroup = async () => {
-    if (!confirm('Are you sure you want to leave this group?')) return;
 
     try {
       const response = await fetch(`/api/group-chats/${groupChatId}`, {
@@ -404,7 +425,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
         description: 'You have left the group chat',
       });
 
-      router.push('/');
+      router.push('/dm');
     } catch (error) {
       console.error('Error leaving group:', error);
       toast({
@@ -568,9 +589,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
                 <Settings className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="glass-card border-white/20">
               <DropdownMenuItem onClick={() => setShowMembers(true)}>View Members</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLeaveGroup} className="text-destructive">Leave Group</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowLeaveDialog(true)} className="text-destructive">Leave Group</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -610,6 +631,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
                     reactions: [],
                     isFlagged: false,
                   }}
+                  onDeleteMessage={handleDeleteGroupMessage}
                 />
               );
             })
@@ -733,6 +755,27 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Leave Group confirmation */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent className="glass-card border-white/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will lose access to this group chat and its message history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={handleLeaveGroup}
+            >
+              Leave group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

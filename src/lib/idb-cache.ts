@@ -208,3 +208,23 @@ export async function saveStatusesIDB(userId: string, statuses: unknown[]): Prom
   if (typeof window === 'undefined' || !window.indexedDB) return;
   await idbSet(STORES.statuses, `statuses_${userId}`, { statuses, updatedAt: Date.now() });
 }
+
+// ── Generic short-lived cache (servers list, user profiles, etc.) ─────────────
+
+const GENERIC_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export async function loadGenericIDB<T>(key: string): Promise<T | null> {
+  if (typeof window === 'undefined' || !window.indexedDB) return null;
+  const entry = await idbGet<{ data: T; updatedAt: number }>(STORES.conversations, `generic_${key}`);
+  if (!entry) return null;
+  if (Date.now() - entry.updatedAt > GENERIC_TTL_MS) {
+    await idbDelete(STORES.conversations, `generic_${key}`);
+    return null;
+  }
+  return entry.data;
+}
+
+export async function saveGenericIDB<T>(key: string, data: T): Promise<void> {
+  if (typeof window === 'undefined' || !window.indexedDB) return;
+  await idbSet(STORES.conversations, `generic_${key}`, { data, updatedAt: Date.now() });
+}

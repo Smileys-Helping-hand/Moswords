@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import CreateServerDialog from '@/components/create-server-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { loadGenericIDB, saveGenericIDB } from '@/lib/idb-cache';
 
 interface ServerData {
   id: string;
@@ -35,10 +36,18 @@ export default function ServersPage() {
 
     const fetchServers = async () => {
       try {
+        // Cache-first: show instantly from IDB while network loads
+        const cachedServers = await loadGenericIDB<ServerData[]>('servers');
+        if (cachedServers && cachedServers.length > 0) {
+          setServers(cachedServers);
+          setLoading(false);
+        }
         const response = await fetch('/api/servers');
         if (!response.ok) throw new Error('Failed to fetch servers');
         const data = await response.json();
-        setServers(data.servers.map((item: any) => item.server));
+        const serverList = data.servers.map((item: any) => item.server);
+        setServers(serverList);
+        saveGenericIDB('servers', serverList);
       } catch (error) {
         console.error('Failed to fetch servers:', error);
         toast({
@@ -100,7 +109,7 @@ export default function ServersPage() {
         className="glass-panel border-b border-white/10 px-4 py-3 shrink-0"
       >
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="shrink-0 w-9 h-9">
+          <Button variant="ghost" size="icon" onClick={() => { if (window.history.length > 1) router.back(); else router.push('/dm'); }} className="shrink-0 w-9 h-9 md:hidden">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Server className="w-5 h-5 text-primary shrink-0" />

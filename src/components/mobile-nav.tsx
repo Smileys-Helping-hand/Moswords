@@ -47,6 +47,9 @@ export default function MobileNav() {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
+  // Don't render on unauthenticated pages (login, etc.)
+  if (!session) return null;
+
   return (
     <>
       {/* Mobile Bottom Navigation - Only visible on screens < 768px */}

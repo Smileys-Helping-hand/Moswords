@@ -203,7 +203,7 @@ export default function ProfilePage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push('/')}
+              onClick={() => { if (window.history.length > 1) router.back(); else router.push('/dm'); }}
               className="hover:bg-white/10 shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -412,7 +412,7 @@ export default function ProfilePage() {
         <div className="mt-6 text-center">
           <Button
             variant="ghost"
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/dm')}
             className="text-muted-foreground"
           >
             Back to Chat

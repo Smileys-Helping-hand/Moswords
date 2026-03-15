@@ -8,6 +8,7 @@ import MobileNav from '@/components/mobile-nav';
 import InstallPrompt from '@/components/install-prompt';
 import ClientOnlyProviders from '@/components/client-only-providers';
 import ClientMobileWrapper from '@/components/ClientMobileWrapper';
+import OfflineBanner from '@/components/OfflineBanner';
 
 export const viewport: Viewport = {
   themeColor: '#030014',
@@ -72,6 +73,7 @@ export default function RootLayout({
         <AuthProvider>
           <UnreadProvider>
             <ClientMobileWrapper>
+            <OfflineBanner />
             <ClientOnlyProviders />
             {children}
             <NotificationManager />

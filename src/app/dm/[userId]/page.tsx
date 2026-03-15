@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, use, useCallback } from 'react';
 import { loadCachedMessages, saveMessagesToCache } from '@/lib/message-cache';
+import { loadCachedMessagesIDB, saveMessagesToCacheIDB } from '@/lib/idb-cache';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -19,6 +20,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   decryptMessage,
   ensureConversationKey,
@@ -124,6 +135,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const [newMessage, setNewMessage] = useState('');
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const previousMessageCount = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -165,12 +177,22 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   // ── Step 1: instant cache load on mount ────────────────────────────────
   useEffect(() => {
     if (status !== 'authenticated' || !currentUserId) return;
-    const cached = loadCachedMessages(userId, currentUserId);
-    if (cached && cached.length > 0) {
-      setMessages(cached as unknown as Message[]);
-      setLoading(false);
-      lastMessageIdRef.current = cached[cached.length - 1].id;
-    }
+    // Try IDB first (larger capacity), then fall back to localStorage
+    (async () => {
+      const idbCached = await loadCachedMessagesIDB(userId, currentUserId);
+      if (idbCached && idbCached.length > 0) {
+        setMessages(idbCached as unknown as Message[]);
+        setLoading(false);
+        lastMessageIdRef.current = idbCached[idbCached.length - 1].id;
+        return;
+      }
+      const cached = loadCachedMessages(userId, currentUserId);
+      if (cached && cached.length > 0) {
+        setMessages(cached as unknown as Message[]);
+        setLoading(false);
+        lastMessageIdRef.current = cached[cached.length - 1].id;
+      }
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, currentUserId, userId]);
 
@@ -251,6 +273,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
         setMessages(decrypted);
         saveMessagesToCache(userId, currentUserId, decrypted as any);
+        saveMessagesToCacheIDB(userId, currentUserId, decrypted as any);
 
         if (decrypted.length > 0) {
           lastMessageIdRef.current = decrypted[decrypted.length - 1].id;
@@ -293,6 +316,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
           const merged = [...prev, ...trulyNew];
           saveMessagesToCache(userId, currentUserId, merged as any);
+          saveMessagesToCacheIDB(userId, currentUserId, merged as any);
 
           // Show "new messages" scroll button if not at bottom
           if (!checkIfAtBottom()) setHasNewMessages(true);
@@ -303,9 +327,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         // Update anchor ID
         lastMessageIdRef.current = data.messages[data.messages.length - 1].id;
 
-        // Toast for incoming messages
+        // Toast for incoming messages — only when user is not actively reading
         const lastNew = newDecrypted[newDecrypted.length - 1];
-        if (lastNew && lastNew.senderId === userId) {
+        if (lastNew && lastNew.senderId === userId && document.hidden) {
           const u = otherUserRef.current;
           toast({
             title: '💬 New message',
@@ -481,10 +505,13 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   // Mute stored in localStorage — no DB migration needed
   const getMuteKey = () => `muted_${currentUserId}_${userId}`;
-  const [isMutedConvo, setIsMutedConvo] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem(`muted_${userId}`) === '1';
-  });
+  const [isMutedConvo, setIsMutedConvo] = useState(false);
+  // Sync mute state once currentUserId is available
+  useEffect(() => {
+    if (!currentUserId || typeof window === 'undefined') return;
+    setIsMutedConvo(localStorage.getItem(getMuteKey()) === '1');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, userId]);
 
   const handleMute = () => {
     const key = getMuteKey();
@@ -500,7 +527,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   };
 
   const handleDeleteChat = async () => {
-    if (!confirm('Delete this entire conversation? This cannot be undone.')) return;
     try {
       const response = await fetch(`/api/conversations/${userId}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete');
@@ -652,7 +678,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={handleDeleteChat}
+                onClick={() => setShowDeleteDialog(true)}
                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
@@ -756,6 +782,27 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           disabled={sending}
         />
       </div>
+
+      {/* Delete conversation confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="glass-card border-white/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the entire chat history. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={handleDeleteChat}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -20,9 +20,11 @@ import {
   ChevronUp,
   ChevronDown,
   Play,
+  ArrowLeft,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { compressImage } from '@/lib/image-compress';
+import { loadStatusesIDB, saveStatusesIDB } from '@/lib/idb-cache';
 
 interface Status {
   id: string;
@@ -251,15 +253,27 @@ export default function UpdatesPage() {
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return; }
     if (status !== 'authenticated') return;
-    loadStatuses();
-  }, [status]);
+    // Show cached statuses immediately before network fetch
+    (async () => {
+      if (currentUserId) {
+        const cached = await loadStatusesIDB(currentUserId);
+        if (cached && cached.length > 0) {
+          setStatuses(cached as Status[]);
+          setLoading(false);
+        }
+      }
+      loadStatuses();
+    })();
+  }, [status, currentUserId]);
 
   const loadStatuses = async () => {
     try {
       const res = await fetch('/api/statuses');
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setStatuses(data.statuses || []);
+      const freshStatuses = data.statuses || [];
+      setStatuses(freshStatuses);
+      if (currentUserId) saveStatusesIDB(currentUserId, freshStatuses);
     } catch {
       toast({ variant: 'destructive', title: 'Failed to load updates' });
     } finally {
@@ -273,7 +287,7 @@ export default function UpdatesPage() {
     try {
       let uploadFile: File = file;
       if (file.type.startsWith('image/')) {
-        const compressed = await compressImage(file, 1200, 0.85);
+        const compressed = await compressImage(file, { maxPx: 1200, quality: 0.85 });
         uploadFile = compressed;
       }
 
@@ -375,7 +389,7 @@ export default function UpdatesPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-background">
+      <div className="flex flex-col h-[calc(100svh-4rem)] md:h-screen bg-background">
         <div className="sticky top-0 z-10 px-4 py-3 border-b border-border/40 flex items-center justify-between">
           <h1 className="text-xl font-bold">Updates</h1>
         </div>
@@ -396,9 +410,18 @@ export default function UpdatesPage() {
 
   return (
     <>
-      <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-background">
+      <div className="flex flex-col h-[calc(100svh-4rem)] md:h-screen bg-background">
         {/* Header */}
         <div className="sticky top-0 z-10 px-4 py-3 border-b border-border/40 glass-panel flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden shrink-0 w-9 h-9"
+            onClick={() => router.back()}
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <h1 className="text-xl font-bold flex-1">Updates</h1>
           <Button variant="ghost" size="icon" aria-label="Search">
             <Search className="w-5 h-5" />
@@ -425,7 +448,6 @@ export default function UpdatesPage() {
                   <UserAvatar
                     src={session?.user?.image || ''}
                     fallback={(session?.user?.name || 'Me').substring(0, 2).toUpperCase()}
-                    size="lg"
                   />
                 </button>
                 <button
@@ -663,7 +685,6 @@ function StatusRow({
             <UserAvatar
               src={group.photoURL || ''}
               fallback={(group.displayName || 'U').substring(0, 2).toUpperCase()}
-              size="lg"
             />
           </div>
         </div>

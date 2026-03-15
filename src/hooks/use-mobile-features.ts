@@ -7,6 +7,7 @@ import { Network } from '@capacitor/network';
 import { App, AppState } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useToast } from './use-toast';
+import { useRouter } from 'next/navigation';
 
 interface NetworkStatus {
   connected: boolean;
@@ -24,6 +25,7 @@ export function useMobileFeatures() {
   });
   const [appState, setAppState] = useState<string>('active');
   const { toast } = useToast();
+  const router = useRouter();
   const isNative = Capacitor.isNativePlatform();
 
   // Initialize mobile features
@@ -75,10 +77,14 @@ export function useMobileFeatures() {
           console.log('App state changed:', state.isActive ? 'active' : 'background');
         });
 
-        // Listen for back button
-        backButtonListener = await App.addListener('backButton', () => {
-          // Handle back button press
-          console.log('Back button pressed');
+        // Listen for back button — navigate back or exit if at root
+        backButtonListener = await App.addListener('backButton', ({ canGoBack }) => {
+          if (canGoBack) {
+            router.back();
+          } else {
+            // At root of app — show exit confirmation or exit directly
+            App.exitApp();
+          }
         });
       } catch (error) {
         console.error('Failed to initialize mobile features:', error);

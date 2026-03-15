@@ -1,6 +1,6 @@
 "use client"
 
-import { Hash, Pin, Users, Sparkles, Video, Phone, Server } from 'lucide-react';
+import { Hash, Pin, Users, Sparkles, Video, Phone, Server, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -276,6 +276,15 @@ export default function ChatHeader() {
         >
           {/* Left section with channel info */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden shrink-0 w-9 h-9 -ml-1"
+              onClick={() => router.push('/servers')}
+              aria-label="Back to servers"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
             <Hash className="w-5 h-5 text-primary flex-shrink-0" />
             <h2 className="text-lg font-semibold truncate">
               {currentChannel?.name || 'Select a channel'}
@@ -323,29 +332,6 @@ export default function ChatHeader() {
                     router.push(url);
                   }}
                 >
-                  <Video className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Start Video Call</p>
-              </TooltipContent>
-            </Tooltip>
-          </motion.div>
-          
-          {/* Voice call button */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="hover:text-primary hover:bg-white/10"
-                  onClick={() => {
-                    if (!serverId || !channelId) return;
-                    const url = `/call?serverId=${serverId}&channelId=${channelId}&type=voice`;
-                    router.push(url);
-                  }}
-                >
                   <Phone className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
@@ -359,12 +345,19 @@ export default function ChatHeader() {
             <NotificationsPopover />
           </motion.div>
           
-          <KeyboardShortcutsDialog />
+          <div className="hidden md:block">
+            <KeyboardShortcutsDialog />
+          </div>
           
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:text-primary hover:bg-white/10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:text-primary hover:bg-white/10"
+                  onClick={() => toast({ title: 'Pinned Messages', description: 'No pinned messages yet.' })}
+                >
                   <Pin className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>

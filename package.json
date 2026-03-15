@@ -16,13 +16,25 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/lib/seed.ts",
     "db:dedupe-friends": "tsx src/lib/dedupe-friends.ts",
+
     "mobile:sync": "npx cap sync",
-    "mobile:sync:dev": "npx cap sync --config capacitor.config.dev.ts",
-    "mobile:sync:prod": "npx cap sync --config capacitor.config.prod.ts",
+    "mobile:sync:dev": "npx cap sync",
+    "mobile:sync:prod": "CAPACITOR_BUILD_MODE=prod npx cap sync",
     "mobile:open:android": "npx cap open android",
     "mobile:run:android": "npx cap run android",
-    "mobile:run:android:dev": "npx cap run android --config capacitor.config.dev.ts",
-    "build:mobile": "next build && npx cap sync"
+    "mobile:run:android:dev": "npx cap run android",
+
+    "build:mobile": "next build && CAPACITOR_BUILD_MODE=prod npx cap sync",
+
+    "apk:debug": "npx cap sync && cd android && .\\gradlew.bat assembleDebug",
+    "apk:release": "CAPACITOR_BUILD_MODE=prod npx cap sync && cd android && .\\gradlew.bat assembleRelease",
+    "apk:release:unix": "CAPACITOR_BUILD_MODE=prod npx cap sync && cd android && ./gradlew assembleRelease",
+
+    "aab:release": "CAPACITOR_BUILD_MODE=prod npx cap sync && cd android && .\\gradlew.bat bundleRelease",
+    "aab:release:unix": "CAPACITOR_BUILD_MODE=prod npx cap sync && cd android && ./gradlew bundleRelease",
+
+    "keystore:create": "keytool -genkeypair -v -keystore android/keystore/moswords-release.keystore -alias moswords -keyalg RSA -keysize 2048 -validity 10000",
+    "keystore:verify": "keytool -list -v -keystore android/keystore/moswords-release.keystore"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

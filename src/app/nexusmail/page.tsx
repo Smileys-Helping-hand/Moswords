@@ -185,7 +185,7 @@ export default function NexusMailDashboard() {
           <div className="flex items-start gap-3">
             {/* Mobile back button */}
             <Button 
-              onClick={() => router.push('/')} 
+              onClick={() => router.push('/dm')} 
               variant="ghost" 
               size="icon"
               className="md:hidden shrink-0 w-10 h-10"
@@ -203,7 +203,7 @@ export default function NexusMailDashboard() {
             </div>
           </div>
           {/* Desktop back button */}
-          <Button onClick={() => router.push('/')} variant="outline" className="hidden md:flex">
+          <Button onClick={() => router.push('/dm')} variant="outline" className="hidden md:flex">
             Back to App
           </Button>
         </motion.div>
