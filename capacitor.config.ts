@@ -3,13 +3,14 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
-  webDir: 'public',
-  // ⚠️ NO server.url here — the bundled public/index.html loads instantly
-  // and intelligently connects to the dev server or Vercel production.
-  // server.url was causing a blank screen whenever the dev server was unreachable.
+  // Serve content from the deployed server URL.
+  // In dev this is the laptop's local Next.js dev server (same WiFi).
+  // In production, set CAPACITOR_SERVER_URL=https://your-domain.vercel.app
+  // and rebuild before distributing.
+  webDir: 'public',  // only used as a fallback while WebView loads
   server: {
-    // Allow HTTP cleartext to the local dev server IP
-    cleartext: true,
+    url: process.env.CAPACITOR_SERVER_URL || 'http://192.168.31.217:3000',
+    cleartext: true,           // allow HTTP to local dev server
     androidScheme: 'https',
     hostname: 'moswords.app',
     allowNavigation: [
@@ -36,6 +37,12 @@ const config: CapacitorConfig = {
     scrollEnabled: false,
   },
   plugins: {
+    // CapacitorHttp: intercepts window.fetch/XHR at the NATIVE layer.
+    // This bypasses WebView CORS and SameSite cookie restrictions so the
+    // bundled static app can talk to the API server without any CORS setup.
+    CapacitorHttp: {
+      enabled: true,
+    },
     StatusBar: {
       style: 'DARK',
       backgroundColor: '#030014',

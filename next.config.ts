@@ -2,8 +2,13 @@ import type {NextConfig} from 'next';
 // @ts-ignore – next-pwa has no bundled type declarations
 import withPWA from 'next-pwa';
 
+const isMobileBuild = process.env.NEXT_MOBILE === 'true';
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Standard server build (Vercel, Railway, etc.).
+  // Set NEXT_MOBILE=true to produce a static export for bundling in the APK.
+  // NOTE: static export requires removing force-dynamic from all API routes first.
+  // ...(isMobileBuild ? { output: 'export' } : {}),
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -46,5 +51,6 @@ export default withPWA({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
+  // Disable PWA SW generation for mobile static-export builds (CapacitorHttp handles networking)
+  disable: process.env.NODE_ENV === 'development' || isMobileBuild,
 })(nextConfig);
