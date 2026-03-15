@@ -1,33 +1,21 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// --------------------------------------------------------------------------
-// AUTO-SELECTS between dev and prod based on NODE_ENV / CAPACITOR_BUILD_MODE
-// 
-//   Development:  npx cap sync                  → uses CAPACITOR_SERVER_URL or local IP
-//   APK Release:  CAPACITOR_BUILD_MODE=prod npx cap sync  → bundles from deployed URL
-// --------------------------------------------------------------------------
-
-const isProd = process.env.CAPACITOR_BUILD_MODE === 'prod';
-
-// ⚠️  SET THIS after deploying to Vercel / Render / Railway etc.
-//     e.g.  https://moswords.vercel.app
-const PRODUCTION_URL = process.env.CAPACITOR_SERVER_URL || 'https://moswords.vercel.app';
-
-// Your local machine IP while developing (the phone must be on same WiFi)
-const DEV_URL = 'http://192.168.31.217:3000';
-
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
   webDir: 'public',
+  // ⚠️ NO server.url here — the bundled public/index.html loads instantly
+  // and intelligently connects to the dev server or Vercel production.
+  // server.url was causing a blank screen whenever the dev server was unreachable.
   server: {
-    url: isProd ? PRODUCTION_URL : DEV_URL,
-    cleartext: !isProd,     // HTTPS only in production
-    androidScheme: isProd ? 'https' : 'http',
+    // Allow HTTP cleartext to the local dev server IP
+    cleartext: true,
+    androidScheme: 'https',
     hostname: 'moswords.app',
-    // Allow credentials / cookies across native bridge
     allowNavigation: [
       'moswords.vercel.app',
+      '192.168.31.217',
+      'localhost',
       '*.neon.tech',
       '*.r2.dev',
       '*.livekit.cloud',
@@ -36,10 +24,10 @@ const config: CapacitorConfig = {
   },
   android: {
     backgroundColor: '#030014',
-    allowMixedContent: !isProd,
+    allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: !isProd,
-    loggingBehavior: isProd ? 'none' : 'debug',
+    webContentsDebuggingEnabled: true,
+    loggingBehavior: 'debug',
   },
   ios: {
     contentInset: 'automatic',

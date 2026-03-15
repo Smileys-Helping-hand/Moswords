@@ -121,55 +121,67 @@
   </div>
 
   <script>
-    // Configuration - UPDATE THIS WITH YOUR SERVER URL
-    const SERVER_URL = window.location.hostname === 'localhost' 
-      ? 'http://localhost:3000'
-      : 'https://your-app-url.vercel.app';  // Update with your production URL
-    
+    // Server candidates — tried in order. First one that responds wins.
+    const SERVERS = [
+      'http://192.168.31.217:3000',       // Local dev server (same WiFi)
+      'http://localhost:3000',             // Emulator / USB-forwarded
+      'https://moswords.vercel.app',       // Production deployment (always available)
+    ];
+
     const statusEl = document.getElementById('status');
-    const errorEl = document.getElementById('error');
+    const errorEl  = document.getElementById('error');
     const retryBtn = document.getElementById('retry-btn');
-    
-    async function checkServer() {
+    let   attempt  = 0;
+
+    async function tryServer(url) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000); // 4 s timeout per server
       try {
-        statusEl.textContent = 'Connecting to server...';
-        errorEl.style.display = 'none';
-        retryBtn.style.display = 'none';
-        
-        const response = await fetch(`${SERVER_URL}/api/health`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
+        const res = await fetch(url + '/api/health', {
+          signal: controller.signal,
+          cache: 'no-store',
         });
-        
-        if (response.ok) {
-          statusEl.textContent = 'Connected! Redirecting...';
-          // Redirect to the main app
-          window.location.href = SERVER_URL;
-        } else {
-          throw new Error('Server returned error status');
-        }
-      } catch (error) {
-        console.error('Connection error:', error);
-        statusEl.textContent = 'Connection failed';
-        errorEl.textContent = 'Unable to connect to the server. Please check your internet connection and try again.';
-        errorEl.style.display = 'block';
-        retryBtn.style.display = 'inline-block';
+        clearTimeout(timer);
+        return res.ok;
+      } catch (_) {
+        clearTimeout(timer);
+        return false;
       }
     }
-    
-    retryBtn.addEventListener('click', checkServer);
-    
-    // Check server on load
-    checkServer();
-    
-    // Auto-retry every 5 seconds
-    setInterval(() => {
-      if (errorEl.style.display !== 'none') {
-        checkServer();
+
+    async function connect() {
+      errorEl.style.display = 'none';
+      retryBtn.style.display = 'none';
+      attempt++;
+
+      for (let i = 0; i < SERVERS.length; i++) {
+        const url = SERVERS[i];
+        statusEl.textContent = `Connecting… (${url.replace('http://','').replace('https://','').split('/')[0]})`;
+        const ok = await tryServer(url);
+        if (ok) {
+          statusEl.textContent = 'Connected! Loading app…';
+          window.location.replace(url);
+          return;
+        }
       }
-    }, 5000);
+
+      // All servers failed
+      statusEl.textContent = 'Cannot reach any server';
+      errorEl.innerHTML =
+        '<b>No connection</b><br>' +
+        'Make sure your PC is running <code>npx next dev</code> and the phone is on the same WiFi,<br>' +
+        'or deploy the app to <b>Vercel</b> for always-on access.';
+      errorEl.style.display = 'block';
+      retryBtn.style.display = 'inline-block';
+    }
+
+    retryBtn.addEventListener('click', connect);
+    connect();
+
+    // Auto-retry every 8 seconds while offline
+    setInterval(() => {
+      if (errorEl.style.display !== 'none') connect();
+    }, 8000);
   </script>
 </body>
 </html>
