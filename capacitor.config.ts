@@ -3,18 +3,13 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
-  // The app shell (HTML/CSS/JS) is served from the APK's bundled assets (public/).
-  // This makes the app open instantly with no network dependency.
-  // The public/index.html loading page then navigates to awehchat.co.za.
-  // API calls (/api/...) from JavaScript automatically resolve to awehchat.co.za
-  // because hostname below remaps the WebView origin to that domain.
+  // The app shell loads from APK assets instantly (no network needed to start).
+  // public/index.html immediately navigates (window.location) to https://awehchat.co.za
+  // which the WebView opens as a real external URL since hostname is 'localhost'.
   webDir: 'public',
   server: {
-    // NO server.url — app shell loads from APK assets, not the network.
-    // Remove this comment block if you want the old behavior of loading directly
-    // from the remote server (which requires the server to be reachable to start).
     androidScheme: 'https',
-    hostname: 'awehchat.co.za',  // all relative fetch('/api/...') go to https://awehchat.co.za/api/...
+    hostname: 'localhost',  // local assets served at https://localhost — awehchat.co.za is external navigation
     cleartext: false,
     allowNavigation: [
       'awehchat.co.za',

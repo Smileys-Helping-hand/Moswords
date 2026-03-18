@@ -121,62 +121,10 @@
   </div>
 
   <script>
-    // The app shell is served from APK assets (instant load).
-    // We navigate to the live server for the full app.
-    // CapacitorHttp intercepts all fetch/XHR at the native layer so
-    // CORS is handled automatically — no server changes needed.
-    const APP_URL = 'https://awehchat.co.za';
-
-    const statusEl = document.getElementById('status');
-    const errorEl  = document.getElementById('error');
-    const retryBtn = document.getElementById('retry-btn');
-
-    function showError(msg) {
-      statusEl.textContent = 'Cannot connect';
-      errorEl.innerHTML = msg;
-      errorEl.style.display = 'block';
-      retryBtn.style.display = 'inline-block';
-      document.querySelector('.loading').style.display = 'none';
-    }
-
-    async function connect() {
-      errorEl.style.display = 'none';
-      retryBtn.style.display = 'none';
-      document.querySelector('.loading').style.display = 'inline-block';
-      statusEl.textContent = 'Connecting…';
-
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 8000);
-        const res = await fetch(APP_URL + '/api/health', {
-          signal: ctrl.signal,
-          cache: 'no-store',
-        });
-        clearTimeout(timer);
-
-        if (res.ok) {
-          statusEl.textContent = 'Loading app…';
-          window.location.replace(APP_URL);
-        } else {
-          throw new Error('Server returned ' + res.status);
-        }
-      } catch (err) {
-        const isOffline = !navigator.onLine || err.name === 'AbortError';
-        showError(
-          isOffline
-            ? '<b>No internet connection</b><br>Connect to the internet and tap Retry.'
-            : '<b>Server unreachable</b><br>awehchat.co.za is not responding.<br>Try again in a moment.'
-        );
-      }
-    }
-
-    retryBtn.addEventListener('click', connect);
-    connect();
-
-    // Auto-retry every 10 s while showing error
-    setInterval(() => {
-      if (errorEl.style.display !== 'none') connect();
-    }, 10000);
+    // This shell page is served from APK local assets — instant, no network needed.
+    // It immediately navigates the WebView to the real app at awehchat.co.za.
+    // If the navigation fails (no internet), MainActivity shows the offline screen.
+    window.location.replace('https://awehchat.co.za');
   </script>
 </body>
 </html>

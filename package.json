@@ -26,7 +26,7 @@
 
     "build:mobile": "next build && npx cap sync",
 
-    "apk:debug": "npx cap sync && cd android && .\\gradlew.bat assembleDebug",
+    "apk:debug": "npx cap sync && cd android && .\\gradlew.bat assembleDebug && cd .. && copy android\\app\\build\\outputs\\apk\\debug\\app-debug.apk apk\\Moswords.apk",
     "apk:release": "npx cap sync && cd android && .\\gradlew.bat assembleRelease",
     "apk:release:unix": "npx cap sync && cd android && ./gradlew assembleRelease",
 
