@@ -18,20 +18,20 @@
     "db:dedupe-friends": "tsx src/lib/dedupe-friends.ts",
 
     "mobile:sync": "npx cap sync",
-    "mobile:sync:dev": "set CAPACITOR_SERVER_URL=http://192.168.31.217:3000 && npx cap sync",
-    "mobile:sync:prod": "set CAPACITOR_SERVER_URL=https://awehchat.co.za && npx cap sync",
+    "mobile:sync:dev": "npx cap sync",
+    "mobile:sync:prod": "npx cap sync",
     "mobile:open:android": "npx cap open android",
     "mobile:run:android": "npx cap run android",
     "mobile:run:android:dev": "npx cap run android",
 
-    "build:mobile": "next build && set CAPACITOR_SERVER_URL=https://awehchat.co.za && npx cap sync",
+    "build:mobile": "next build && npx cap sync",
 
-    "apk:debug": "set CAPACITOR_SERVER_URL=http://192.168.31.217:3000 && npx cap sync && cd android && .\\gradlew.bat assembleDebug",
-    "apk:release": "set CAPACITOR_SERVER_URL=https://awehchat.co.za && npx cap sync && cd android && .\\gradlew.bat assembleRelease",
-    "apk:release:unix": "CAPACITOR_SERVER_URL=https://awehchat.co.za npx cap sync && cd android && ./gradlew assembleRelease",
+    "apk:debug": "npx cap sync && cd android && .\\gradlew.bat assembleDebug",
+    "apk:release": "npx cap sync && cd android && .\\gradlew.bat assembleRelease",
+    "apk:release:unix": "npx cap sync && cd android && ./gradlew assembleRelease",
 
-    "aab:release": "set CAPACITOR_SERVER_URL=https://awehchat.co.za && npx cap sync && cd android && .\\gradlew.bat bundleRelease",
-    "aab:release:unix": "CAPACITOR_SERVER_URL=https://awehchat.co.za npx cap sync && cd android && ./gradlew bundleRelease",
+    "aab:release": "npx cap sync && cd android && .\\gradlew.bat bundleRelease",
+    "aab:release:unix": "npx cap sync && cd android && ./gradlew bundleRelease",
 
     "keystore:create": "keytool -genkeypair -v -keystore android/keystore/moswords-release.keystore -alias moswords -keyalg RSA -keysize 2048 -validity 10000",
     "keystore:verify": "keytool -list -v -keystore android/keystore/moswords-release.keystore"

@@ -32,21 +32,21 @@ public class MainActivity extends BridgeActivity {
                 "background:linear-gradient(135deg,#a259ff,#00f0ff);-webkit-background-clip:text;" +
                 "-webkit-text-fill-color:transparent;}" +
                 "p{color:#8888a0;font-size:15px;margin:0 0 32px;line-height:1.6;}" +
-                ".steps{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);" +
+                ".card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);" +
                 "border-radius:16px;padding:20px 24px;width:100%;max-width:340px;text-align:left;}" +
-                ".steps li{color:#c0c0d8;font-size:14px;margin-bottom:10px;list-style:none;}" +
-                ".steps li:before{content:'→ ';color:#a259ff;font-weight:bold;}" +
+                ".card p{color:#c0c0d8;font-size:14px;margin:0 0 8px;}" +
+                ".card p:last-child{margin:0;}" +
                 "button{margin-top:28px;padding:14px 36px;background:linear-gradient(135deg,#a259ff,#7c3aed);" +
                 "color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;cursor:pointer;}" +
                 "</style></head><body>" +
-                "<div class='logo'>M</div>" +
-                "<h1>Moswords</h1>" +
-                "<p>Cannot reach the server.<br>Make sure your dev server is running.</p>" +
-                "<div class='steps'><ul>" +
-                "<li>Open a terminal on your PC</li>" +
-                "<li>Run: <b>npx next dev</b></li>" +
-                "<li>Ensure phone &amp; PC are on the same WiFi</li>" +
-                "</ul></div>" +
+                "<div class='logo'>A</div>" +
+                "<h1>Awehchat</h1>" +
+                "<p>Cannot reach the server.<br>Check your internet connection.</p>" +
+                "<div class='card'>" +
+                "<p>&#8594; Make sure you have internet access</p>" +
+                "<p>&#8594; Try switching between WiFi and mobile data</p>" +
+                "<p>&#8594; If the problem persists, the server may be temporarily down</p>" +
+                "</div>" +
                 "<button onclick='window.location.reload()'>Retry</button>" +
                 "</body></html>";
 

@@ -3,17 +3,22 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
-  // Serve content from the deployed server URL.
-  // Production default is the Vercel deployment.
-  // For local dev on the same WiFi, set CAPACITOR_SERVER_URL=http://192.168.31.217:3000
-  webDir: 'public',  // only used as a fallback while WebView loads
+  // The app shell (HTML/CSS/JS) is served from the APK's bundled assets (public/).
+  // This makes the app open instantly with no network dependency.
+  // The public/index.html loading page then navigates to awehchat.co.za.
+  // API calls (/api/...) from JavaScript automatically resolve to awehchat.co.za
+  // because hostname below remaps the WebView origin to that domain.
+  webDir: 'public',
   server: {
-    url: process.env.CAPACITOR_SERVER_URL || 'https://awehchat.co.za',
-    cleartext: process.env.CAPACITOR_SERVER_URL?.startsWith('http://') ?? false,
+    // NO server.url — app shell loads from APK assets, not the network.
+    // Remove this comment block if you want the old behavior of loading directly
+    // from the remote server (which requires the server to be reachable to start).
     androidScheme: 'https',
-    hostname: 'awehchat.co.za',
+    hostname: 'awehchat.co.za',  // all relative fetch('/api/...') go to https://awehchat.co.za/api/...
+    cleartext: false,
     allowNavigation: [
       'awehchat.co.za',
+      '*.awehchat.co.za',
       '192.168.31.217',
       'localhost',
       '*.neon.tech',
@@ -24,10 +29,10 @@ const config: CapacitorConfig = {
   },
   android: {
     backgroundColor: '#030014',
-    allowMixedContent: process.env.CAPACITOR_SERVER_URL?.startsWith('http://') ?? false,
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: process.env.NODE_ENV === 'development',
-    loggingBehavior: process.env.NODE_ENV === 'development' ? 'debug' : 'none',
+    webContentsDebuggingEnabled: false,
+    loggingBehavior: 'none',
   },
   ios: {
     contentInset: 'automatic',

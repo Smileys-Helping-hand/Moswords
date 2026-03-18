@@ -121,67 +121,62 @@
   </div>
 
   <script>
-    // Server candidates — tried in order. First one that responds wins.
-    const SERVERS = [
-      'https://awehchat.co.za',           // Production deployment (always available)
-      'http://192.168.31.217:3000',       // Local dev server (same WiFi)
-      'http://localhost:3000',             // Emulator / USB-forwarded
-    ];
+    // The app shell is served from APK assets (instant load).
+    // We navigate to the live server for the full app.
+    // CapacitorHttp intercepts all fetch/XHR at the native layer so
+    // CORS is handled automatically — no server changes needed.
+    const APP_URL = 'https://awehchat.co.za';
 
     const statusEl = document.getElementById('status');
     const errorEl  = document.getElementById('error');
     const retryBtn = document.getElementById('retry-btn');
-    let   attempt  = 0;
 
-    async function tryServer(url) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000); // 4 s timeout per server
-      try {
-        const res = await fetch(url + '/api/health', {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        clearTimeout(timer);
-        return res.ok;
-      } catch (_) {
-        clearTimeout(timer);
-        return false;
-      }
+    function showError(msg) {
+      statusEl.textContent = 'Cannot connect';
+      errorEl.innerHTML = msg;
+      errorEl.style.display = 'block';
+      retryBtn.style.display = 'inline-block';
+      document.querySelector('.loading').style.display = 'none';
     }
 
     async function connect() {
       errorEl.style.display = 'none';
       retryBtn.style.display = 'none';
-      attempt++;
+      document.querySelector('.loading').style.display = 'inline-block';
+      statusEl.textContent = 'Connecting…';
 
-      for (let i = 0; i < SERVERS.length; i++) {
-        const url = SERVERS[i];
-        statusEl.textContent = `Connecting… (${url.replace('http://','').replace('https://','').split('/')[0]})`;
-        const ok = await tryServer(url);
-        if (ok) {
-          statusEl.textContent = 'Connected! Loading app…';
-          window.location.replace(url);
-          return;
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(APP_URL + '/api/health', {
+          signal: ctrl.signal,
+          cache: 'no-store',
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          statusEl.textContent = 'Loading app…';
+          window.location.replace(APP_URL);
+        } else {
+          throw new Error('Server returned ' + res.status);
         }
+      } catch (err) {
+        const isOffline = !navigator.onLine || err.name === 'AbortError';
+        showError(
+          isOffline
+            ? '<b>No internet connection</b><br>Connect to the internet and tap Retry.'
+            : '<b>Server unreachable</b><br>awehchat.co.za is not responding.<br>Try again in a moment.'
+        );
       }
-
-      // All servers failed
-      statusEl.textContent = 'Cannot reach any server';
-      errorEl.innerHTML =
-        '<b>No connection</b><br>' +
-        'Make sure your phone has internet access.<br>' +
-        'The app connects to <b>awehchat.co.za</b>.';
-      errorEl.style.display = 'block';
-      retryBtn.style.display = 'inline-block';
     }
 
     retryBtn.addEventListener('click', connect);
     connect();
 
-    // Auto-retry every 8 seconds while offline
+    // Auto-retry every 10 s while showing error
     setInterval(() => {
       if (errorEl.style.display !== 'none') connect();
-    }, 8000);
+    }, 10000);
   </script>
 </body>
 </html>
