@@ -3,19 +3,18 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
-  // The app shell loads from APK assets instantly (no network needed to start).
-  // public/index.html immediately navigates (window.location) to https://awehchat.co.za
-  // which the WebView opens as a real external URL since hostname is 'localhost'.
-  webDir: 'public',
+  // The WebView loads https://awehchat.co.za directly.
+  // This is the correct Capacitor hybrid-app pattern: all API calls, cookies,
+  // and sessions are on the same origin — no CORS issues, no cross-origin navigation.
+  // If the server is unreachable, MainActivity.onReceivedError shows the offline page.
+  webDir: 'public',  // fallback assets (used if server.url is removed for local dev)
   server: {
+    url: 'https://awehchat.co.za',
     androidScheme: 'https',
-    hostname: 'localhost',  // local assets served at https://localhost — awehchat.co.za is external navigation
     cleartext: false,
     allowNavigation: [
       'awehchat.co.za',
       '*.awehchat.co.za',
-      '192.168.31.217',
-      'localhost',
       '*.neon.tech',
       '*.r2.dev',
       '*.livekit.cloud',

@@ -1,11 +1,11 @@
 package com.moswords.app;
 
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceError;
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
 
@@ -13,9 +13,11 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Override the WebViewClient so we show a helpful offline page
-        // instead of a blank black screen when the server is unreachable.
-        getBridge().getWebView().setWebViewClient(new WebViewClient() {
+        // Extend BridgeWebViewClient (not plain WebViewClient) so that:
+        //  - All Capacitor plugin bridge calls still work (StatusBar, SplashScreen, etc.)
+        //  - CapacitorHttp request interception still works
+        //  - We also show a custom offline page when the server is unreachable
+        getBridge().getWebView().setWebViewClient(new BridgeWebViewClient(getBridge()) {
 
             private static final String OFFLINE_HTML =
                 "<!DOCTYPE html><html><head><meta charset='UTF-8'>" +
@@ -53,7 +55,9 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         WebResourceError error) {
-                // Only replace main-frame failures (not sub-resource errors)
+                // Must call super so Capacitor bridge keeps functioning
+                super.onReceivedError(view, request, error);
+                // Only replace main-frame failures (not sub-resource errors like images)
                 if (request != null && request.isForMainFrame()) {
                     view.loadDataWithBaseURL(null, OFFLINE_HTML, "text/html", "UTF-8", null);
                 }
@@ -61,4 +65,3 @@ public class MainActivity extends BridgeActivity {
         });
     }
 }
-
