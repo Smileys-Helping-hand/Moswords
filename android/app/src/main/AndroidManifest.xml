@@ -8,7 +8,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/network_security_config"
         android:hardwareAccelerated="true"
         android:largeHeap="true">
@@ -37,12 +37,12 @@
                 <data android:scheme="com.moswords.app" />
             </intent-filter>
 
-            <!-- Deep link: https://moswords.vercel.app (App Links — requires asset verification) -->
+            <!-- Deep link: https://awehchat.co.za (App Links — requires asset verification) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="moswords.vercel.app" />
+                <data android:scheme="https" android:host="awehchat.co.za" />
             </intent-filter>
 
         </activity>

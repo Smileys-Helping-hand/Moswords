@@ -123,9 +123,9 @@
   <script>
     // Server candidates — tried in order. First one that responds wins.
     const SERVERS = [
+      'https://awehchat.co.za',           // Production deployment (always available)
       'http://192.168.31.217:3000',       // Local dev server (same WiFi)
       'http://localhost:3000',             // Emulator / USB-forwarded
-      'https://moswords.vercel.app',       // Production deployment (always available)
     ];
 
     const statusEl = document.getElementById('status');
@@ -169,8 +169,8 @@
       statusEl.textContent = 'Cannot reach any server';
       errorEl.innerHTML =
         '<b>No connection</b><br>' +
-        'Make sure your PC is running <code>npx next dev</code> and the phone is on the same WiFi,<br>' +
-        'or deploy the app to <b>Vercel</b> for always-on access.';
+        'Make sure your phone has internet access.<br>' +
+        'The app connects to <b>awehchat.co.za</b>.';
       errorEl.style.display = 'block';
       retryBtn.style.display = 'inline-block';
     }

@@ -10,7 +10,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 //   3. Run:  npm run build:apk:release
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PRODUCTION_URL = process.env.CAPACITOR_SERVER_URL || 'https://moswords.vercel.app';
+const PRODUCTION_URL = process.env.CAPACITOR_SERVER_URL || 'https://awehchat.co.za';
 
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',

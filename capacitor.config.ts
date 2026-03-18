@@ -4,17 +4,16 @@ const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
   // Serve content from the deployed server URL.
-  // In dev this is the laptop's local Next.js dev server (same WiFi).
-  // In production, set CAPACITOR_SERVER_URL=https://your-domain.vercel.app
-  // and rebuild before distributing.
+  // Production default is the Vercel deployment.
+  // For local dev on the same WiFi, set CAPACITOR_SERVER_URL=http://192.168.31.217:3000
   webDir: 'public',  // only used as a fallback while WebView loads
   server: {
-    url: process.env.CAPACITOR_SERVER_URL || 'http://192.168.31.217:3000',
-    cleartext: true,           // allow HTTP to local dev server
+    url: process.env.CAPACITOR_SERVER_URL || 'https://awehchat.co.za',
+    cleartext: process.env.CAPACITOR_SERVER_URL?.startsWith('http://') ?? false,
     androidScheme: 'https',
-    hostname: 'moswords.app',
+    hostname: 'awehchat.co.za',
     allowNavigation: [
-      'moswords.vercel.app',
+      'awehchat.co.za',
       '192.168.31.217',
       'localhost',
       '*.neon.tech',
@@ -25,10 +24,10 @@ const config: CapacitorConfig = {
   },
   android: {
     backgroundColor: '#030014',
-    allowMixedContent: true,
+    allowMixedContent: process.env.CAPACITOR_SERVER_URL?.startsWith('http://') ?? false,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    loggingBehavior: 'debug',
+    webContentsDebuggingEnabled: process.env.NODE_ENV === 'development',
+    loggingBehavior: process.env.NODE_ENV === 'development' ? 'debug' : 'none',
   },
   ios: {
     contentInset: 'automatic',
