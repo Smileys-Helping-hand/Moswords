@@ -10,7 +10,7 @@
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>       <!-- Android emulator → host machine -->
         <domain includeSubdomains="true">192.168.31.217</domain>  <!-- Your dev machine on LAN -->
-        <domain includeSubdomains="true">192.168.0.0</domain>     <!-- Generic LAN range -->
+        <domain includeSubdomains="true">192.168.1.1</domain>     <!-- Generic LAN router/gateway -->
     </domain-config>
 
     <!-- All other traffic: HTTPS only, trust system CA + user-installed CAs for dev -->

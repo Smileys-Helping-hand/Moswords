@@ -41,8 +41,8 @@ public class MainActivity extends BridgeActivity {
                 "button{margin-top:28px;padding:14px 36px;background:linear-gradient(135deg,#a259ff,#7c3aed);" +
                 "color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;cursor:pointer;}" +
                 "</style></head><body>" +
-                "<div class='logo'>A</div>" +
-                "<h1>Awehchat</h1>" +
+                "<div class='logo'>M</div>" +
+                "<h1>Moswords</h1>" +
                 "<p>Cannot reach the server.<br>Check your internet connection.</p>" +
                 "<div class='card'>" +
                 "<p>&#8594; Make sure you have internet access</p>" +

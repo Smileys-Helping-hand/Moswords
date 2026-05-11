@@ -1,8 +1,10 @@
 // Service Worker for Moswords PWA — v3
-// Strategy: WhatsApp-style local-first caching
-const CACHE_NAME = 'moswords-v3';
-const RUNTIME_CACHE = 'moswords-runtime-v3';
-const IMAGE_CACHE = 'moswords-images-v3';
+// Strategy: WhatsApp-style local-first caching with aggressive version checking
+// Server version is read from /version.json on each deployment
+let APP_VERSION = 'unknown';
+let CACHE_NAME = 'moswords-cache';
+let RUNTIME_CACHE = 'moswords-runtime-cache';
+let IMAGE_CACHE = 'moswords-images-cache';
 
 const urlsToCache = [
   '/',
@@ -12,32 +14,67 @@ const urlsToCache = [
   '/icon-512.png',
 ];
 
+// Fetch current app version from server (always network-first)
+async function getAppVersion() {
+  try {
+    const response = await fetch('/version.json', {
+      cache: 'no-store',
+      headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || 'unknown';
+    }
+  } catch (err) {
+    console.error('Failed to fetch version:', err);
+  }
+  return 'unknown';
+}
+
+// Initialize version on first run
+async function initializeVersion() {
+  const version = await getAppVersion();
+  APP_VERSION = version;
+  CACHE_NAME = `moswords-v${version}`;
+  RUNTIME_CACHE = `moswords-runtime-v${version}`;
+  IMAGE_CACHE = `moswords-images-v${version}`;
+}
+
 // Install event - cache resources
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-      .catch((err) => {
-        console.error('Cache installation failed:', err);
-      })
+    initializeVersion().then(() => {
+      return caches.open(CACHE_NAME)
+        .then((cache) => {
+          console.log(`Installed cache: ${CACHE_NAME}`);
+          return cache.addAll(urlsToCache);
+        })
+        .catch((err) => {
+          console.error('Cache installation failed:', err);
+        });
+    })
   );
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and check for version updates
 self.addEventListener('activate', (event) => {
-  const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(
-        cacheNames
-          .filter((n) => !currentCaches.includes(n))
-          .map((n) => caches.delete(n))
-      )
-    )
+    initializeVersion().then(() => {
+      const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
+      return caches.keys().then((cacheNames) => {
+        console.log(`Activating with caches: ${currentCaches.join(', ')}`);
+        console.log(`Old caches to delete: ${cacheNames.filter((n) => !currentCaches.includes(n)).join(', ')}`);
+        return Promise.all(
+          cacheNames
+            .filter((n) => !currentCaches.includes(n))
+            .map((n) => {
+              console.log(`Deleting old cache: ${n}`);
+              return caches.delete(n);
+            })
+        );
+      });
+    })
   );
   self.clients.claim();
 });
@@ -56,6 +93,68 @@ self.addEventListener('fetch', (event) => {
 
   const { request } = event;
   const url = new URL(request.url);
+
+  // ── Version check endpoint: always fresh ────────────────────────────────────
+  // Never cache version.json - always fetch from server
+  if (url.pathname === '/version.json') {
+    event.respondWith(
+      fetch(request, {
+        cache: 'no-store',
+        headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' }
+      })
+        .then((response) => {
+          if (response.ok) {
+            response.clone().json().then((data) => {
+              const newVersion = data.version;
+              if (newVersion !== APP_VERSION) {
+                console.log(`🔄 New version detected: ${APP_VERSION} → ${newVersion}`);
+                // Notify all clients about the update
+                self.clients.matchAll().then((clients) => {
+                  clients.forEach((client) => {
+                    client.postMessage({
+                      type: 'UPDATE_AVAILABLE',
+                      oldVersion: APP_VERSION,
+                      newVersion: newVersion
+                    });
+                  });
+                });
+                // Clear all caches for new version
+                caches.keys().then((names) => {
+                  names.forEach((name) => caches.delete(name));
+                });
+              }
+            });
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // ── HTML documents: always fetch fresh, cache as fallback ──────────────────
+  // This ensures UI updates (like purple → blue) are always shown
+  if (request.destination === 'document' || 
+      url.pathname === '/' || 
+      url.pathname === '/dm' || 
+      url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request);
+        })
+    );
+    return;
+  }
 
   // ── Conversation API: stale-while-revalidate ──────────────────────────────
   // Return cached response instantly, then update cache in background.

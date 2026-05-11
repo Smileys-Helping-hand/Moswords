@@ -9,6 +9,7 @@ import InstallPrompt from '@/components/install-prompt';
 import ClientOnlyProviders from '@/components/client-only-providers';
 import ClientMobileWrapper from '@/components/ClientMobileWrapper';
 import OfflineBanner from '@/components/OfflineBanner';
+import UpdateChecker from '@/components/UpdateChecker';
 
 export const viewport: Viewport = {
   themeColor: '#030014',
@@ -73,6 +74,7 @@ export default function RootLayout({
         <AuthProvider>
           <UnreadProvider>
             <ClientMobileWrapper>
+            <UpdateChecker />
             <OfflineBanner />
             <ClientOnlyProviders />
             {children}

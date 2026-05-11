@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client, BUCKET_NAME, getPublicUrl } from '@/lib/storage';
+import { put } from '@/lib/storage';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-// Maximum file size: 10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Vercel server uploads are limited to 4.5 MB (Next.js serverless body limit).
+// For larger files, switch to Vercel Blob client uploads.
+const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
 
 // Allowed MIME types
 // NOTE: Allow all file types for file sharing; size limit still enforced.
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 10MB.' },
+        { error: 'File too large. Maximum size is 4.5MB.' },
         { status: 400 }
       );
     }
@@ -52,30 +52,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate unique filename
-    const fileExtension = file.name.split('.').pop() || 'bin';
     const uniqueId = crypto.randomUUID();
     const sanitizedName = file.name
       .replace(/[^a-zA-Z0-9.-]/g, '_')
       .substring(0, 50);
     const key = `uploads/${uniqueId}-${sanitizedName}`;
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Upload to R2
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-      Body: buffer,
-      ContentType: file.type,
-      // Note: R2 doesn't support ACLs, public access is configured at bucket level
+    // Upload to Vercel Blob
+    const blob = await put(key, file.stream(), {
+      access: 'public',
+      contentType: file.type,
+      addRandomSuffix: false,
     });
 
-    await s3Client.send(command);
-
-    // Generate public URL
-    const url = getPublicUrl(key);
+    const url = blob.url;
 
     // Determine media type
     let mediaType: 'image' | 'video' | 'audio' | 'file' = 'file';
