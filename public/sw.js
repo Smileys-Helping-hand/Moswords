@@ -156,6 +156,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // ── Auth API: ALWAYS network-only, NEVER cache ────────────────────────────
+  // Caching auth endpoints causes stale CSRF tokens → server errors on login
+  if (url.pathname.startsWith('/api/auth/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // ── Conversation API: stale-while-revalidate ──────────────────────────────
   // Return cached response instantly, then update cache in background.
   // This makes chat open INSTANTLY even on slow connections.
