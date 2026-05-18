@@ -4,13 +4,28 @@
 
 ### ✅ 1. Prepare Your Environment Variables
 
-You'll need these environment variables in Vercel:
+You need a small set of deployment variables in Vercel. The app is designed to work with the web app and native APK from the same deployed host.
 
-**Required:**
+**Required for the web app:**
 ```
 DATABASE_URL=postgres://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require
 NEXTAUTH_URL=https://yourapp.vercel.app
 NEXTAUTH_SECRET=your_production_secret
+```
+
+**Required for APK builds:**
+```
+CAPACITOR_SERVER_URL=https://yourapp.vercel.app
+```
+
+**Optional, but useful if you want an explicit canonical URL in client code:**
+```
+NEXT_PUBLIC_SITE_URL=https://yourapp.vercel.app
+```
+
+**Optional only if the app should call a separate API origin:**
+```
+NEXT_PUBLIC_API_BASE=https://your-api-host.vercel.app
 ```
 
 **For NexusMail (if using):**
@@ -21,10 +36,9 @@ AWS_SECRET_ACCESS_KEY=your_secret
 AWS_SES_FROM_EMAIL=noreply@yourdomain.com
 ```
 
-**Optional:**
+**Optional app integrations:**
 ```
 GOOGLE_GENAI_API_KEY=your_google_key
-NEXT_PUBLIC_APP_URL=https://yourapp.vercel.app
 ```
 
 ### ✅ 2. Generate NEXTAUTH_SECRET
@@ -97,7 +111,9 @@ In the Vercel project settings, add these environment variables:
 | Key | Value |
 |-----|-------|
 | `GOOGLE_GENAI_API_KEY` | Your Google AI key |
-| `NEXT_PUBLIC_APP_URL` | Same as NEXTAUTH_URL |
+| `NEXT_PUBLIC_SITE_URL` | Same as `NEXTAUTH_URL`; used as a client/mobile fallback |
+| `NEXT_PUBLIC_API_BASE` | Separate API origin, only if you do not host API + web on one domain |
+| `CAPACITOR_SERVER_URL` | Same deployed site URL, used by the APK shell |
 
 ### Step 5: Deploy
 

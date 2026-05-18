@@ -10,7 +10,11 @@ import type { CapacitorConfig } from '@capacitor/cli';
 //   3. Run:  npm run build:apk:release
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PRODUCTION_URL = process.env.CAPACITOR_SERVER_URL || 'https://awehchat.co.za';
+const PRODUCTION_URL =
+  process.env.CAPACITOR_SERVER_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  'https://awehchat.co.za';
 
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
@@ -22,6 +26,9 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     hostname: 'moswords.app',
     allowNavigation: [
+      'localhost',
+      '127.0.0.1',
+      '10.0.2.2',
       '*.vercel.app',
       '*.neon.tech',
       '*.r2.dev',

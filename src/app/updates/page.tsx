@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Play,
   ArrowLeft,
+  MessageSquare,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { compressImage } from '@/lib/image-compress';
@@ -415,12 +416,14 @@ export default function UpdatesPage() {
         <div className="sticky top-0 z-10 px-4 py-3 border-b border-border/40 glass-panel flex items-center gap-2">
           <Button
             variant="ghost"
-            size="icon"
-            className="md:hidden shrink-0 w-9 h-9"
-            onClick={() => router.back()}
-            aria-label="Back"
+            size="sm"
+            className="shrink-0 gap-2 px-3"
+            onClick={() => router.replace('/dm')}
+            aria-label="Go to chats"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4" />
+            <span className="hidden sm:inline">Chats</span>
           </Button>
           <h1 className="text-xl font-bold flex-1">Updates</h1>
           <Button variant="ghost" size="icon" aria-label="Search">

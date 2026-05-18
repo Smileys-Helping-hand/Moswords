@@ -1,18 +1,25 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const MOBILE_SERVER_URL =
+  process.env.CAPACITOR_SERVER_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  'https://awehchat.co.za';
+
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
-  // The WebView loads https://awehchat.co.za directly.
-  // This is the correct Capacitor hybrid-app pattern: all API calls, cookies,
-  // and sessions are on the same origin — no CORS issues, no cross-origin navigation.
-  // If the server is unreachable, MainActivity.onReceivedError shows the offline page.
+  // The WebView loads the configured host directly so the APK can share the same
+  // authenticated origin as the web app. Set CAPACITOR_SERVER_URL for release builds.
   webDir: 'public',  // fallback assets (used if server.url is removed for local dev)
   server: {
-    url: 'https://awehchat.co.za',
+    url: MOBILE_SERVER_URL,
     androidScheme: 'https',
     cleartext: false,
     allowNavigation: [
+      'localhost',
+      '127.0.0.1',
+      '10.0.2.2',
       'awehchat.co.za',
       '*.awehchat.co.za',
       '*.neon.tech',

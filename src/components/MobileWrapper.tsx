@@ -9,7 +9,10 @@ import { useEffect } from 'react';
 // -------------------------------------------------------------------------
 if (typeof window !== 'undefined') {
   const API_BASE =
-    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ?? '';
+    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+    (process.env.CAPACITOR_SERVER_URL as string | undefined) ||
+    (process.env.NEXT_PUBLIC_SITE_URL as string | undefined) ||
+    '';
 
   if (API_BASE) {
     const _origFetch = window.fetch.bind(window);

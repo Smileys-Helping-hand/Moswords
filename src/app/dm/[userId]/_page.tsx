@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import UserAvatar from '@/components/user-avatar';
 import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
-import { ArrowLeft, Archive, MoreVertical, Phone, Video, ArrowDown, BellOff, Bell, Trash2 } from 'lucide-react';
+import { ArrowLeft, Archive, MoreVertical, Phone, Video, ArrowDown, BellOff, Bell, Trash2, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
@@ -605,14 +605,16 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         className="bg-background/95 backdrop-blur-sm border-b border-border/50 px-3 py-2.5 flex items-center justify-between gap-2 shadow-sm shrink-0"
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          {/* Back arrow ΓÇö mobile only, desktop has sidebar */}
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => router.push('/dm')}
-            className="md:hidden shrink-0 h-9 w-9"
+            size="sm"
+            onClick={() => router.replace('/dm')}
+            className="shrink-0 gap-2 px-3"
+            aria-label="Back to chats"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4" />
+            <span className="hidden sm:inline">Chats</span>
           </Button>
           {otherUser && (
             <>
@@ -665,6 +667,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="glass-card border-white/20 min-w-[180px]">
+              <DropdownMenuItem onClick={() => router.replace('/dm')}>
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Back to chats
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleMute}>
                 {isMutedConvo ? (
                   <><Bell className="w-4 h-4 mr-2" />Unmute</>  
