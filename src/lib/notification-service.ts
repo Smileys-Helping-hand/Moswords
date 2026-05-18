@@ -5,10 +5,12 @@
 
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { PushNotifications } from '@capacitor/push-notifications';
 
 export class NotificationService {
   private static instance: NotificationService;
   private registration: ServiceWorkerRegistration | null = null;
+  private nativePushInitialized = false;
 
   private constructor() {}
 
@@ -26,7 +28,51 @@ export class NotificationService {
     if (Capacitor.isNativePlatform()) {
       try {
         const permission = await LocalNotifications.requestPermissions();
-        return permission.display === 'granted';
+        if (permission.display !== 'granted') {
+          return false;
+        }
+
+        if (!this.nativePushInitialized) {
+          this.nativePushInitialized = true;
+          await PushNotifications.requestPermissions();
+          await PushNotifications.register();
+
+          PushNotifications.addListener('registration', (token) => {
+            console.log('FCM registration token received');
+            try {
+              localStorage.setItem('moswords_fcm_token', token.value);
+            } catch {
+              // Ignore storage failures; token still exists in runtime.
+            }
+          });
+
+          PushNotifications.addListener('registrationError', (error) => {
+            console.error('FCM registration error:', error);
+          });
+
+          PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+            try {
+              await this.showNotification(
+                notification.title || 'Moswords',
+                {
+                  body: notification.body || '',
+                  data: notification.data,
+                }
+              );
+            } catch (error) {
+              console.error('Error handling received push notification:', error);
+            }
+          });
+
+          PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+            const targetUrl = (action.notification.data as any)?.url;
+            if (typeof window !== 'undefined' && targetUrl) {
+              window.location.href = targetUrl;
+            }
+          });
+        }
+
+        return true;
       } catch (error) {
         console.error('Local notification permission failed:', error);
         return false;
