@@ -517,3 +517,23 @@ export const gifItemsRelations = relations(gifItems, ({ one }) => ({
     references: [gifPacks.id],
   }),
 }));
+
+// Approvals table — in-app approval requests replacing email-based workflows
+export const approvals = pgTable('approvals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  requestedBy: text('requested_by').notNull(), // display name or app name
+  appSource: text('app_source'), // registered app that sent the request (null = internal)
+  assignedToId: uuid('assigned_to_id').references(() => users.id, { onDelete: 'set null' }),
+  decidedById: uuid('decided_by_id').references(() => users.id, { onDelete: 'set null' }),
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  priority: text('priority').notNull().default('normal'), // 'low' | 'normal' | 'high' | 'urgent'
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  callbackUrl: text('callback_url'), // optional webhook on decision
+  note: text('note'), // reviewer note
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  decidedAt: timestamp('decided_at'),
+  expiresAt: timestamp('expires_at'),
+});
+

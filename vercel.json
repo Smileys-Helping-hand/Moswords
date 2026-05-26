@@ -25,6 +25,13 @@
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]
+    },
+    {
+      "source": "/((?!_next/static|_next/image|favicon.ico|icon-|manifest|sounds|.*\\.(jpg|jpeg|gif|png|svg|ico|webp|woff|woff2|ttf|eot|otf|mp3|mp4|wav|json)).*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
     }
   ]
 }
