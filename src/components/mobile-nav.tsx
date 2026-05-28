@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { MessageSquare, Menu, Server, User, Settings, LogOut, X, Radio, Sparkles, Zap } from 'lucide-react';
+import { MessageSquare, Menu, Server, User, Settings, LogOut, X, Radio, Sparkles, Zap, Users } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
@@ -13,6 +13,7 @@ import { useMobileFeatures } from '@/hooks/use-mobile-features';
 const navItems = [
   { id: 'messages', label: 'Chats', icon: MessageSquare, href: '/dm' },
   { id: 'updates', label: 'Updates', icon: Radio, href: '/updates' },
+  { id: 'people', label: 'People', icon: Users, href: '/people' },
   { id: 'ai', label: 'AI', icon: Sparkles, href: '/ai' },
   { id: 'more', label: 'More', icon: Menu, href: null },
 ];
@@ -21,6 +22,7 @@ export default function MobileNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [showMenu, setShowMenu] = useState(false);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const { session } = useAuth();
   const { haptic, isNative } = useMobileFeatures();
 
@@ -28,6 +30,29 @@ export default function MobileNav() {
   useEffect(() => {
     setShowMenu(false);
   }, [pathname]);
+
+  // Fetch pending friend requests count
+  useEffect(() => {
+    const fetchPendingRequests = async () => {
+      try {
+        const res = await fetch('/api/friends');
+        if (res.ok) {
+          const data = await res.json();
+          const pending = (data.requests || []).filter((r: any) => r.status === 'pending').length;
+          setPendingRequestCount(pending);
+        }
+      } catch (error) {
+        console.error('Error fetching pending requests:', error);
+      }
+    };
+
+    if (session) {
+      fetchPendingRequests();
+      // Poll every 30 seconds
+      const interval = setInterval(fetchPendingRequests, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [session]);
 
   const handleNavigate = (href: string | null) => {
     // Haptic feedback on tap
@@ -77,6 +102,16 @@ export default function MobileNav() {
                     active ? 'text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]' : 'text-muted-foreground'
                   }`}
                 />
+                {/* Pending requests badge for People tab */}
+                {item.id === 'people' && pendingRequestCount > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute top-0 right-1 w-4 h-4 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center z-20"
+                  >
+                    {pendingRequestCount > 9 ? '9+' : pendingRequestCount}
+                  </motion.span>
+                )}
                 <span
                   className={`text-[10px] font-semibold relative z-10 transition-colors duration-150 ${
                     active ? 'text-primary' : 'text-muted-foreground'

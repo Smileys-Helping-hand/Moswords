@@ -19,11 +19,17 @@ import {
   Archive,
   Trash2,
   Radio,
+  QrCode,
+  Plus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CreateGroupChatDialog from '@/components/create-group-chat-dialog';
 import FriendsDialog from '@/components/friends-dialog';
+import QRContactSheet from '@/components/qr-contact-sheet';
+import AddContactSheet from '@/components/add-contact-sheet';
+import { Button } from '@/components/ui/button';
+import { useMobileFeatures } from '@/hooks/use-mobile-features';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,12 +123,15 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   const currentUserId = (session?.user as any)?.id || (session?.user as any)?.uid;
   const router = useRouter();
   const pathname = usePathname();
+  const { haptic } = useMobileFeatures();
 
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [showQRSheet, setShowQRSheet] = useState(false);
+  const [showAddSheet, setShowAddSheet] = useState(false);
 
   // Mute state stored in localStorage
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set());
@@ -262,8 +271,29 @@ export default function ConversationListPanel({ compact = false }: ConversationL
       <div className="px-4 pt-3 pb-2.5 border-b border-border/20 shrink-0 bg-background">
         <div className="flex items-center justify-between mb-2.5">
           <h1 className="text-[22px] font-bold tracking-tight">Messages</h1>
-          <div className="flex items-center gap-0.5">
-            <FriendsDialog />
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                haptic.light();
+                setShowQRSheet(true);
+              }}
+              className="rounded-lg w-9 h-9"
+            >
+              <QrCode className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                haptic.light();
+                setShowAddSheet(true);
+              }}
+              className="rounded-lg w-9 h-9"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
             <CreateGroupChatDialog />
           </div>
         </div>
@@ -580,6 +610,12 @@ export default function ConversationListPanel({ compact = false }: ConversationL
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* QR Code Sheet */}
+    <QRContactSheet open={showQRSheet} onOpenChange={setShowQRSheet} />
+
+    {/* Add Contact Sheet */}
+    <AddContactSheet open={showAddSheet} onOpenChange={setShowAddSheet} onFriendAdded={load} />
     </>
   );
 }
