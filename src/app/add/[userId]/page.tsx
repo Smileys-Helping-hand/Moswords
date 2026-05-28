@@ -33,29 +33,30 @@ export default function AddUserPage() {
   const [sendingRequest, setSendingRequest] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
 
-  const userId = params?.userId as string;
+  const currentUserId = (session?.user as any)?.id || (session?.user as any)?.uid;
+  const scannedUserId = params?.userId as string;
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      const callbackUrl = `/add/${userId}`;
+      const callbackUrl = `/add/${scannedUserId}`;
       router.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
     }
-  }, [status, router, userId]);
+  }, [status, router, scannedUserId]);
 
   useEffect(() => {
-    if (!userId || status !== 'authenticated') return;
+    if (!scannedUserId || status !== 'authenticated') return;
 
     const fetchUser = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        if (userId === session?.user?.id) {
+        if (scannedUserId === currentUserId) {
           setError("That's your own profile!");
           return;
         }
 
-        const res = await fetch(`/api/users/${userId}`);
+        const res = await fetch(`/api/users/${scannedUserId}`);
         if (!res.ok) {
           if (res.status === 404) {
             throw new Error('User not found');
@@ -74,7 +75,7 @@ export default function AddUserPage() {
     };
 
     fetchUser();
-  }, [userId, status, session?.user?.id]);
+  }, [scannedUserId, status, currentUserId]);
 
   const handleSendFriendRequest = async () => {
     if (!user) return;
@@ -197,10 +198,8 @@ export default function AddUserPage() {
         >
           <div>
             <UserAvatar
-              userId={user.id}
-              photoURL={user.photoURL}
-              displayName={user.displayName || user.name}
-              className="w-20 h-20 mx-auto mb-4"
+              src={user.photoURL || ''}
+              fallback={(user.displayName || user.name || user.email || 'U').substring(0, 2).toUpperCase()}
             />
             <h1 className="text-3xl font-bold">{user.displayName || user.name || 'User'}</h1>
             {user.customStatus && (

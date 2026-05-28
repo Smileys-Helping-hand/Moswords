@@ -251,10 +251,8 @@ export default function AddContactSheet({ open, onOpenChange, onFriendAdded }: A
                           }}
                         >
                           <UserAvatar
-                            userId={user.id}
-                            photoURL={user.photoURL}
-                            displayName={user.displayName || user.name}
-                            className="w-10 h-10"
+                            src={user.photoURL || ''}
+                            fallback={(user.displayName || user.name || user.email || 'U').substring(0, 2).toUpperCase()}
                           />
                           <div className="flex-1 text-left">
                             <p className="font-medium text-sm">
@@ -298,10 +296,8 @@ export default function AddContactSheet({ open, onOpenChange, onFriendAdded }: A
                 className="flex items-center gap-3 p-4 rounded-lg bg-white/5 border border-border/50"
               >
                 <UserAvatar
-                  userId={selectedUser.id}
-                  photoURL={selectedUser.photoURL}
-                  displayName={selectedUser.displayName || selectedUser.name}
-                  className="w-12 h-12"
+                  src={selectedUser.photoURL || ''}
+                  fallback={(selectedUser.displayName || selectedUser.name || selectedUser.email || 'U').substring(0, 2).toUpperCase()}
                 />
                 <div className="flex-1">
                   <p className="font-semibold">{selectedUser.displayName || selectedUser.name || 'User'}</p>

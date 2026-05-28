@@ -238,10 +238,8 @@ export default function PeopleView() {
                       >
                         <div className="relative">
                           <UserAvatar
-                            userId={friend.id}
-                            photoURL={friend.photoURL}
-                            displayName={friend.displayName || friend.name}
-                            className="w-10 h-10"
+                            src={friend.photoURL || ''}
+                            fallback={(friend.displayName || friend.name || 'U').substring(0, 2).toUpperCase()}
                           />
                           {isOnline(friend.lastSeen) && (
                             <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-background" />
@@ -299,10 +297,8 @@ export default function PeopleView() {
                         className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-primary/20"
                       >
                         <UserAvatar
-                          userId={request.sender?.id || ''}
-                          photoURL={request.sender?.photoURL}
-                          displayName={request.sender?.displayName || request.sender?.name}
-                          className="w-10 h-10"
+                          src={request.sender?.photoURL || ''}
+                          fallback={(request.sender?.displayName || request.sender?.name || 'U').substring(0, 2).toUpperCase()}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">

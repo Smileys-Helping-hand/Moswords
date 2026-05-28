@@ -35,15 +35,16 @@ export default function QRContactSheet({ open, onOpenChange }: QRContactSheetPro
   const qrRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | null>(null);
 
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scannedUser, setScannedUser] = useState<ScannedUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(false);
 
+  const userId = (session?.user as any)?.id || (session?.user as any)?.uid;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://moswords.app';
-  const qrValue = session?.user?.id ? `${appUrl}/add/${session.user.id}` : '';
+  const qrValue = userId ? `${appUrl}/add/${userId}` : '';
 
   useEffect(() => {
     if (open) {
@@ -88,7 +89,7 @@ export default function QRContactSheet({ open, onOpenChange }: QRContactSheetPro
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
     }
-    if (animationRef.current) {
+    if (animationRef.current !== null) {
       cancelAnimationFrame(animationRef.current);
     }
     setScanning(false);
@@ -115,12 +116,12 @@ export default function QRContactSheet({ open, onOpenChange }: QRContactSheetPro
         // Extract user ID from URL like: https://moswords.app/add/userId
         const match = scannedUrl.match(/\/add\/([^/?]+)/);
         if (match) {
-          const userId = match[1];
-          if (userId === session?.user?.id) {
+          const scannedId = match[1];
+          if (scannedId === userId) {
             setCameraError('That\'s your own code!');
             haptic.light();
           } else {
-            fetchScannedUser(userId);
+            fetchScannedUser(scannedId);
             stopCamera();
             haptic.success?.();
           }
@@ -278,10 +279,8 @@ export default function QRContactSheet({ open, onOpenChange }: QRContactSheetPro
                 {session?.user && (
                   <div className="text-center">
                     <UserAvatar
-                      userId={session.user.id || ''}
-                      photoURL={session.user.image}
-                      displayName={session.user.name}
-                      className="w-12 h-12 mx-auto mb-2"
+                      src={session.user.image || ''}
+                      fallback={(session.user.name || session.user.email || 'U').substring(0, 2).toUpperCase()}
                     />
                     <p className="font-semibold">{session.user.name}</p>
                   </div>
@@ -345,10 +344,8 @@ export default function QRContactSheet({ open, onOpenChange }: QRContactSheetPro
                   className="text-center"
                 >
                   <UserAvatar
-                    userId={scannedUser.id}
-                    photoURL={scannedUser.photoURL}
-                    displayName={scannedUser.displayName}
-                    className="w-16 h-16 mx-auto mb-3"
+                    src={scannedUser.photoURL || ''}
+                    fallback={(scannedUser.displayName || scannedUser.name || 'U').substring(0, 2).toUpperCase()}
                   />
                   <p className="font-semibold text-lg">{scannedUser.displayName || scannedUser.name}</p>
                   {loadingUser && <p className="text-sm text-muted-foreground">Loading...</p>}
