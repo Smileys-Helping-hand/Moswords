@@ -1,0 +1,580 @@
+openapi: 3.0.0
+info:
+  title: Moswords API
+  description: Professional Team Communication Platform with Nexus Integration
+  version: 1.1.0
+  contact:
+    name: Moswords Support
+    url: https://moswords.app
+  license:
+    name: MIT
+
+servers:
+  - url: https://moswords.app/api
+    description: Production server
+  - url: http://localhost:3000/api
+    description: Local development server
+
+tags:
+  - name: Contacts
+    description: Contact management and syncing
+  - name: API Keys
+    description: API key management for integrations
+  - name: Nexus Email
+    description: Nexus email system integration
+  - name: Nexus OS
+    description: Nexus OS platform integration
+
+paths:
+  /contacts:
+    get:
+      summary: Fetch all contacts
+      tags:
+        - Contacts
+      operationId: getContacts
+      responses:
+        '200':
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contact'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create a new contact
+      tags:
+        - Contacts
+      operationId: createContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                avatar:
+                  type: string
+      responses:
+        '201':
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contact:
+                    $ref: '#/components/schemas/Contact'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /contacts/sync:
+    post:
+      summary: Batch sync multiple contacts
+      tags:
+        - Contacts
+      operationId: batchSyncContacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - events
+              properties:
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SyncEvent'
+      responses:
+        '200':
+          description: Contacts synced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contact'
+
+  /contacts/{contactId}/sync:
+    post:
+      summary: Sync contact to external system
+      tags:
+        - Contacts
+      operationId: syncContact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - system
+              properties:
+                system:
+                  type: string
+                  enum: [nexus, discord, slack]
+      responses:
+        '200':
+          description: Contact synced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contact:
+                    $ref: '#/components/schemas/Contact'
+
+    put:
+      summary: Update a contact
+      tags:
+        - Contacts
+      operationId: updateContact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: Contact updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contact:
+                    $ref: '#/components/schemas/Contact'
+
+    delete:
+      summary: Delete a contact
+      tags:
+        - Contacts
+      operationId: deleteContact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contact deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: string
+
+  /keys/api-keys:
+    get:
+      summary: Fetch all API keys
+      tags:
+        - API Keys
+      operationId: getAPIKeys
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIKey'
+
+    post:
+      summary: Create a new API key
+      tags:
+        - API Keys
+      operationId: createAPIKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    $ref: '#/components/schemas/APIKey'
+
+  /keys/api-keys/{keyId}:
+    delete:
+      summary: Delete an API key
+      tags:
+        - API Keys
+      operationId: deleteAPIKey
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API key deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: string
+
+    patch:
+      summary: Update API key settings
+      tags:
+        - API Keys
+      operationId: updateAPIKey
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                isActive:
+                  type: boolean
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: API key updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    $ref: '#/components/schemas/APIKey'
+
+  /nexus/sync:
+    post:
+      summary: Sync contacts to Nexus Email
+      tags:
+        - Nexus Email
+      operationId: nexusSyncContacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - contacts
+                - apiKey
+              properties:
+                contacts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      phone:
+                        type: string
+                apiKey:
+                  type: string
+                  description: Nexus Email API key
+      responses:
+        '200':
+          description: Contacts synced to Nexus
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  synced:
+                    type: integer
+                  failed:
+                    type: integer
+                  total:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NexusSyncResult'
+
+    get:
+      summary: Get Nexus sync history
+      tags:
+        - Nexus Email
+      operationId: getNexusSyncHistory
+      responses:
+        '200':
+          description: Sync history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  syncHistory:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        timestamp:
+                          type: string
+                          format: date-time
+                        contactsCount:
+                          type: integer
+                        successCount:
+                          type: integer
+                        failureCount:
+                          type: integer
+                        status:
+                          type: string
+
+  /nexus/os:
+    post:
+      summary: Interact with Nexus OS
+      tags:
+        - Nexus OS
+      operationId: nexusOSAction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+                - apiKey
+              properties:
+                action:
+                  type: string
+                  enum: [getProfile, updateProfile, getSettings, updateSettings, getConnectedApps, getActivity]
+                apiKey:
+                  type: string
+                  description: Nexus OS API key
+                profileData:
+                  type: object
+                settings:
+                  type: object
+      responses:
+        '200':
+          description: Nexus OS action completed
+          content:
+            application/json:
+              schema:
+                type: object
+
+    get:
+      summary: Get Nexus OS integration status
+      tags:
+        - Nexus OS
+      operationId: getNexusOSStatus
+      responses:
+        '200':
+          description: Integration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isConnected:
+                    type: boolean
+                  connectedApps:
+                    type: array
+                    items:
+                      type: string
+                  lastSync:
+                    type: string
+                    format: date-time
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+
+components:
+  schemas:
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        avatar:
+          type: string
+        userId:
+          type: string
+        lastSynced:
+          type: string
+          format: date-time
+        syncedWith:
+          type: array
+          items:
+            type: string
+        customData:
+          type: object
+
+    APIKey:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        key:
+          type: string
+          description: Full key (only on creation)
+        maskedKey:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUsed:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+
+    SyncEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [add, update, delete, sync]
+        contact:
+          $ref: '#/components/schemas/Contact'
+        timestamp:
+          type: string
+          format: date-time
+        syncedWith:
+          type: array
+          items:
+            type: string
+
+    NexusSyncResult:
+      type: object
+      properties:
+        contactId:
+          type: string
+        nexusId:
+          type: string
+        status:
+          type: string
+          enum: [synced, failed, pending]
+        lastSync:
+          type: string
+          format: date-time
+        error:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        statusCode:
+          type: integer
+
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+
+security:
+  - sessionAuth: []
