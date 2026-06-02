@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { enforceAdminAccess } from '@/lib/admin';
-import { verifyMfaToken, saveMfaSecret, updateLastMfaVerified } from '@/lib/mfa';
+import { enforceAdminAccess, updateLastMfaVerified } from '@/lib/admin';
+import { verifyMfaToken, saveMfaSecret } from '@/lib/mfa';
 import { logAdminAction } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
