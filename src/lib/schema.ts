@@ -537,3 +537,138 @@ export const approvals = pgTable('approvals', {
   expiresAt: timestamp('expires_at'),
 });
 
+// ===== FRIENDS & CONTACTS SYSTEM =====
+
+/** Friends/Friendships table */
+export const friendships = pgTable('friendships', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  friendId: uuid('friend_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'blocked'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  acceptedAt: timestamp('accepted_at'),
+  blockedAt: timestamp('blocked_at'),
+});
+
+export const friendshipsRelations = relations(friendships, ({ one }) => ({
+  user: one(users, {
+    fields: [friendships.userId],
+    references: [users.id],
+  }),
+  friend: one(users, {
+    fields: [friendships.friendId],
+    references: [users.id],
+  }),
+}));
+
+/** Shared contacts across ecosystem */
+export const contacts = pgTable('contacts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  name: text('name').notNull(),
+  phoneNumber: text('phone_number'),
+  photoURL: text('photo_url'),
+  source: text('source').notNull(), // 'moswords', 'awechat', 'import', etc.
+  syncedToApps: text('synced_to_apps').array().notNull().default([]), // ['moswords', 'awechat', 'financeplay']
+  metadata: jsonb('metadata').$type<{
+    label?: string;
+    company?: string;
+    notes?: string;
+  }>(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  user: one(users, {
+    fields: [contacts.userId],
+    references: [users.id],
+  }),
+}));
+
+// ===== API KEY MANAGEMENT SYSTEM =====
+
+/** API Keys for apps to authenticate with the ecosystem */
+export const ecosystemApiKeys = pgTable('ecosystem_api_keys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  appName: text('app_name').notNull(), // 'awechat', 'financeplay', 'lifestack', etc.
+  apiKey: text('api_key').notNull().unique(),
+  apiSecret: text('api_secret').notNull(), // Used for signing requests
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('active'), // 'active', 'revoked', 'expired'
+  permissions: text('permissions').array().notNull().default(['contacts.read', 'profile.read']),
+  webhookUrl: text('webhook_url'), // URL to send events to
+  rateLimitPerMinute: integer('rate_limit_per_minute').notNull().default(100),
+  requestsThisMinute: integer('requests_this_minute').notNull().default(0),
+  lastResetTime: timestamp('last_reset_time').notNull().defaultNow(),
+  totalRequests: integer('total_requests').notNull().default(0),
+  metadata: jsonb('metadata').$type<{
+    appUrl?: string;
+    description?: string;
+    icon?: string;
+  }>(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at'),
+  expiresAt: timestamp('expires_at'),
+});
+
+export const ecosystemApiKeysRelations = relations(ecosystemApiKeys, ({ one }) => ({
+  owner: one(users, {
+    fields: [ecosystemApiKeys.ownerId],
+    references: [users.id],
+  }),
+}));
+
+/** Connected apps registry */
+export const connectedApps = pgTable('connected_apps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  appName: text('app_name').notNull(), // 'awechat', 'financeplay', etc.
+  apiKeyId: uuid('api_key_id').references(() => ecosystemApiKeys.id, { onDelete: 'set null' }),
+  status: text('status').notNull().default('connected'), // 'connected', 'error', 'disabled'
+  lastHealthCheck: timestamp('last_health_check').notNull().defaultNow(),
+  lastError: text('last_error'),
+  consecutiveErrors: integer('consecutive_errors').notNull().default(0),
+  permissionScope: text('permission_scope').array().notNull().default(['contacts', 'profile']),
+  metadata: jsonb('metadata').$type<{
+    version?: string;
+    url?: string;
+    icon?: string;
+  }>(),
+  connectedAt: timestamp('connected_at').notNull().defaultNow(),
+  disconnectedAt: timestamp('disconnected_at'),
+});
+
+export const connectedAppsRelations = relations(connectedApps, ({ one }) => ({
+  user: one(users, {
+    fields: [connectedApps.userId],
+    references: [users.id],
+  }),
+  apiKey: one(ecosystemApiKeys, {
+    fields: [connectedApps.apiKeyId],
+    references: [ecosystemApiKeys.id],
+  }),
+}));
+
+/** API request logs for monitoring */
+export const apiRequestLogs = pgTable('api_request_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  apiKeyId: uuid('api_key_id').notNull().references(() => ecosystemApiKeys.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  method: text('method').notNull(), // GET, POST, etc.
+  statusCode: integer('status_code').notNull(),
+  responseTime: integer('response_time').notNull(), // milliseconds
+  errorMessage: text('error_message'),
+  ipAddress: text('ip_address'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const apiRequestLogsRelations = relations(apiRequestLogs, ({ one }) => ({
+  apiKey: one(ecosystemApiKeys, {
+    fields: [apiRequestLogs.apiKeyId],
+    references: [ecosystemApiKeys.id],
+  }),
+}));
+
