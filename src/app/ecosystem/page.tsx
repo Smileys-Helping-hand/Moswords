@@ -7,18 +7,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, RefreshCw, Trash2, Eye, EyeOff, Copy, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Plus, RefreshCw, Trash2, Eye, EyeOff, Copy, CheckCircle, AlertCircle, Clock, Settings } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 // Components for each section
 import ApiKeysTab from '@/components/ecosystem/api-keys-tab';
 import ConnectedAppsTab from '@/components/ecosystem/connected-apps-tab';
 import FriendsTab from '@/components/ecosystem/friends-tab';
 import ContactsTab from '@/components/ecosystem/contacts-tab';
+import SettingsTab from '@/components/ecosystem/settings-tab';
+
+const SUPERADMIN_EMAIL = 'mraaziqp@gmail.com';
 
 export default function EcosystemPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('api-keys');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    if (session?.user?.email) {
+      // Simple check for superadmin
+      const superAdmin = session.user.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase();
+      setIsSuperAdmin(superAdmin);
+
+      // You would normally check this against the database,
+      // but for now we'll rely on the SUPERADMIN_EMAIL check
+      if (superAdmin) {
+        setIsAdmin(true);
+      }
+    }
+  }, [session]);
 
   if (status === 'loading') {
     return (
@@ -53,7 +75,7 @@ export default function EcosystemPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} mb-8`}>
             <TabsTrigger value="api-keys" className="flex items-center gap-2">
               🔑 API Keys
             </TabsTrigger>
@@ -66,6 +88,11 @@ export default function EcosystemPage() {
             <TabsTrigger value="contacts" className="flex items-center gap-2">
               📇 Contacts
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                ⚙️ Settings
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* API Keys Tab */}
@@ -118,6 +145,19 @@ export default function EcosystemPage() {
                 transition={{ duration: 0.2 }}
               >
                 <ContactsTab />
+              </motion.div>
+            )}
+
+            {/* Settings Tab - Admin Only */}
+            {isAdmin && activeTab === 'settings' && (
+              <motion.div
+                key="settings"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <SettingsTab isSuperAdmin={isSuperAdmin} userEmail={session?.user?.email || ''} />
               </motion.div>
             )}
           </AnimatePresence>
