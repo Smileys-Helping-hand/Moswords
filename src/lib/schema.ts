@@ -672,3 +672,54 @@ export const apiRequestLogsRelations = relations(apiRequestLogs, ({ one }) => ({
   }),
 }));
 
+/** Admin users for superadmin and admin roles */
+export const adminUsers = pgTable('admin_users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull().unique(),
+  role: text('role').notNull().default('admin'), // 'superadmin', 'admin'
+  features: text('features').array().notNull().default([
+    'can_manage_api_keys',
+    'can_manage_users',
+    'can_view_audit_logs',
+    'can_configure_subdomain',
+    'can_manage_contacts',
+  ]),
+  mfaEnabled: boolean('mfa_enabled').notNull().default(false),
+  mfaSecret: text('mfa_secret'), // encrypted
+  mfaBackupCodes: text('mfa_backup_codes'), // encrypted array
+  lastMfaVerified: timestamp('last_mfa_verified'),
+  lastLogin: timestamp('last_login'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const adminUsersRelations = relations(adminUsers, ({ one }) => ({
+  user: one(users, {
+    fields: [adminUsers.userId],
+    references: [users.id],
+  }),
+}));
+
+/** Audit logs for tracking admin actions */
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  action: text('action').notNull(), // 'created_api_key', 'deleted_user', 'granted_permission', etc.
+  resource: text('resource').notNull(), // 'api_key', 'user_permission', 'subdomain', etc.
+  resourceId: text('resource_id'),
+  details: jsonb('details').$type<Record<string, any>>(),
+  mfaVerified: boolean('mfa_verified').notNull().default(false),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
