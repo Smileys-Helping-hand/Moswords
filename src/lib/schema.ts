@@ -17,18 +17,6 @@ export const users = pgTable('users', {
   themePreference: text('theme_preference').default('obsidian'),
   isPro: boolean('is_pro').notNull().default(false),
   lastSeen: timestamp('last_seen').notNull().defaultNow(),
-  appearance: jsonb('appearance').$type<{
-    theme: 'default' | 'light' | 'cyberpunk' | 'nord';
-    accent: string;
-    density: 'comfy' | 'compact';
-  }>(),
-  privacySettings: jsonb('privacy_settings').$type<{
-    readReceipts: boolean;
-    lastSeenVisibility: 'everyone' | 'contacts' | 'nobody';
-    profilePictureVisibility: 'everyone' | 'contacts' | 'nobody';
-    aboutVisibility: 'everyone' | 'contacts' | 'nobody';
-    statusVisibility: 'everyone' | 'contacts' | 'nobody';
-  }>(),
 });
 
 // Accounts table for OAuth providers
