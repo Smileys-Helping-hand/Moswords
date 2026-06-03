@@ -14,7 +14,7 @@ const PRODUCTION_URL =
   process.env.CAPACITOR_SERVER_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  'https://awehchat.co.za';
+  'https://awechat.co.za';
 
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
@@ -29,9 +29,15 @@ const config: CapacitorConfig = {
       'localhost',
       '127.0.0.1',
       '10.0.2.2',
+      'awechat.co.za',
+      'api.awechat.co.za',
+      '*.awechat.co.za',
       '*.vercel.app',
+      'neon.tech',
       '*.neon.tech',
+      'r2.dev',
       '*.r2.dev',
+      'livekit.cloud',
       '*.livekit.cloud',
     ],
   },
