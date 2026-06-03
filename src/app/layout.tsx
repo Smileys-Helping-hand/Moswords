@@ -10,6 +10,7 @@ import ClientOnlyProviders from '@/components/client-only-providers';
 import ClientMobileWrapper from '@/components/ClientMobileWrapper';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateChecker from '@/components/UpdateChecker';
+import { AntiFlicker } from '@/components/anti-flicker';
 
 export const viewport: Viewport = {
   themeColor: '#030014',
@@ -71,6 +72,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
+        <AntiFlicker />
         <AuthProvider>
           <UnreadProvider>
             <ClientMobileWrapper>

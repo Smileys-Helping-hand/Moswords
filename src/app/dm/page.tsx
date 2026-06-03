@@ -1,6 +1,7 @@
 'use client';
 
 import ConversationListPanel from '@/components/dm/ConversationListPanel';
+import EmptyState from '@/components/empty-state';
 import { MessageSquare } from 'lucide-react';
 
 export default function DMInboxPage() {
@@ -12,14 +13,13 @@ export default function DMInboxPage() {
       </div>
 
       {/* Desktop: right-panel placeholder (list is in dm/layout.tsx) */}
-      <div className="hidden md:flex flex-col items-center justify-center h-full text-center select-none">
-        <div className="w-24 h-24 rounded-full bg-primary/8 flex items-center justify-center mb-5">
-          <MessageSquare className="w-12 h-12 text-primary/30" />
-        </div>
-        <h2 className="text-xl font-semibold text-foreground/60 mb-2">Your Messages</h2>
-        <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-          Select a conversation from the left panel to start chatting
-        </p>
+      <div className="hidden md:flex flex-1 items-center justify-center h-full">
+        <EmptyState
+          icon={<MessageSquare />}
+          title="Your Messages"
+          description="Select a conversation from the left panel to start chatting"
+          variant="primary"
+        />
       </div>
     </>
   );

@@ -65,6 +65,10 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        neon: {
+          cyan: '#00F0FF',
+          purple: '#8B5CF6',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

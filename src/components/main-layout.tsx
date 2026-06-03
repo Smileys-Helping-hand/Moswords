@@ -5,6 +5,7 @@ import ChatMessages from './chat-messages';
 import ChatInput from './chat-input';
 import MemberSidebar from './member-sidebar';
 import MobileServerPicker from './mobile-server-picker';
+import AppLauncher from './app-launcher';
 import { ChatProvider } from '@/providers/chat-provider';
 
 export default function MainLayout() {
@@ -21,7 +22,12 @@ export default function MainLayout() {
       <div className="relative z-10 flex w-full overflow-x-hidden">
         {/* Mobile Server Picker - Only on mobile */}
         <MobileServerPicker />
-        
+
+        {/* App Launcher - Hidden on mobile */}
+        <div className="hidden md:flex">
+          <AppLauncher />
+        </div>
+
         {/* Server Sidebar - Hidden on mobile */}
         <div className="hidden md:flex">
           <ServerSidebar />
