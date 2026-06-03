@@ -4,7 +4,7 @@ const MOBILE_SERVER_URL =
   process.env.CAPACITOR_SERVER_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  'https://awehchat.co.za';
+  'https://awechat.co.za';
 
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
@@ -20,8 +20,8 @@ const config: CapacitorConfig = {
       'localhost',
       '127.0.0.1',
       '10.0.2.2',
-      'awehchat.co.za',
-      '*.awehchat.co.za',
+      'awechat.co.za',
+      '*.awechat.co.za',
       '*.neon.tech',
       '*.r2.dev',
       '*.livekit.cloud',
