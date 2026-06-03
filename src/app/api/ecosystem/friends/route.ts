@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { friendships, users } from '@/lib/schema';
+import { friends, users } from '@/lib/schema';
 import { eq, or, and } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status') || 'accepted';
 
     // Get friends with specified status
-    const friends = await db.query.friendships.findMany({
+    const friends = await db.query.friends.findMany({
       where: and(
-        eq(friendships.userId, userId),
-        eq(friendships.status, status)
+        eq(friends.userId, userId),
+        eq(friends.status, status)
       ),
       with: {
         friend: {
@@ -93,16 +93,16 @@ export async function POST(request: NextRequest) {
     if (action === 'accept') {
       // Accept incoming friend request
       const updated = await db
-        .update(friendships)
+        .update(friends)
         .set({
           status: 'accepted',
           acceptedAt: new Date(),
         })
         .where(
           and(
-            eq(friendships.userId, friend.id),
-            eq(friendships.friendId, userId),
-            eq(friendships.status, 'pending')
+            eq(friends.userId, friend.id),
+            eq(friends.friendId, userId),
+            eq(friends.status, 'pending')
           )
         )
         .returning();
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
 
       // Also create reverse friendship
       await db
-        .insert(friendships)
+        .insert(friends)
         .values({
           userId,
           friendId: friend.id,
@@ -132,15 +132,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Send friend request
-    const existing = await db.query.friendships.findFirst({
+    const existing = await db.query.friends.findFirst({
       where: or(
         and(
-          eq(friendships.userId, userId),
-          eq(friendships.friendId, friend.id)
+          eq(friends.userId, userId),
+          eq(friends.friendId, friend.id)
         ),
         and(
-          eq(friendships.userId, friend.id),
-          eq(friendships.friendId, userId)
+          eq(friends.userId, friend.id),
+          eq(friends.friendId, userId)
         )
       ),
     });
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     // Create friendship request
     const newFriendship = await db
-      .insert(friendships)
+      .insert(friends)
       .values({
         userId,
         friendId: friend.id,

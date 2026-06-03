@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { friends, users, ecosystemApiKeys } from '@/lib/schema';
 import { eq, or, and } from 'drizzle-orm';
+import { sendEmail, generateFriendRequestEmailHtml, generateFriendRequestEmailText } from '@/lib/email';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
@@ -152,6 +153,29 @@ export async function POST(request: NextRequest) {
 
     const [friendship] = inserted;
 
+    // Send email notification to recipient
+    try {
+      await sendEmail({
+        to: targetUser.email,
+        subject: `${senderUser.displayName || senderEmail} sent you a friend request from ${apiKeyRecord.appName}`,
+        htmlBody: generateFriendRequestEmailHtml({
+          senderName: senderUser.displayName || senderEmail,
+          senderEmail: senderUser.email,
+          appName: apiKeyRecord.appName,
+          friendshipId: friendship.id,
+          acceptLink: `${process.env.NEXTAUTH_URL || 'https://moswords.vercel.app'}/api/friends/${friendship.id}/accept?token=${friendship.id}`,
+          declineLink: `${process.env.NEXTAUTH_URL || 'https://moswords.vercel.app'}/api/friends/${friendship.id}/decline?token=${friendship.id}`,
+        }),
+        textBody: generateFriendRequestEmailText({
+          senderName: senderUser.displayName || senderEmail,
+          appName: apiKeyRecord.appName,
+        }),
+      });
+    } catch (emailError) {
+      console.error('Failed to send friend request email:', emailError);
+      // Don't fail the request if email fails - friendship was created
+    }
+
     // Update API key last used timestamp
     await db
       .update(ecosystemApiKeys)
@@ -162,7 +186,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         friendship,
-        message: `Friend request sent from ${senderEmail} to ${targetEmail}`,
+        message: `Friend request sent from ${senderEmail} to ${targetEmail}. Email notification sent.`,
         appName: apiKeyRecord.appName,
       },
       { status: 201 }

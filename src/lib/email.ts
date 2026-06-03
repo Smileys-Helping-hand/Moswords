@@ -118,3 +118,105 @@ If you didn't request this code, please ignore this email and contact support if
 © 2026 Moswords. All rights reserved.
   `.trim();
 }
+
+/**
+ * Generate HTML email for friend request
+ */
+export interface FriendRequestEmailParams {
+  senderName: string;
+  senderEmail: string;
+  appName: string;
+  friendshipId: string;
+  acceptLink: string;
+  declineLink: string;
+}
+
+export function generateFriendRequestEmailHtml(params: FriendRequestEmailParams): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: white; border-radius: 8px; }
+        .header { text-align: center; color: #333; margin-bottom: 20px; }
+        .message { color: #555; font-size: 16px; margin: 20px 0; line-height: 1.6; }
+        .button-group { text-align: center; margin: 30px 0; }
+        .button {
+          display: inline-block;
+          padding: 12px 30px;
+          margin: 0 10px;
+          border-radius: 6px;
+          text-decoration: none;
+          font-weight: bold;
+          cursor: pointer;
+        }
+        .accept-btn {
+          background-color: #10b981;
+          color: white;
+        }
+        .accept-btn:hover {
+          background-color: #059669;
+        }
+        .decline-btn {
+          background-color: #ef4444;
+          color: white;
+        }
+        .decline-btn:hover {
+          background-color: #dc2626;
+        }
+        .app-badge { background-color: #f3f4f6; padding: 4px 12px; border-radius: 20px; display: inline-block; color: #666; }
+        .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Friend Request from <span class="app-badge">${params.appName}</span></h1>
+        </div>
+
+        <div class="message">
+          <p><strong>${params.senderName}</strong> (${params.senderEmail}) sent you a friend request!</p>
+          <p>Click below to accept or decline the request.</p>
+        </div>
+
+        <div class="button-group">
+          <a href="${params.acceptLink}" class="button accept-btn">✓ Accept</a>
+          <a href="${params.declineLink}" class="button decline-btn">✗ Decline</a>
+        </div>
+
+        <p style="color: #999; font-size: 14px; text-align: center;">
+          Or copy this link to accept: <br/>
+          <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${params.acceptLink}</code>
+        </p>
+
+        <div class="footer">
+          <p>This is an automated message from Moswords. If you didn't expect this request, you can safely ignore it.</p>
+          <p>&copy; 2026 Moswords. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Generate plain text email for friend request
+ */
+export interface FriendRequestEmailTextParams {
+  senderName: string;
+  appName: string;
+}
+
+export function generateFriendRequestEmailText(params: FriendRequestEmailTextParams): string {
+  return `
+Friend Request from ${params.appName}
+
+${params.senderName} sent you a friend request!
+
+Check the HTML version of this email to accept or decline the request, or visit your Moswords app to respond.
+
+© 2026 Moswords. All rights reserved.
+  `.trim();
+}
