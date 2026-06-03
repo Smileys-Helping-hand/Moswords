@@ -11,6 +11,17 @@ import { ecosystemApiKeys } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 
+/**
+ * Generate app-specific key prefix from app name
+ * e.g., "Moswords" -> "mosw", "Nexus Integration" -> "nexus"
+ */
+function generateKeyPrefix(appName: string): string {
+  return appName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 5) || 'app';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -60,8 +71,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate secure API key and secret
-    const apiKey = `ek_${crypto.randomBytes(24).toString('hex')}`;
+    // Generate secure API key with app-name prefix and secret
+    const keyPrefix = generateKeyPrefix(appName);
+    const apiKey = `${keyPrefix}_${crypto.randomBytes(24).toString('hex')}`;
     const apiSecret = crypto.randomBytes(32).toString('hex');
 
     // Create the key

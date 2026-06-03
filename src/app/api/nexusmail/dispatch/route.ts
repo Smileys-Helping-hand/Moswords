@@ -2,19 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { registeredApps, emailLogs } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { sendEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// Initialize AWS SES client
-const sesClient = new SESClient({
-  region: process.env.AWS_REGION || 'af-south-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
-});
 
 /**
  * POST /api/nexusmail/dispatch
@@ -70,30 +61,15 @@ export async function POST(request: NextRequest) {
     let errorMessage: string | undefined;
 
     try {
-      const sendEmailCommand = new SendEmailCommand({
-        Source: process.env.AWS_SES_FROM_EMAIL || 'noreply@yourdomain.com',
-        Destination: {
-          ToAddresses: [recipient],
-        },
-        Message: {
-          Subject: {
-            Data: subject,
-            Charset: 'UTF-8',
-          },
-          Body: {
-            Html: {
-              Data: body,
-              Charset: 'UTF-8',
-            },
-          },
-        },
+      await sendEmail({
+        to: recipient,
+        subject,
+        htmlBody: body,
       });
-
-      await sesClient.send(sendEmailCommand);
-    } catch (sesError: any) {
-      console.error('AWS SES Error:', sesError);
+    } catch (error: any) {
+      console.error('Email send error:', error);
       emailStatus = 'failed';
-      errorMessage = sesError.message || 'Unknown SES error';
+      errorMessage = error.message || 'Unknown error';
     }
 
     // Log the email

@@ -688,6 +688,9 @@ export const adminUsers = pgTable('admin_users', {
   mfaEnabled: boolean('mfa_enabled').notNull().default(false),
   mfaSecret: text('mfa_secret'), // encrypted
   mfaBackupCodes: text('mfa_backup_codes'), // encrypted array
+  mfaEmailCode: text('mfa_email_code'), // encrypted email OTP
+  mfaEmailCodeExpiry: timestamp('mfa_email_code_expiry'), // 10-minute expiry
+  mfaEmailEnabled: boolean('mfa_email_enabled').notNull().default(false),
   lastMfaVerified: timestamp('last_mfa_verified'),
   lastLogin: timestamp('last_login'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

@@ -57,6 +57,13 @@
       "when": 1770309031074,
       "tag": "0006_e2e_encryption",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780488146432,
+      "tag": "0008_email_mfa",
+      "breakpoints": true
     }
   ]
 }

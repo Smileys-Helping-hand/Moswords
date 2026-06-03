@@ -245,20 +245,175 @@ function generateBackupCodes(count: number): string[] {
 }
 
 /**
- * Encrypt data using NODE_ENV based approach
- * In production, use proper encryption library like crypto-js
+ * Encrypt data using AES-256-CBC
+ * Uses MFA_ENCRYPTION_KEY env var (32-byte hex key)
+ * Falls back to base64 in dev/test when key is missing
  */
 function encryptData(data: string): string {
-  // Simple base64 encoding for now - in production, use proper encryption
-  return Buffer.from(data).toString('base64');
+  const key = process.env.MFA_ENCRYPTION_KEY;
+
+  // Fallback to base64 if key not configured (dev/test)
+  if (!key) {
+    console.warn('MFA_ENCRYPTION_KEY not set, using base64 fallback (insecure)');
+    return `b64:${Buffer.from(data).toString('base64')}`;
+  }
+
+  try {
+    const keyBuffer = Buffer.from(key, 'hex');
+    if (keyBuffer.length !== 32) {
+      throw new Error(`MFA_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got ${keyBuffer.length}`);
+    }
+
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, iv);
+
+    let encrypted = cipher.update(data, 'utf-8', 'hex');
+    encrypted += cipher.final('hex');
+
+    // Return IV:encrypted data for decryption
+    return `aes:${iv.toString('hex')}:${encrypted}`;
+  } catch (error) {
+    console.error('Encryption error:', error);
+    throw new Error('Failed to encrypt MFA data');
+  }
 }
 
 /**
  * Decrypt data
  */
 function decryptData(encrypted: string): string {
-  // Simple base64 decoding for now - in production, use proper decryption
+  // Handle base64 fallback format
+  if (encrypted.startsWith('b64:')) {
+    return Buffer.from(encrypted.slice(4), 'base64').toString('utf-8');
+  }
+
+  // Handle AES format: aes:iv:ciphertext
+  if (encrypted.startsWith('aes:')) {
+    const key = process.env.MFA_ENCRYPTION_KEY;
+    if (!key) {
+      throw new Error('MFA_ENCRYPTION_KEY not set but encrypted data found');
+    }
+
+    try {
+      const parts = encrypted.slice(4).split(':');
+      if (parts.length !== 2) {
+        throw new Error('Invalid encrypted data format');
+      }
+
+      const keyBuffer = Buffer.from(key, 'hex');
+      const iv = Buffer.from(parts[0], 'hex');
+      const ciphertext = parts[1];
+
+      const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
+      let decrypted = decipher.update(ciphertext, 'hex', 'utf-8');
+      decrypted += decipher.final('utf-8');
+
+      return decrypted;
+    } catch (error) {
+      console.error('Decryption error:', error);
+      throw new Error('Failed to decrypt MFA data');
+    }
+  }
+
+  // Assume old base64 format without prefix
   return Buffer.from(encrypted, 'base64').toString('utf-8');
+}
+
+/**
+ * Generate a 6-digit email MFA code and store it encrypted
+ */
+export async function generateEmailMfaCode(email: string): Promise<string> {
+  const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+  const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+  const encryptedCode = encryptData(code);
+
+  await db
+    .update(adminUsers)
+    .set({
+      mfaEmailCode: encryptedCode,
+      mfaEmailCodeExpiry: expiryTime,
+    })
+    .where(eq(adminUsers.email, email.toLowerCase()));
+
+  return code; // Return plaintext code to send via email
+}
+
+/**
+ * Verify email MFA code
+ */
+export async function verifyEmailMfaCode(email: string, code: string): Promise<MfaVerifyResult> {
+  try {
+    const admin = await db
+      .select()
+      .from(adminUsers)
+      .where(eq(adminUsers.email, email.toLowerCase()))
+      .limit(1);
+
+    if (!admin[0]?.mfaEmailCode) {
+      return { valid: false, message: 'No email code pending' };
+    }
+
+    // Check expiry
+    const now = new Date();
+    if (!admin[0].mfaEmailCodeExpiry || admin[0].mfaEmailCodeExpiry < now) {
+      return { valid: false, message: 'Email code expired. Please request a new one.' };
+    }
+
+    // Decrypt and compare code
+    const storedCode = decryptData(admin[0].mfaEmailCode);
+    if (storedCode !== code) {
+      return { valid: false, message: 'Invalid email code' };
+    }
+
+    // Clear code after successful verification
+    await db
+      .update(adminUsers)
+      .set({
+        mfaEmailCode: null,
+        mfaEmailCodeExpiry: null,
+      })
+      .where(eq(adminUsers.email, email.toLowerCase()));
+
+    return { valid: true, message: 'Email code verified' };
+  } catch (error) {
+    console.error('Error verifying email MFA code:', error);
+    return { valid: false, message: 'Error verifying email code' };
+  }
+}
+
+/**
+ * Enable email MFA for user
+ */
+export async function enableEmailMfa(email: string): Promise<void> {
+  try {
+    await db
+      .update(adminUsers)
+      .set({ mfaEmailEnabled: true })
+      .where(eq(adminUsers.email, email.toLowerCase()));
+  } catch (error) {
+    console.error('Error enabling email MFA:', error);
+    throw new Error('Failed to enable email MFA');
+  }
+}
+
+/**
+ * Disable email MFA for user
+ */
+export async function disableEmailMfa(email: string): Promise<void> {
+  try {
+    await db
+      .update(adminUsers)
+      .set({
+        mfaEmailEnabled: false,
+        mfaEmailCode: null,
+        mfaEmailCodeExpiry: null,
+      })
+      .where(eq(adminUsers.email, email.toLowerCase()));
+  } catch (error) {
+    console.error('Error disabling email MFA:', error);
+    throw new Error('Failed to disable email MFA');
+  }
 }
 
 /**

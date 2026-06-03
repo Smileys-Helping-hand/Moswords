@@ -10,10 +10,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Eye, EyeOff } from 'lucide-react';
+import { Copy, Mail, Smartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface MfaModalProps {
@@ -22,18 +21,28 @@ interface MfaModalProps {
   userEmail: string;
 }
 
+type MfaMethod = 'totp' | 'email';
+type StepType = 'method-select' | 'totp-verify' | 'email-setup';
+
 export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProps) {
   const { toast } = useToast();
-  const [step, setStep] = useState<'setup' | 'verify'>('setup');
+  const [step, setStep] = useState<StepType>('method-select');
+  const [method, setMethod] = useState<MfaMethod | null>(null);
+
+  // TOTP state
   const [secret, setSecret] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [manualEntryKey, setManualEntryKey] = useState('');
-  const [verifyToken, setVerifyToken] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showBackupCodes, setShowBackupCodes] = useState(false);
+  const [totpToken, setTotpToken] = useState('');
 
-  const handleSetupMfa = async () => {
+  // Email state
+  const [emailCode, setEmailCode] = useState('');
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+
+  const handleSetupTotp = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/admin/mfa/setup');
@@ -43,7 +52,8 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
         setQrCode(data.qrCode);
         setBackupCodes(data.backupCodes);
         setManualEntryKey(data.manualEntryKey);
-        setStep('verify');
+        setMethod('totp');
+        setStep('totp-verify');
         toast.success('MFA setup initiated');
       } else {
         const error = await res.json();
@@ -57,8 +67,8 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
     }
   };
 
-  const handleVerifyMfa = async () => {
-    if (!verifyToken) {
+  const handleVerifyTotp = async () => {
+    if (!totpToken) {
       toast.error('Please enter the token from your authenticator app');
       return;
     }
@@ -70,7 +80,7 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           secret,
-          token: verifyToken,
+          token: totpToken,
           backupCodes,
           action: 'enable',
         }),
@@ -79,13 +89,7 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
       if (res.ok) {
         toast.success('MFA enabled successfully!');
         onOpenChange(false);
-        // Reset state
-        setStep('setup');
-        setSecret('');
-        setQrCode('');
-        setBackupCodes([]);
-        setVerifyToken('');
-        setManualEntryKey('');
+        resetState();
       } else {
         const error = await res.json();
         toast.error(error.error || 'Failed to verify MFA token');
@@ -98,9 +102,81 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
     }
   };
 
+  const handleSendEmailCode = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/mfa/email/send', {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        setEmailCodeSent(true);
+        toast.success('Verification code sent to your email');
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to send verification code');
+      }
+    } catch (error) {
+      console.error('Error sending email code:', error);
+      toast.error('Error sending verification code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyEmailCode = async () => {
+    if (!emailCode) {
+      toast.error('Please enter the code from your email');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/mfa/email/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: emailCode,
+          action: 'enable',
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Email MFA enabled successfully!');
+        onOpenChange(false);
+        resetState();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to verify code');
+      }
+    } catch (error) {
+      console.error('Error verifying email code:', error);
+      toast.error('Error verifying code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetState = () => {
+    setStep('method-select');
+    setMethod(null);
+    setSecret('');
+    setQrCode('');
+    setBackupCodes([]);
+    setManualEntryKey('');
+    setTotpToken('');
+    setEmailCode('');
+    setEmailCodeSent(false);
+  };
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
+  };
+
+  const maskEmail = (email: string) => {
+    const [local, domain] = email.split('@');
+    return `${local.substring(0, 2)}***@${domain}`;
   };
 
   return (
@@ -109,7 +185,7 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
         <DialogHeader>
           <DialogTitle>🔐 Setup Two-Factor Authentication</DialogTitle>
           <DialogDescription>
-            Secure your admin account with time-based one-time passwords
+            Secure your admin account with an additional verification method
           </DialogDescription>
         </DialogHeader>
 
@@ -118,30 +194,65 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {step === 'setup' && (
+          {/* Method Selection */}
+          {step === 'method-select' && (
             <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Step 1: Get Started</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm mb-4">
-                    You'll need an authenticator app like Google Authenticator, Microsoft
-                    Authenticator, or Authy to enable MFA.
-                  </p>
-                  <Button onClick={handleSetupMfa} disabled={loading} className="w-full">
-                    {loading ? 'Generating...' : 'Generate Setup Code'}
-                  </Button>
-                </CardContent>
-              </Card>
+              <p className="text-sm text-muted-foreground">
+                Choose your preferred verification method:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card
+                  className="cursor-pointer hover:border-primary transition-colors"
+                  onClick={() => {
+                    setMethod('totp');
+                    handleSetupTotp();
+                  }}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Smartphone className="w-5 h-5 text-blue-600" />
+                      Authenticator App
+                    </CardTitle>
+                    <CardDescription>Recommended</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm">
+                      Use Google Authenticator, Microsoft Authenticator, or Authy to generate
+                      verification codes.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className="cursor-pointer hover:border-primary transition-colors"
+                  onClick={() => {
+                    setMethod('email');
+                    setStep('email-setup');
+                  }}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Mail className="w-5 h-5 text-green-600" />
+                      Email Code
+                    </CardTitle>
+                    <CardDescription>Backup option</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm">
+                      Receive a verification code via email when you need to authenticate.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
 
-          {step === 'verify' && qrCode && (
+          {/* TOTP Verification */}
+          {step === 'totp-verify' && qrCode && (
             <div className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Step 2: Scan QR Code</CardTitle>
+                  <CardTitle className="text-lg">Step 1: Scan QR Code</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-center">
@@ -173,23 +284,33 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Step 3: Verify Token</CardTitle>
+                  <CardTitle className="text-lg">Step 2: Verify Token</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Input
                     placeholder="Enter 6-digit token from your app"
-                    value={verifyToken}
-                    onChange={(e) => setVerifyToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    value={totpToken}
+                    onChange={(e) => setTotpToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     maxLength={6}
                     className="text-center text-2xl tracking-widest"
                     disabled={loading}
                   />
                   <Button
-                    onClick={handleVerifyMfa}
-                    disabled={verifyToken.length !== 6 || loading}
+                    onClick={handleVerifyTotp}
+                    disabled={totpToken.length !== 6 || loading}
                     className="w-full"
                   >
                     {loading ? 'Verifying...' : 'Verify & Enable MFA'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setStep('method-select');
+                      resetState();
+                    }}
+                    className="w-full"
+                  >
+                    Back
                   </Button>
                 </CardContent>
               </Card>
@@ -227,6 +348,91 @@ export default function MfaModal({ open, onOpenChange, userEmail }: MfaModalProp
                       ))}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Email MFA Setup */}
+          {step === 'email-setup' && !emailCodeSent && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Email Verification</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    We'll send a 6-digit verification code to your email address:
+                  </p>
+                  <div className="bg-muted p-3 rounded">
+                    <p className="font-mono text-sm">{maskEmail(userEmail)}</p>
+                  </div>
+                  <Button
+                    onClick={handleSendEmailCode}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    {loading ? 'Sending...' : 'Send Verification Code'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setStep('method-select');
+                      resetState();
+                    }}
+                    className="w-full"
+                  >
+                    Back
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Email Code Entry */}
+          {step === 'email-setup' && emailCodeSent && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Enter Verification Code</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Enter the 6-digit code sent to your email:
+                  </p>
+                  <Input
+                    placeholder="000000"
+                    value={emailCode}
+                    onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength={6}
+                    className="text-center text-2xl tracking-widest"
+                    disabled={loading}
+                  />
+                  <Button
+                    onClick={handleVerifyEmailCode}
+                    disabled={emailCode.length !== 6 || loading}
+                    className="w-full"
+                  >
+                    {loading ? 'Verifying...' : 'Verify & Enable MFA'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSendEmailCode}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    Resend Code
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setStep('method-select');
+                      resetState();
+                    }}
+                    className="w-full"
+                  >
+                    Back to Method Selection
+                  </Button>
                 </CardContent>
               </Card>
             </div>
