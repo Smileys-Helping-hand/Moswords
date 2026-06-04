@@ -8,15 +8,20 @@ import { useEffect } from 'react';
  */
 export function AntiFlicker() {
   useEffect(() => {
-    // Add class to disable animations during hydration
     const html = document.documentElement;
-    html.classList.add('hydrating');
 
-    // Small delay to ensure DOM is fully painted
+    // Ensure hydrating class is set
+    if (!html.classList.contains('hydrating')) {
+      html.classList.add('hydrating');
+    }
+
+    // Wait for page to be fully interactive
     const timer = setTimeout(() => {
       html.classList.remove('hydrating');
       html.classList.add('hydrated');
-    }, 100);
+      // Force a repaint
+      void html.offsetHeight;
+    }, 300);
 
     return () => clearTimeout(timer);
   }, []);

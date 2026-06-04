@@ -2,15 +2,26 @@
 @import './mobile-responsive.css';
 
 /***** ANTI-FLICKER RULES *****/
-/* Disable all animations while hydrating */
+/* Prevent flicker during hydration */
+html.hydrating {
+  animation: none !important;
+}
+
 html.hydrating,
 html.hydrating * {
   animation: none !important;
   transition: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Prevent layout shift during hydration */
+html.hydrating body {
+  display: block !important;
 }
 
 /* Enable animations after hydration complete */
-html.hydrated * {
+html.hydrated {
   /* Animations re-enabled */
 }
 

@@ -71,6 +71,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const html = document.documentElement;
+                html.classList.add('hydrating');
+                html.style.colorScheme = 'dark';
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
         <AntiFlicker />
         <AuthProvider>
