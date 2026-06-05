@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Smartphone, Tablet, Monitor } from 'lucide-react';
+import { useIsHydrating } from '@/contexts/hydration-context';
 
 /**
  * Device type indicator for testing responsive design
@@ -10,6 +11,7 @@ import { Smartphone, Tablet, Monitor } from 'lucide-react';
  */
 export default function DeviceIndicator() {
   const isDev = process.env.NODE_ENV === 'development';
+  const isHydrating = useIsHydrating();
   const [mounted, setMounted] = useState(false);
   const [deviceType, setDeviceType] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
   const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
@@ -48,8 +50,9 @@ export default function DeviceIndicator() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 100 }}
+      initial={isHydrating ? { opacity: 1, x: 0 } : { opacity: 0, x: 100 }}
       animate={{ opacity: 1, x: 0 }}
+      transition={isHydrating ? { duration: 0 } : undefined}
       className="fixed bottom-24 right-4 z-50 md:bottom-4"
     >
       <div className="glass-panel px-3 py-2 rounded-lg border border-primary/50 shadow-lg">

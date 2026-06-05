@@ -11,6 +11,7 @@ import ClientMobileWrapper from '@/components/ClientMobileWrapper';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateChecker from '@/components/UpdateChecker';
 import { AntiFlicker } from '@/components/anti-flicker';
+import { HydrationProvider } from '@/contexts/hydration-context';
 
 export const viewport: Viewport = {
   themeColor: '#030014',
@@ -86,19 +87,21 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased overflow-x-hidden max-w-full pb-20 md:pb-0">
         <AntiFlicker />
-        <AuthProvider>
-          <UnreadProvider>
-            <ClientMobileWrapper>
-            <UpdateChecker />
-            <OfflineBanner />
-            <ClientOnlyProviders />
-            {children}
-            <NotificationManager />
-            <MobileNav />
-            <InstallPrompt />
-            </ClientMobileWrapper>
-          </UnreadProvider>
-        </AuthProvider>
+        <HydrationProvider>
+          <AuthProvider>
+            <UnreadProvider>
+              <ClientMobileWrapper>
+              <UpdateChecker />
+              <OfflineBanner />
+              <ClientOnlyProviders />
+              {children}
+              <NotificationManager />
+              <MobileNav />
+              <InstallPrompt />
+              </ClientMobileWrapper>
+            </UnreadProvider>
+          </AuthProvider>
+        </HydrationProvider>
         <Toaster />
       </body>
     </html>

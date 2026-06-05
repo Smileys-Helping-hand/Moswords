@@ -19,12 +19,13 @@ export function AntiFlicker() {
     // Wait longer to allow dynamically-loaded components (NetworkStatus, DeviceIndicator)
     // to mount and complete their animations before removing the hydrating class.
     // This ensures all framer-motion animations are suppressed during hydration.
+    // Increased to 700ms to ensure all components use the hydration context properly.
     const timer = setTimeout(() => {
       html.classList.remove('hydrating');
       html.classList.add('hydrated');
       // Force a repaint to ensure the transition is clean
       void html.offsetHeight;
-    }, 500);
+    }, 700);
 
     return () => clearTimeout(timer);
   }, []);
