@@ -2,17 +2,14 @@
 @import './mobile-responsive.css';
 
 /***** ANTI-FLICKER RULES *****/
-/* Prevent flicker during hydration */
-html.hydrating {
-  animation: none !important;
-}
-
+/* Prevent flicker during hydration - suppress all animations and transforms */
 html.hydrating,
 html.hydrating * {
   animation: none !important;
   transition: none !important;
   opacity: 1 !important;
   visibility: visible !important;
+  transform: none !important;
 }
 
 /* Prevent layout shift during hydration */

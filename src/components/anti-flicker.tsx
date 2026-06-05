@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 
 /**
  * Prevents visual flicker during page hydration by disabling animations
- * until the page is fully loaded. This fixes the flickering issue on load.
+ * until the page is fully loaded and all dynamically-loaded components
+ * have mounted and started their animations.
  */
 export function AntiFlicker() {
   useEffect(() => {
@@ -15,13 +16,15 @@ export function AntiFlicker() {
       html.classList.add('hydrating');
     }
 
-    // Wait for page to be fully interactive
+    // Wait longer to allow dynamically-loaded components (NetworkStatus, DeviceIndicator)
+    // to mount and complete their animations before removing the hydrating class.
+    // This ensures all framer-motion animations are suppressed during hydration.
     const timer = setTimeout(() => {
       html.classList.remove('hydrating');
       html.classList.add('hydrated');
-      // Force a repaint
+      // Force a repaint to ensure the transition is clean
       void html.offsetHeight;
-    }, 300);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, []);
