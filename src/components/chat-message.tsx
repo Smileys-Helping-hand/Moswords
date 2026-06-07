@@ -10,6 +10,7 @@ import { format, isToday, isYesterday, parseISO, isValid } from 'date-fns';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import { cn } from '@/lib/utils';
+import MessageReactions from './message-reactions';
 
 interface ChatMessageProps {
   message: OptimisticMessage;
@@ -378,6 +379,13 @@ function ChatMessage({
                   {timeStr}{isCurrentUser && '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0'}
                 </span>
               </p>
+            </div>
+          )}
+
+          {/* ── Message Reactions ── */}
+          {message.reactions && message.reactions.length > 0 && (
+            <div className="px-3 py-1.5 border-t border-white/10">
+              <MessageReactions messageId={message.id} compact={true} />
             </div>
           )}
 

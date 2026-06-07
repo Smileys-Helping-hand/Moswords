@@ -1,105 +1,17 @@
 import { useAppearance } from '@/store/appearance';
 import { useState } from 'react';
-import { Loader2, Sparkles, Stars, Sun, Zap } from 'lucide-react';
+import { Loader2, Sparkles, Stars, Sun, Zap, Palette, Droplet } from 'lucide-react';
+import { THEMES } from '@/lib/themes';
 
-const themes = [
-  {
-    key: 'default',
-    label: 'Deep Space',
-    description: 'Telegram-inspired dark',
-    preview: 'bg-[#17212B]',
-    textColor: 'text-[#2AABEE]',
-    dot1: 'bg-[#2B5278]',
-    dot2: 'bg-[#182533]',
-    icon: null,
-  },
-  {
-    key: 'light',
-    label: 'Light Mode',
-    description: 'Clean & bright',
-    preview: 'bg-[#f8f9fb]',
-    textColor: 'text-[#a259ff]',
-    dot1: 'bg-[#0EA5E9]',
-    dot2: 'bg-[#e5e7eb]',
-    icon: null,
-  },
-  {
-    key: 'cyberpunk',
-    label: 'Cyberpunk',
-    description: 'GitHub dark vibes',
-    preview: 'bg-[#0D1117]',
-    textColor: 'text-[#00d4ff]',
-    dot1: 'bg-[#00d4ff]',
-    dot2: 'bg-[#7c3aed]',
-    icon: null,
-  },
-  {
-    key: 'nord',
-    label: 'Nord',
-    description: 'Arctic blue calm',
-    preview: 'bg-[#2e3440]',
-    textColor: 'text-[#88c0d0]',
-    dot1: 'bg-[#88c0d0]',
-    dot2: 'bg-[#b48ead]',
-    icon: null,
-  },
-  {
-    key: 'aurora',
-    label: 'Aurora',
-    description: 'Animated northern lights',
-    preview: 'bg-[#0a0e1a]',
-    textColor: 'text-[#7c4dff]',
-    dot1: 'bg-[#7c4dff]',
-    dot2: 'bg-[#00e5ff]',
-    icon: Sparkles,
-    animated: true,
-    animStyle: {
-      background: 'conic-gradient(from 0deg at 50% 50%, #7c4dff44, #00e5ff33, #00e67622, #7c4dff44)',
-      animation: 'aurora-spin 4s linear infinite',
-    },
-  },
-  {
-    key: 'galaxy',
-    label: 'Galaxy',
-    description: 'Deep space stars',
-    preview: 'bg-[#05050f]',
-    textColor: 'text-[#6eb5ff]',
-    dot1: 'bg-[#6eb5ff]',
-    dot2: 'bg-[#c77dff]',
-    icon: Stars,
-    animated: true,
-  },
-  {
-    key: 'sunset',
-    label: 'Sunset',
-    description: 'Warm glowing horizon',
-    preview: 'bg-[#1a0a0f]',
-    textColor: 'text-[#ff6b35]',
-    dot1: 'bg-[#ff6b35]',
-    dot2: 'bg-[#ff9f1c]',
-    icon: Sun,
-    animated: true,
-    animStyle: {
-      background: 'linear-gradient(160deg, #ff6b3544, #ff9f1c33, #c9184a22)',
-      animation: 'sunset-shift 3s ease-in-out infinite alternate',
-    },
-  },
-  {
-    key: 'neon',
-    label: 'Neon',
-    description: 'Electric glow grid',
-    preview: 'bg-black',
-    textColor: 'text-[#ff00ff]',
-    dot1: 'bg-[#ff00ff]',
-    dot2: 'bg-[#00ffff]',
-    icon: Zap,
-    animated: true,
-    animStyle: {
-      boxShadow: '0 0 12px #ff00ff80, 0 0 24px #ff00ff40',
-      borderColor: '#ff00ff60',
-    },
-  },
-];
+const themeIconMap: Record<string, any> = {
+  aurora: Sparkles,
+  galaxy: Stars,
+  sunset: Sun,
+  neon: Zap,
+  glassmorphism: Palette,
+  gradient: Palette,
+  dracula: Droplet,
+};
 
 const accentPalette = [
   '#00f0ff', '#a259ff', '#00e676', '#ff9800',
@@ -142,9 +54,9 @@ export default function AppearanceTab() {
       <section>
         <h3 className="font-bold mb-1 text-lg">Theme</h3>
         <p className="text-xs text-muted-foreground mb-4">✨ Animated themes bring your chat to life</p>
-        <div className="grid grid-cols-2 gap-3">
-          {themes.map((t) => {
-            const Icon = t.icon;
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {THEMES.map((t) => {
+            const Icon = themeIconMap[t.key];
             const isActive = theme === t.key;
             return (
               <button

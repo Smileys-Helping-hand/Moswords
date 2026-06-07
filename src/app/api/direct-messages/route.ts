@@ -3,13 +3,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { directMessages, users } from '@/lib/schema';
-import { eq, or, desc } from 'drizzle-orm';
+import { eq, or, desc, and, lt } from 'drizzle-orm';
+import { decodeCursor, createCursor, createPaginatedResponse } from '@/lib/pagination';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// GET /api/direct-messages - Get all direct message conversations
-export async function GET() {
+// GET /api/direct-messages - Get direct message conversations with pagination
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -18,9 +19,68 @@ export async function GET() {
     }
 
     const userId = (session.user as any).id;
+    const searchParams = request.nextUrl.searchParams;
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100); // Max 100
+    const cursor = searchParams.get('cursor') || undefined;
+    const receiverId = searchParams.get('receiverId');
 
-    // Get all messages where user is sender or receiver, with sender info
-    const messages = await db
+    // If receiverId is provided, fetch messages for that specific conversation
+    if (receiverId) {
+      const cursorId = cursor ? decodeCursor(cursor) : undefined;
+
+      const whereCondition = cursorId
+        ? and(
+            or(
+              and(eq(directMessages.senderId, userId), eq(directMessages.receiverId, receiverId)),
+              and(eq(directMessages.senderId, receiverId), eq(directMessages.receiverId, userId))
+            ),
+            lt(directMessages.id, cursorId)
+          )
+        : or(
+            and(eq(directMessages.senderId, userId), eq(directMessages.receiverId, receiverId)),
+            and(eq(directMessages.senderId, receiverId), eq(directMessages.receiverId, userId))
+          );
+
+      const messages = await db
+        .select({
+          id: directMessages.id,
+          content: directMessages.content,
+          contentNonce: directMessages.contentNonce,
+          isEncrypted: directMessages.isEncrypted,
+          senderId: directMessages.senderId,
+          receiverId: directMessages.receiverId,
+          createdAt: directMessages.createdAt,
+          read: directMessages.read,
+          readAt: directMessages.readAt,
+          mediaUrl: directMessages.mediaUrl,
+          mediaType: directMessages.mediaType,
+          mediaEncrypted: directMessages.mediaEncrypted,
+          mediaNonce: directMessages.mediaNonce,
+          sender: {
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            displayName: users.displayName,
+            photoURL: users.photoURL,
+          },
+        })
+        .from(directMessages)
+        .leftJoin(users, eq(directMessages.senderId, users.id))
+        .where(whereCondition)
+        .orderBy(desc(directMessages.createdAt))
+        .limit(limit + 1); // Fetch one extra to determine if there are more
+
+      const paginated = createPaginatedResponse(messages, limit);
+
+      return NextResponse.json({
+        messages: paginated.items,
+        nextCursor: paginated.nextCursor,
+        hasMore: paginated.hasMore,
+      });
+    }
+
+    // Get conversation list (latest message from each conversation)
+    const allMessages = await db
       .select({
         id: directMessages.id,
         content: directMessages.content,
@@ -29,6 +89,8 @@ export async function GET() {
         senderId: directMessages.senderId,
         receiverId: directMessages.receiverId,
         createdAt: directMessages.createdAt,
+        read: directMessages.read,
+        readAt: directMessages.readAt,
         mediaUrl: directMessages.mediaUrl,
         mediaType: directMessages.mediaType,
         mediaEncrypted: directMessages.mediaEncrypted,
@@ -50,9 +112,15 @@ export async function GET() {
         )
       )
       .orderBy(desc(directMessages.createdAt))
-      .limit(100);
+      .limit(limit + 1);
 
-    return NextResponse.json({ messages });
+    const paginated = createPaginatedResponse(allMessages, limit);
+
+    return NextResponse.json({
+      messages: paginated.items,
+      nextCursor: paginated.nextCursor,
+      hasMore: paginated.hasMore,
+    });
   } catch (error) {
     console.error('Error fetching direct messages:', error);
     return NextResponse.json(
