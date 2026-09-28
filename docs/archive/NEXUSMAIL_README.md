@@ -51,7 +51,7 @@ Add to your `.env.local` file:
 
 ```env
 # --- DATABASE (NEON) ---
-DATABASE_URL="postgres://user:pass@ep-cool-glade.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL="postgres://user:<REDACTED>@ep-cool-glade.aws.neon.tech/neondb?sslmode=require"
 
 # --- AWS SES ENGINE ---
 AWS_REGION=af-south-1
@@ -68,7 +68,7 @@ NEXTAUTH_SECRET=your_nextauth_secret
 
 1. Go to [Neon.tech](https://neon.tech) and create a free project
 2. On the Dashboard, look for "Connection Details"
-3. Copy the connection string (format: `postgres://user:pass@...`)
+3. Copy the connection string (format: `postgres://user:<REDACTED>@...`)
 
 ### 3. AWS SES Setup
 

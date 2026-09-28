@@ -58,6 +58,20 @@ export const migrations: Migration[] = [
     ],
   },
   {
+    // Stop storing working API keys: keep only a SHA-256 hash. api_key is NOT
+    // NULL + UNIQUE, so it is overwritten with the hash rather than nulled.
+    // Apps keep using the same keys; lookups go through key_hash.
+    id: '2026-09-28-hash-ecosystem-keys',
+    statements: [
+      `UPDATE ecosystem_api_keys
+         SET key_hash = encode(sha256(convert_to(api_key, 'UTF8')), 'hex'),
+             key_prefix = left(api_key, 10)
+       WHERE key_hash IS NULL`,
+      `UPDATE ecosystem_api_keys SET api_key = key_hash
+       WHERE key_hash IS NOT NULL AND api_key <> key_hash`,
+    ],
+  },
+  {
     // Every chat screen and the sync loop filter on these columns; without
     // indexes each request was a sequential scan of the whole message table.
     id: '2026-09-28-hot-path-indexes',

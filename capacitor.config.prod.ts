@@ -14,12 +14,12 @@ const PRODUCTION_URL =
   process.env.CAPACITOR_SERVER_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  'https://awechat.co.za';
+  'https://awehchat.co.za';
 
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
-  webDir: 'public',
+  webDir: 'capacitor-shell',
   server: {
     url: PRODUCTION_URL,
     cleartext: false,
@@ -29,9 +29,8 @@ const config: CapacitorConfig = {
       'localhost',
       '127.0.0.1',
       '10.0.2.2',
-      'awechat.co.za',
-      'api.awechat.co.za',
-      '*.awechat.co.za',
+      'awehchat.co.za',
+      '*.awehchat.co.za',
       '*.vercel.app',
       'neon.tech',
       '*.neon.tech',

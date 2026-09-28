@@ -26,3 +26,15 @@ export async function requireUser(): Promise<
 }
 
 export { isUuid, normalizeEmail } from './validate';
+
+/** Like requireUser, but only for the superadmin or rows in admin_users. */
+export async function requireAdmin(): Promise<
+  { user: SessionUser; response?: undefined } | { user?: undefined; response: NextResponse }
+> {
+  const auth = await requireUser();
+  if (auth.response) return auth;
+  const { isAdmin, isSuperAdmin } = await import('./admin');
+  const email = auth.user.email ?? undefined;
+  if (isSuperAdmin(email) || (await isAdmin(email))) return auth;
+  return { response: NextResponse.json({ error: 'Admin access required' }, { status: 403 }) };
+}

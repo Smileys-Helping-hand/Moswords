@@ -3,9 +3,16 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm install --legacy-peer-deps
+        # Next.js 16 needs Node >= 20.9
+        - nvm install 22 >/dev/null && nvm use 22
+        - node -v
+        - npm ci --legacy-peer-deps --no-audit --no-fund
+        # Additive, idempotent schema migrations + a drift report in the build log
+        - npx tsx scripts/migrate.ts
     build:
       commands:
+        # Console env vars reach the build but not the SSR runtime — hand them over
+        - node scripts/write-runtime-env.mjs
         - npm run build
   artifacts:
     baseDirectory: .next

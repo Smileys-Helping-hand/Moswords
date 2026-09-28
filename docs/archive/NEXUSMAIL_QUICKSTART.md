@@ -62,7 +62,7 @@ drizzle/
 ### 1. Set Environment Variables
 Copy to `.env.local`:
 ```env
-DATABASE_URL="postgres://user:pass@neon.tech/db"
+DATABASE_URL="postgres://user:<REDACTED>@neon.tech/db"
 AWS_REGION=af-south-1
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret

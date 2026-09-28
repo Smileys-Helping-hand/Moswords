@@ -35,7 +35,7 @@
 ##  **Master Token System**
 
 ```
-Token: a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+Token: <REDACTED — rotate, was committed publicly>
 
 Used by: ALL connected apps
 Location: .env.local in each app
@@ -246,13 +246,13 @@ curl http://localhost:3000/api/second-brain/health
 
 ### 3. Test API Key
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 ```
 
 ### 4. Get Contacts
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   -H "X-App-Name: awechat" \
   http://localhost:3000/api/second-brain/contacts
 ```
@@ -272,7 +272,7 @@ Admin Dashboard → API Keys Tab → Create Key → Select "awechat"
 # awechat .env
 SECOND_BRAIN_API_URL=http://localhost:3000
 SECOND_BRAIN_API_KEY=ek_YOUR_KEY_HERE
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 ```
 
 ### Step 3: Use in Code

@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
   const assigned = searchParams.get('assigned') === 'true';
   const currentUserId = (session.user as any).id;
 
-  const conditions = assigned ? [eq(approvals.assignedToId, currentUserId)] : [];
+  // Non-admins only ever see approvals assigned to them.
+  const { isAdmin, isSuperAdmin } = await import('@/lib/admin');
+  const email = session.user.email ?? undefined;
+  const admin = isSuperAdmin(email) || (await isAdmin(email));
+  const conditions = assigned || !admin ? [eq(approvals.assignedToId, currentUserId)] : [];
   if (status) conditions.push(eq(approvals.status, status));
 
   const items = await db
@@ -43,6 +47,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'title required' }, { status: 400 });
   }
 
+  // The decision webhook is called from our servers: https to a public host only.
+  if (callbackUrl && !isPublicHttpsUrl(callbackUrl)) {
+    return NextResponse.json({ error: 'callbackUrl must be a public https URL' }, { status: 400 });
+  }
+
   const approval = await db
     .insert(approvals)
     .values({
@@ -58,4 +67,22 @@ export async function POST(request: NextRequest) {
     .returning();
 
   return NextResponse.json({ approval: approval[0] }, { status: 201 });
+}
+
+function isPublicHttpsUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') return false;
+    const host = url.hostname;
+    return !(
+      host === 'localhost' ||
+      host.endsWith('.internal') ||
+      /^(10|127|169\.254|192\.168|0)\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      host.startsWith('[')
+    );
+  } catch {
+    return false;
+  }
 }

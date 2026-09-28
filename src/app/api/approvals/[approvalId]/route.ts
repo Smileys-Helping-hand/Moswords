@@ -24,6 +24,22 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
+  // Only the assignee (or an admin) may decide, and only once.
+  const [existing] = await db
+    .select({ assignedToId: approvals.assignedToId, status: approvals.status })
+    .from(approvals)
+    .where(eq(approvals.id, approvalId))
+    .limit(1);
+  if (!existing) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (existing.assignedToId !== currentUserId && !(await isAdminEmail(session.user.email))) {
+    return NextResponse.json({ error: 'Only the assignee can decide this approval' }, { status: 403 });
+  }
+  if (existing.status !== 'pending') {
+    return NextResponse.json({ error: `Already ${existing.status}` }, { status: 409 });
+  }
+
   const [approval] = await db
     .update(approvals)
     .set({
@@ -60,6 +76,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  if (!(await isAdminEmail(session.user.email))) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
   const { approvalId } = await params;
   const [deleted] = await db
     .select()
@@ -72,4 +92,9 @@ export async function DELETE(
 
   await db.delete(approvals).where(eq(approvals.id, approvalId));
   return NextResponse.json({ success: true });
+}
+
+async function isAdminEmail(email?: string | null): Promise<boolean> {
+  const { isAdmin, isSuperAdmin } = await import('@/lib/admin');
+  return isSuperAdmin(email ?? undefined) || (await isAdmin(email ?? undefined));
 }

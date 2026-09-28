@@ -45,7 +45,7 @@ git push origin main
 In Vercel dashboard, go to **Settings** → **Environment Variables** and add:
 
 ```
-DATABASE_URL = postgresql://neondb_owner:npg_ivaebn9r2GVp@ep-purple-wave-abqmp0jf-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL = postgresql://neondb_owner:<REDACTED — rotate, was committed publicly>@ep-purple-wave-abqmp0jf-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require
 
 NEXTAUTH_SECRET = kzDV/lrdTUjaUo5xNmI30slVIsQVepUp4bDw0xBpmQ4=
 
@@ -53,7 +53,7 @@ NEXTAUTH_URL = https://api.awechat.co.za
 
 SECOND_BRAIN_API_URL = https://api.awechat.co.za
 
-SECOND_BRAIN_API_KEY = a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY = <REDACTED — rotate, was committed publicly>
 
 NEXT_PUBLIC_LIVEKIT_URL = wss://moswords-ia9e9eme.livekit.cloud
 
@@ -119,11 +119,11 @@ Once DNS propagates, Vercel will automatically issue an SSL certificate and Mosw
 curl https://api.awechat.co.za/api/second-brain/health
 
 # Verify user (with master token)
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   https://api.awechat.co.za/api/second-brain/auth/me
 
 # Get contacts
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   https://api.awechat.co.za/api/second-brain/contacts
 ```
 
@@ -138,13 +138,13 @@ After deployment, update all apps to use the production URL:
 ### **awechat.co.za** (already deployed)
 ```env
 SECOND_BRAIN_API_URL=https://api.awechat.co.za
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 ```
 
 ### **Nexus** (when deploying)
 ```env
 REACT_APP_SECOND_BRAIN_API_URL=https://api.awechat.co.za
-REACT_APP_SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+REACT_APP_SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 ```
 
 ### **FinancePlay, LifeStack** (when deploying)
@@ -159,7 +159,7 @@ Same format as above.
 - GitHub only needs the app code
 
 ✅ **Master Token Security**
-- Keep `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3` secure
+- Keep `<REDACTED — rotate, was committed publicly>` secure
 - Only share with trusted developers
 - Rotate if compromised
 
@@ -187,7 +187,7 @@ Same format as above.
 - Check DATABASE_URL is correct
 
 ### **Master Token not working?**
-- Make sure `Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3` format
+- Make sure `Authorization: Bearer <REDACTED — rotate, was committed publicly>` format
 - Check SECOND_BRAIN_API_KEY matches in .env.local
 - Test health endpoint first
 
@@ -218,7 +218,7 @@ Your Second Brain ecosystem is now deployed at:
 All connected apps now use:
 ```env
 SECOND_BRAIN_API_URL=https://api.awechat.co.za
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 ```
 
 ---

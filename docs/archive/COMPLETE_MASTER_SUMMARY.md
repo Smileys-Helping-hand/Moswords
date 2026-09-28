@@ -68,7 +68,7 @@ All apps use the same Master Token to:
 ### Master Token
 
 ```
-SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000 (dev)
 SECOND_BRAIN_API_URL=https://your-app.vercel.app (prod)
 ```
@@ -137,7 +137,7 @@ moswords/
 #### 1. Add to `.env`:
 ```env
 REACT_APP_SECOND_BRAIN_API_URL=http://localhost:3000
-REACT_APP_SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+REACT_APP_SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 ```
 
 #### 2. Import Helper:
@@ -192,7 +192,7 @@ curl http://localhost:3000/api/second-brain/health
 
 ### Verify User (With Token)
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 ```
 
@@ -250,7 +250,7 @@ curl -H "Authorization: Bearer invalid-token" \
 ```bash
 npm run dev
 # Server running at http://localhost:3000
-# Master Token: a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+# Master Token: <REDACTED — rotate, was committed publicly>
 ```
 
 ### Production (Vercel)
@@ -259,7 +259,7 @@ npm run dev
 vercel deploy
 
 # 2. Add environment variable in Vercel dashboard
-SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 
 # 3. Update connected apps to use Vercel URL
 SECOND_BRAIN_API_URL=https://your-app.vercel.app
@@ -388,7 +388,7 @@ npm run dev    # Watch console for errors
 ### Test Token Validation
 ```bash
 # Valid token
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 
 # Invalid token

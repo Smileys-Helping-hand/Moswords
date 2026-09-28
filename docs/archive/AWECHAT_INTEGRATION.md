@@ -29,7 +29,7 @@ This guide shows how to integrate **awechat.co.za** (Discord-like messaging app)
 SECOND_BRAIN_API_URL=http://localhost:3000
 SECOND_BRAIN_API_KEY=ek_YOUR_API_KEY_HERE
 SECOND_BRAIN_API_SECRET=YOUR_SECRET_HERE
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 ```
 
 ### Step 3: Import Helper in awechat
@@ -192,11 +192,11 @@ export function AweChat() {
 curl http://localhost:3000/api/second-brain/health
 
 # Verify your API key
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 
 # Get contacts
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   -H "X-App-Name: awechat" \
   http://localhost:3000/api/second-brain/contacts
 ```
@@ -211,7 +211,7 @@ curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
 GET /api/second-brain/auth/me
 
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
 
 Response: {
   uid: "user-123",
@@ -229,7 +229,7 @@ Response: {
 GET /api/second-brain/contacts
 
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
   X-App-Name: awechat
 
 Response: {
@@ -254,7 +254,7 @@ Response: {
 POST /api/second-brain/contacts
 
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
   X-App-Name: awechat
   Content-Type: application/json
 
@@ -385,7 +385,7 @@ createPortal({
 
 ### "Unauthorized" Errors
 - Check `SECOND_BRAIN_MASTER_TOKEN` in `.env`
-- Should be: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+- Should be: `<REDACTED — rotate, was committed publicly>`
 
 ### Contacts Not Syncing
 - Verify `X-App-Name: awechat` header is sent
@@ -429,7 +429,7 @@ vercel deploy --prod
 ```env
 REACT_APP_SECOND_BRAIN_API_URL=https://your-app.vercel.app
 REACT_APP_SECOND_BRAIN_API_KEY=ek_YOUR_PROD_KEY
-REACT_APP_SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+REACT_APP_SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 ```
 
 ### Deploy awechat

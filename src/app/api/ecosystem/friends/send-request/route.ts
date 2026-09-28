@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { friends, users, ecosystemApiKeys } from '@/lib/schema';
-import { eq, or, and } from 'drizzle-orm';
+import { friends, users } from '@/lib/schema';
+import { authenticateApp } from '@/lib/ecosystem-auth';
+import { SITE_URL } from '@/lib/site';
+import { eq, or, and, sql } from 'drizzle-orm';
 import { sendEmail, generateFriendRequestEmailHtml, generateFriendRequestEmailText } from '@/lib/email';
 import crypto from 'crypto';
 
@@ -34,9 +36,9 @@ export async function POST(request: NextRequest) {
     const { apiKey, senderEmail, targetEmail } = body;
 
     // Validate request
-    if (!apiKey || !senderEmail || !targetEmail) {
+    if (!senderEmail || !targetEmail) {
       return NextResponse.json(
-        { error: 'Missing required fields: apiKey, senderEmail, targetEmail' },
+        { error: 'Missing required fields: senderEmail, targetEmail' },
         { status: 400 }
       );
     }
@@ -48,37 +50,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify API key
-    const [apiKeyRecord] = await db
-      .select({
-        id: ecosystemApiKeys.id,
-        appName: ecosystemApiKeys.appName,
-        status: ecosystemApiKeys.status,
-        ownerId: ecosystemApiKeys.ownerId,
-      })
-      .from(ecosystemApiKeys)
-      .where(eq(ecosystemApiKeys.apiKey, apiKey))
-      .limit(1);
-
-    if (!apiKeyRecord) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
-    }
-
-    if (apiKeyRecord.status !== 'active') {
-      return NextResponse.json(
-        { error: `API key is ${apiKeyRecord.status}` },
-        { status: 403 }
-      );
-    }
+    const auth = await authenticateApp(request, 'friends.write', apiKey);
+    if (auth.response) return auth.response;
+    const apiKeyRecord = auth.app;
 
     // Get sender user
     const [senderUser] = await db
-      .select({ id: users.id, email: users.email })
+      .select({ id: users.id, email: users.email, displayName: users.displayName })
       .from(users)
-      .where(eq(users.email, senderEmail.toLowerCase()))
+      .where(sql`lower(${users.email}) = ${String(senderEmail).trim().toLowerCase()}`)
       .limit(1);
 
     if (!senderUser) {
@@ -92,7 +72,7 @@ export async function POST(request: NextRequest) {
     const [targetUser] = await db
       .select({ id: users.id, email: users.email })
       .from(users)
-      .where(eq(users.email, targetEmail.toLowerCase()))
+      .where(sql`lower(${users.email}) = ${String(targetEmail).trim().toLowerCase()}`)
       .limit(1);
 
     if (!targetUser) {
@@ -163,8 +143,9 @@ export async function POST(request: NextRequest) {
           senderEmail: senderUser.email,
           appName: apiKeyRecord.appName,
           friendshipId: friendship.id,
-          acceptLink: `${process.env.NEXTAUTH_URL || 'https://moswords.vercel.app'}/api/friends/${friendship.id}/accept?token=${friendship.id}`,
-          declineLink: `${process.env.NEXTAUTH_URL || 'https://moswords.vercel.app'}/api/friends/${friendship.id}/decline?token=${friendship.id}`,
+          // Requests are answered in the app (signed in), never via a bare link.
+          acceptLink: `${SITE_URL}/people?tab=requests`,
+          declineLink: `${SITE_URL}/people?tab=requests`,
         }),
         textBody: generateFriendRequestEmailText({
           senderName: senderUser.displayName || senderEmail,
@@ -176,11 +157,6 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails - friendship was created
     }
 
-    // Update API key last used timestamp
-    await db
-      .update(ecosystemApiKeys)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(ecosystemApiKeys.id, apiKeyRecord.id));
 
     return NextResponse.json(
       {

@@ -36,6 +36,7 @@ import {
   getDmScopeId,
 } from '@/lib/crypto/e2e-client';
 import { compressImage } from '@/lib/image-compress';
+import { uploadFile } from '@/lib/upload-client';
 import { useCall } from '@/providers/call-provider';
 import { usePresence, useSyncBatches, useTyping } from '@/providers/sync-provider';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -364,24 +365,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         if (file.type.startsWith('image/')) {
           file = await compressImage(file);
         }
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!uploadRes.ok) {
-          throw new Error('Failed to upload file');
-        }
-        const uploadData = await uploadRes.json();
-        mediaUrl = uploadData.url;
-        mediaType = file.type.startsWith('image/')
-          ? 'image'
-          : file.type.startsWith('video/')
-            ? 'video'
-            : file.type.startsWith('audio/')
-              ? 'audio'
-              : 'file';
+        // Direct-to-S3 for photos/videos (up to 50 MB), server upload otherwise.
+        const uploaded = await uploadFile(file);
+        mediaUrl = uploaded.url;
+        mediaType = uploaded.mediaType;
       }
 
       const response = await fetch('/api/direct-messages', {

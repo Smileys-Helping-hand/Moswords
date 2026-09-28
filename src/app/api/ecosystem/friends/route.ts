@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status') || 'accepted';
 
     // Get friends with specified status
-    const friends = await db.query.friends.findMany({
+    const rows = await db.query.friends.findMany({
       where: and(
         eq(friends.userId, userId),
         eq(friends.status, status)
@@ -40,13 +40,13 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      friends: friends.map((f) => ({
+      friends: rows.map((f) => ({
         ...f.friend,
         friendshipId: f.id,
         status: f.status,
         addedAt: f.createdAt,
       })),
-      count: friends.length,
+      count: rows.length,
     });
   } catch (error) {
     console.error('[Friends List] Error:', error);

@@ -1,11 +1,16 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
+// On Amplify, credentials come from the app's IAM compute role via the default
+// provider chain (Amplify forbids AWS_* env vars). Static keys are only used
+// when explicitly provided, e.g. for local development.
+const staticKeyId = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+const staticSecret = process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+
 const sesClient = new SESClient({
-  region: process.env.AWS_REGION || 'af-south-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
+  region: process.env.SES_REGION || process.env.AWS_REGION || 'eu-west-2',
+  ...(staticKeyId && staticSecret
+    ? { credentials: { accessKeyId: staticKeyId, secretAccessKey: staticSecret } }
+    : {}),
 });
 
 export interface EmailOptions {
@@ -19,11 +24,7 @@ export interface EmailOptions {
  * Send email via AWS SES
  */
 export async function sendEmail({ to, subject, htmlBody, textBody }: EmailOptions): Promise<void> {
-  const fromEmail = process.env.AWS_SES_FROM_EMAIL || 'noreply@awechat.co.za';
-
-  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-    throw new Error('AWS credentials not configured');
-  }
+  const fromEmail = process.env.SES_FROM_EMAIL || process.env.AWS_SES_FROM_EMAIL || 'AwehChat <noreply@awehchat.co.za>';
 
   try {
     const command = new SendEmailCommand({

@@ -36,7 +36,7 @@ curl http://localhost:3000/api/second-brain/health
 
 **Verify User** (With master token):
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 ```
 
@@ -117,7 +117,7 @@ curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
 **1. Update `.env`:**
 ```env
 REACT_APP_SECOND_BRAIN_API_URL=http://localhost:3000
-REACT_APP_SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+REACT_APP_SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 ```
 
 **2. Add Auth Helper:**
@@ -209,7 +209,7 @@ adb install -r apk/Moswords.apk
 ## 🔑 Master Token Info
 
 ```
-SECOND_BRAIN_API_KEY = a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY = <REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL = http://localhost:3000  (dev)
                      = https://your-app.vercel.app (prod)
 ```
@@ -234,7 +234,7 @@ curl http://localhost:3000/api/second-brain/health
 ### Test Authentication
 ```bash
 # Should return user data
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 
 # Should return 401
@@ -286,7 +286,7 @@ curl http://localhost:3000/api/second-brain/health
 cat .env.local | grep SECOND_BRAIN
 
 # 3. Verify endpoint format
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 ```
 
@@ -360,7 +360,7 @@ PORT=3001 npm run dev
 ### Step 1: Update Master Token in Vercel
 ```bash
 vercel env add SECOND_BRAIN_API_KEY
-# Paste: a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+# Paste: <REDACTED — rotate, was committed publicly>
 ```
 
 ### Step 2: Deploy
@@ -371,7 +371,7 @@ vercel deploy --prod
 ### Step 3: Update Connected Apps
 ```env
 SECOND_BRAIN_API_URL=https://your-app.vercel.app
-SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 ```
 
 ### Step 4: Redeploy Connected Apps

@@ -207,7 +207,7 @@
 
 ### **For App Developers** (Nexus, awechat, etc.)
 
-1. Use master token: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+1. Use master token: `<REDACTED — rotate, was committed publicly>`
 2. API endpoint: `https://api.awechat.co.za`
 3. View integration guide in Settings tab
 4. Follow curl examples or code snippets
@@ -313,7 +313,7 @@ Both are industry-standard, maintained packages.
 
 **Your Superadmin Account**: mraaziqp@gmail.com  
 **API Subdomain**: https://api.awechat.co.za  
-**Master Token**: a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3  
+**Master Token**: <REDACTED — rotate, was committed publicly>  
 **Admin Dashboard**: https://awechat.co.za/ecosystem  
 **MFA Status**: Ready to setup  
 

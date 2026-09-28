@@ -1,7 +1,7 @@
 # 🧠 Nexus App - Second Brain Integration Guide
 
 **Status**: Ready to integrate with Second Brain ecosystem
-**Master Token**: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+**Master Token**: `<REDACTED — rotate, was committed publicly>`
 
 ---
 
@@ -9,7 +9,7 @@
 
 ### Step 1: Add Master Token to `.env`
 ```env
-REACT_APP_SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+REACT_APP_SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 REACT_APP_SECOND_BRAIN_API_URL=http://localhost:3000
 # Production: REACT_APP_SECOND_BRAIN_API_URL=https://moswords.vercel.app
 ```
@@ -77,7 +77,7 @@ export function NexusApp() {
 
 ### Step 4: Vercel Environment Variables
 ```
-REACT_APP_SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+REACT_APP_SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 REACT_APP_SECOND_BRAIN_API_URL=https://moswords.vercel.app
 ```
 
@@ -99,7 +99,7 @@ Go to: `http://localhost:3000/ecosystem`
 
 ## ✅ THAT'S IT!
 
-Master Token: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+Master Token: `<REDACTED — rotate, was committed publicly>`
 
 Use in all apps (Nexus, awechat, FinancePlay, LifeStack)
 All will share contacts, users, and friends!

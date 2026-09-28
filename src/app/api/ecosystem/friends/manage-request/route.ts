@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { friends, ecosystemApiKeys } from '@/lib/schema';
+import { friends } from '@/lib/schema';
+import { authenticateApp, resolveActingUser } from '@/lib/ecosystem-auth';
 import { eq } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
@@ -13,7 +14,8 @@ export const dynamic = 'force-dynamic';
  *
  * Request Body:
  * {
- *   "apiKey": "nexus_...",
+ *   "apiKey": "nexus_...",          // or Authorization: Bearer <key>
+ *   "userEmail": "user@example.com", // the user acting (must be the recipient)
  *   "friendshipId": "uuid",
  *   "action": "accept" | "reject" | "block"
  * }
@@ -28,12 +30,12 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { apiKey, friendshipId, action } = body;
+    const { apiKey, friendshipId, action, userEmail } = body;
 
     // Validate request
-    if (!apiKey || !friendshipId || !action) {
+    if (!friendshipId || !action) {
       return NextResponse.json(
-        { error: 'Missing required fields: apiKey, friendshipId, action' },
+        { error: 'Missing required fields: friendshipId, action' },
         { status: 400 }
       );
     }
@@ -45,30 +47,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify API key
-    const [apiKeyRecord] = await db
-      .select({
-        id: ecosystemApiKeys.id,
-        appName: ecosystemApiKeys.appName,
-        status: ecosystemApiKeys.status,
-      })
-      .from(ecosystemApiKeys)
-      .where(eq(ecosystemApiKeys.apiKey, apiKey))
-      .limit(1);
-
-    if (!apiKeyRecord) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
-    }
-
-    if (apiKeyRecord.status !== 'active') {
-      return NextResponse.json(
-        { error: `API key is ${apiKeyRecord.status}` },
-        { status: 403 }
-      );
-    }
+    const auth = await authenticateApp(request, 'friends.write', apiKey);
+    if (auth.response) return auth.response;
+    const apiKeyRecord = auth.app;
 
     // Get the friendship request
     const [friendship] = await db
@@ -81,6 +62,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Friendship request not found' },
         { status: 404 }
+      );
+    }
+
+    // The app must say which user is acting, and that user must be party to
+    // the request: only the recipient can accept/reject, either side can block.
+    const acting = await resolveActingUser(request, userEmail);
+    if (acting.response) return acting.response;
+    const isRecipient = friendship.friendId === acting.user.id;
+    const isParty = isRecipient || friendship.userId === acting.user.id;
+    if (!isParty || (action !== 'block' && !isRecipient)) {
+      return NextResponse.json(
+        { error: 'That user cannot perform this action on this friend request' },
+        { status: 403 }
       );
     }
 
@@ -130,11 +124,6 @@ export async function POST(request: NextRequest) {
 
     const [updatedFriendship] = updated;
 
-    // Update API key last used timestamp
-    await db
-      .update(ecosystemApiKeys)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(ecosystemApiKeys.id, apiKeyRecord.id));
 
     return NextResponse.json(
       {

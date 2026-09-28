@@ -3,7 +3,7 @@
 ## Master Token
 
 ```
-Token:  a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+Token:  <REDACTED — rotate, was committed publicly>
 Format: Bearer token (OAuth 2.0)
 Location: .env.local
 Status: ✅ Active
@@ -27,7 +27,7 @@ Response: { status: "ok", service: "second-brain", ... }
 GET http://localhost:3000/api/second-brain/auth/me
 
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
 
 Response:
 {
@@ -47,7 +47,7 @@ Response:
 POST http://localhost:3000/api/second-brain/data/gateway
 
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
   Content-Type: application/json
 
 Body:
@@ -70,7 +70,7 @@ Body:
 curl http://localhost:3000/api/second-brain/health
 
 # Auth (with token)
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 
 # Invalid token (should fail with 401)
@@ -79,7 +79,7 @@ curl -H "Authorization: Bearer wrong-token" \
 
 # Data gateway
 curl -X POST \
-  -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+  -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   -H "Content-Type: application/json" \
   -d '{"action":"list","resource":"profile"}' \
   http://localhost:3000/api/second-brain/data/gateway
@@ -88,7 +88,7 @@ curl -X POST \
 ### Using JavaScript
 
 ```javascript
-const TOKEN = 'a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3';
+const TOKEN = '<REDACTED — rotate, was committed publicly>';
 const BASE_URL = 'http://localhost:3000';
 
 // Health check
@@ -125,7 +125,7 @@ fetch(`${BASE_URL}/api/second-brain/data/gateway`, {
 import requests
 import os
 
-TOKEN = os.getenv('SECOND_BRAIN_API_KEY', 'a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3')
+TOKEN = os.getenv('SECOND_BRAIN_API_KEY', '<REDACTED — rotate, was committed publicly>')
 BASE_URL = 'http://localhost:3000'
 HEADERS = {'Authorization': f'Bearer {TOKEN}'}
 
@@ -205,13 +205,13 @@ Response (401):
 
 ### Development (.env.local)
 ```env
-SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000
 ```
 
 ### Production (Vercel)
 ```env
-SECOND_BRAIN_API_KEY=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_API_KEY=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=https://your-app.vercel.app
 ```
 
@@ -241,7 +241,7 @@ curl http://localhost:3000/api/second-brain/health
 
 ### Get Current User
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 ```
 
@@ -310,6 +310,6 @@ adb logcat | grep -i "moswords\|error"
 
 ---
 
-**Token**: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`  
+**Token**: `<REDACTED — rotate, was committed publicly>`  
 **Server**: `http://localhost:3000` (dev) | `https://your-app.vercel.app` (prod)  
 **Status**: ✅ Ready to Use

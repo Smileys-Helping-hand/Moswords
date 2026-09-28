@@ -28,65 +28,60 @@ export default function IntegrationGuideModal({ open, onOpenChange }: Integratio
   };
 
   const codeExamples = {
-    env: `SECOND_BRAIN_API_URL=https://api.awechat.co.za
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`,
+    env: `AWEHCHAT_API_URL=https://awehchat.co.za
+AWEHCHAT_API_KEY=<key issued on /ecosystem — shown once>`,
 
-    helper: `// src/lib/second-brain.ts
-const API_URL = process.env.SECOND_BRAIN_API_URL;
-const MASTER_TOKEN = process.env.SECOND_BRAIN_MASTER_TOKEN;
+    helper: `// src/lib/awehchat.ts — server-side only; never ship the key to browsers
+const API_URL = process.env.AWEHCHAT_API_URL;
+const API_KEY = process.env.AWEHCHAT_API_KEY;
 
-export async function verifyUser() {
-  const res = await fetch(\`\${API_URL}/api/second-brain/auth/me\`, {
-    headers: { Authorization: \`Bearer \${MASTER_TOKEN}\` },
+async function call(path: string, userEmail: string, init: RequestInit = {}) {
+  const res = await fetch(\`\${API_URL}/api/v1\${path}\`, {
+    ...init,
+    headers: {
+      Authorization: \`Bearer \${API_KEY}\`,
+      'X-User-Email': userEmail,
+      'Content-Type': 'application/json',
+      ...init.headers,
+    },
   });
+  if (!res.ok) throw new Error(\`AwehChat \${res.status}\`);
   return res.json();
 }
 
-export async function getContacts() {
-  const res = await fetch(\`\${API_URL}/api/second-brain/contacts\`, {
-    headers: {
-      Authorization: \`Bearer \${MASTER_TOKEN}\`,
-      'X-App-Name': 'your-app',
-    },
-  });
-  return res.json();
-}`,
+// Full book first, then only changes: keep nextCursor per user.
+export const getContacts = (userEmail: string, cursor?: string) =>
+  call(\`/contacts\${cursor ? \`?cursor=\${cursor}\` : ''}\`, userEmail);
 
-    usage: `import { verifyUser, getContacts } from '@/lib/second-brain';
+export const pushContacts = (userEmail: string, contacts: object[]) =>
+  call('/contacts', userEmail, { method: 'POST', body: JSON.stringify({ contacts }) });`,
 
-export default function App() {
-  useEffect(() => {
-    // Verify user with Second Brain
-    verifyUser().then(user => {
-      console.log('User:', user);
-    });
+    usage: `// e.g. in a server action or API route
+const { contacts, nextCursor } = await getContacts(user.email);
+await saveCursor(user.id, nextCursor);
 
-    // Get shared contacts
-    getContacts().then(data => {
-      console.log('Contacts:', data.contacts);
-    });
-  }, []);
+await pushContacts(user.email, [
+  { externalId: 'crm-42', name: 'Thandi M', email: 'thandi@example.com', phone: '+27 82 555 0101' },
+]);`,
 
-  return <div>Connected to Second Brain!</div>;
-}`,
+    health: `curl https://awehchat.co.za/api/v1/health`,
 
-    health: `curl https://api.awechat.co.za/api/second-brain/health`,
+    auth: `curl -H "Authorization: Bearer $AWEHCHAT_API_KEY" \
+  -H "X-User-Email: someone@example.com" \
+  https://awehchat.co.za/api/v1/connections`,
 
-    auth: `curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \\
-  https://api.awechat.co.za/api/second-brain/auth/me`,
-
-    contacts: `curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \\
-  -H "X-App-Name: your-app" \\
-  https://api.awechat.co.za/api/second-brain/contacts`,
+    contacts: `curl -H "Authorization: Bearer $AWEHCHAT_API_KEY" \
+  -H "X-User-Email: someone@example.com" \
+  "https://awehchat.co.za/api/v1/contacts?include=connections"`,
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>📖 Second Brain Integration Guide</DialogTitle>
+          <DialogTitle>📖 AwehChat Contacts API — integration guide</DialogTitle>
           <DialogDescription>
-            Complete guide to integrating your app with the Second Brain ecosystem
+            Connect an ecosystem app to AwehChat, the shared contact book and messaging hub
           </DialogDescription>
         </DialogHeader>
 
@@ -242,7 +237,7 @@ export default function App() {
             <Card>
               <CardHeader>
                 <CardTitle>/api/second-brain/auth/me</CardTitle>
-                <CardDescription>Verify user identity with master token</CardDescription>
+                <CardDescription>List a user's AwehChat connections</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="bg-muted p-3 rounded font-mono text-xs">
@@ -292,7 +287,7 @@ export default function App() {
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm">❌ 401 Unauthorized</h4>
                   <p className="text-sm text-muted-foreground">
-                    Your master token is missing or invalid. Check that SECOND_BRAIN_MASTER_TOKEN
+                    Your app key is missing, revoked or lacks the needed permission. Check that AWEHCHAT_API_KEY
                     is set correctly in your .env file.
                   </p>
                 </div>
@@ -301,7 +296,7 @@ export default function App() {
                   <h4 className="font-semibold text-sm">❌ Connection Refused</h4>
                   <p className="text-sm text-muted-foreground">
                     The API URL is incorrect or the server is down. Verify that
-                    SECOND_BRAIN_API_URL is set to https://api.awechat.co.za
+                    AWEHCHAT_API_URL is set to https://awehchat.co.za
                   </p>
                 </div>
 

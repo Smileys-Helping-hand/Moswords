@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/session';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -15,6 +16,8 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
@@ -47,6 +50,8 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
@@ -105,6 +110,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {

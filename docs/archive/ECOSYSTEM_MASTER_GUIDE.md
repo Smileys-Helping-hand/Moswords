@@ -38,7 +38,7 @@ All sharing:
     └─────────┴──────────┴─────────┴──────────┘
 
 All apps authenticate with Master Token:
-a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+<REDACTED — rotate, was committed publicly>
 
 All apps share:
 - User profiles
@@ -155,7 +155,7 @@ Response: { status: "ok", service: "second-brain", ... }
 #### Verify User
 ```
 GET /api/second-brain/auth/me
-Headers: Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+Headers: Authorization: Bearer <REDACTED — rotate, was committed publicly>
 Response: { uid, email, displayName, role, authenticated: true }
 ```
 
@@ -163,7 +163,7 @@ Response: { uid, email, displayName, role, authenticated: true }
 ```
 GET /api/second-brain/contacts
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
   X-App-Name: awechat
 Response: { contacts: [...], count: N, userId, appName }
 ```
@@ -172,7 +172,7 @@ Response: { contacts: [...], count: N, userId, appName }
 ```
 POST /api/second-brain/contacts
 Headers:
-  Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+  Authorization: Bearer <REDACTED — rotate, was committed publicly>
   X-App-Name: awechat
 Body: {
   action: "sync",
@@ -262,7 +262,7 @@ GET  /api/ecosystem/apps/status       - Get connected apps status
    ```env
    SECOND_BRAIN_API_URL=http://localhost:3000
    SECOND_BRAIN_API_KEY=ek_YOUR_KEY
-   SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+   SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
    ```
 
 3. **Import Helper**
@@ -336,7 +336,7 @@ moswords/
 ## Master Token
 
 ```
-Token: a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+Token: <REDACTED — rotate, was committed publicly>
 
 Used by: All connected apps
 Format: Bearer token (OAuth 2.0)
@@ -355,7 +355,7 @@ Security:
 
 ### Master Token
 - **Purpose**: Used by ALL apps globally
-- **Value**: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+- **Value**: `<REDACTED — rotate, was committed publicly>`
 - **Scope**: Full ecosystem access
 - **Rotation**: Rarely (affects all apps)
 
@@ -413,13 +413,13 @@ curl http://localhost:3000/api/second-brain/health
 
 ### Verify User
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 ```
 
 ### Get Contacts
 ```bash
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   -H "X-App-Name: awechat" \
   http://localhost:3000/api/second-brain/contacts
 ```
@@ -457,7 +457,7 @@ curl -X POST http://localhost:3000/api/ecosystem/keys \
 
 ### "Unauthorized" on API endpoints
 → Check Master Token in `.env`
-→ Verify header: `Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+→ Verify header: `Authorization: Bearer <REDACTED — rotate, was committed publicly>`
 
 ### Contacts not syncing
 → Ensure `X-App-Name` header sent

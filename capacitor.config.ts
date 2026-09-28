@@ -4,14 +4,14 @@ const MOBILE_SERVER_URL =
   process.env.CAPACITOR_SERVER_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  'https://awechat.co.za';
+  'https://awehchat.co.za';
 
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords',
   // The WebView loads the configured host directly so the APK can share the same
   // authenticated origin as the web app. Set CAPACITOR_SERVER_URL for release builds.
-  webDir: 'public',  // fallback assets (used if server.url is removed for local dev)
+  webDir: 'capacitor-shell',  // fallback assets (used if server.url is removed for local dev)
   server: {
     url: MOBILE_SERVER_URL,
     androidScheme: 'https',
@@ -20,8 +20,8 @@ const config: CapacitorConfig = {
       'localhost',
       '127.0.0.1',
       '10.0.2.2',
-      'awechat.co.za',
-      '*.awechat.co.za',
+      'awehchat.co.za',
+      '*.awehchat.co.za',
       '*.neon.tech',
       '*.r2.dev',
       '*.livekit.cloud',

@@ -10,7 +10,7 @@
 In your hosting platform dashboard, add these environment variables:
 
 ```bash
-DATABASE_URL=postgresql://[user]:[password]@[host]/[database]
+DATABASE_URL=postgresql://[user]:<REDACTED>@[host]/[database]
 NEXTAUTH_SECRET=[run: openssl rand -base64 32]
 NEXTAUTH_URL=https://yourdomain.com
 ```

@@ -8,7 +8,7 @@ You need a small set of deployment variables in Vercel. The app is designed to w
 
 **Required for the web app:**
 ```
-DATABASE_URL=postgres://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=postgres://user:<REDACTED>@ep-xxx.aws.neon.tech/neondb?sslmode=require
 NEXTAUTH_URL=https://yourapp.vercel.app
 NEXTAUTH_SECRET=your_production_secret
 ```

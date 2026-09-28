@@ -16,7 +16,7 @@ cp .env.example .env.local
 ### 2. Configure required variables
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/moswords
+DATABASE_URL=postgresql://user:<REDACTED>@localhost:5432/moswords
 
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000

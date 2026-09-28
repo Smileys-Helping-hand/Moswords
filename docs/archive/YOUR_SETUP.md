@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ MASTER TOKEN: a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3                │
+│ MASTER TOKEN: <REDACTED — rotate, was committed publicly>                │
 │                                                                 │
 │ This is THE token that powers your entire ecosystem.            │
 │ Add to EVERY app's .env file                                   │
@@ -20,19 +20,19 @@
 ### Use in ALL apps:
 ```env
 # Nexus app .env
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000
 
 # awechat .env
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000
 
 # FinancePlay .env
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000
 
 # LifeStack .env
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000
 ```
 
@@ -110,7 +110,7 @@ URL: http://localhost:3000/ecosystem
 
 1. **Add to Nexus .env**
 ```env
-SECOND_BRAIN_MASTER_TOKEN=a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
+SECOND_BRAIN_MASTER_TOKEN=<REDACTED — rotate, was committed publicly>
 SECOND_BRAIN_API_URL=http://localhost:3000
 ```
 
@@ -166,7 +166,7 @@ export default function App() {
 ## 📋 API Key Types
 
 ### Master Token (What you have now)
-- **Token**: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+- **Token**: `<REDACTED — rotate, was committed publicly>`
 - **Used by**: ALL apps
 - **Scope**: Full ecosystem access
 - **Rate limit**: None (admin token)
@@ -188,11 +188,11 @@ export default function App() {
 curl http://localhost:3000/api/second-brain/health
 
 # 2. Verify user (with master token)
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   http://localhost:3000/api/second-brain/auth/me
 
 # 3. Get contacts (with master token)
-curl -H "Authorization: Bearer a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3" \
+curl -H "Authorization: Bearer <REDACTED — rotate, was committed publicly>" \
   -H "X-App-Name: nexus" \
   http://localhost:3000/api/second-brain/contacts
 
@@ -261,7 +261,7 @@ Every time you:
 
 ## 🎯 Quick Checklist
 
-- [ ] Master token: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`
+- [ ] Master token: `<REDACTED — rotate, was committed publicly>`
 - [ ] Add to Nexus `.env`
 - [ ] Start Moswords: `npm run dev`
 - [ ] Visit admin dashboard: `http://localhost:3000/ecosystem`
@@ -309,7 +309,7 @@ All guides available in repo:
 
 **Your Second Brain is ready to power your entire app ecosystem!** 🧠
 
-**Master Token**: `a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3`  
+**Master Token**: `<REDACTED — rotate, was committed publicly>`  
 **Admin Dashboard**: `http://localhost:3000/ecosystem`  
 **Superadmin**: `mraaziqp@gmail.com`  
 **Status**: ✅ Production Ready
