@@ -3,6 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/providers/auth-provider';
 import { UnreadProvider } from '@/providers/unread-provider';
+import { SyncProvider } from '@/providers/sync-provider';
+import { CallProvider } from '@/providers/call-provider';
 import NotificationManager from '@/components/notification-manager';
 import MobileNav from '@/components/mobile-nav';
 import InstallPrompt from '@/components/install-prompt';
@@ -24,8 +26,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Moswords - Professional Team Communication',
-  description: 'Real-time collaboration platform with AI-powered features, messaging, and team workspaces',
+  title: 'Moswords — Messaging for friends, family and teams',
+  description: 'Fast, private messaging, calls and team workspaces. Your contacts, synced across every app you use.',
   manifest: '/manifest.json',
   applicationName: 'Moswords',
   appleWebApp: {
@@ -89,7 +91,9 @@ export default function RootLayout({
         <AntiFlicker />
         <HydrationProvider>
           <AuthProvider>
+            <SyncProvider>
             <UnreadProvider>
+              <CallProvider>
               <ClientMobileWrapper>
               <UpdateChecker />
               <OfflineBanner />
@@ -99,7 +103,9 @@ export default function RootLayout({
               <MobileNav />
               <InstallPrompt />
               </ClientMobileWrapper>
+              </CallProvider>
             </UnreadProvider>
+            </SyncProvider>
           </AuthProvider>
         </HydrationProvider>
         <Toaster />

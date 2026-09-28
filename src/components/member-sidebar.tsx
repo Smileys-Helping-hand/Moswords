@@ -1,6 +1,7 @@
 "use client";
 
 import UserAvatar from './user-avatar';
+import { isOnline } from '@/lib/presence';
 import { Crown, Shield, Star, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Skeleton } from './ui/skeleton';
@@ -35,7 +36,7 @@ function MemberRow({ member }: { member: Member }) {
     offline: 'bg-gray-500',
   };
 
-  const status = member.user.lastSeen === 'online' ? 'online' : 'offline';
+  const status = isOnline(member.user.lastSeen) ? 'online' : 'offline';
   
   const getRoleIcon = () => {
     switch (member.membership.role) {
@@ -133,15 +134,18 @@ export default function MemberSidebar() {
     };
 
     fetchMembers();
-    const interval = setInterval(fetchMembers, 5000);
+    // Membership changes rarely; refresh every minute while the tab is visible.
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchMembers();
+    }, 60000);
     return () => clearInterval(interval);
   }, [activeServerId, toast]);
 
     const admins = members.filter(m => m.membership.role === 'admin' || m.membership.role === 'owner');
     const moderators = members.filter(m => m.membership.role === 'moderator');
     const regularMembers = members.filter(m => m.membership.role === 'member');
-    const onlineMembers = regularMembers.filter(m => m.user.lastSeen === 'online');
-    const offlineMembers = regularMembers.filter(m => m.user.lastSeen !== 'online');
+    const onlineMembers = regularMembers.filter(m => isOnline(m.user.lastSeen));
+    const offlineMembers = regularMembers.filter(m => !isOnline(m.user.lastSeen));
 
   if (loading) {
     return (

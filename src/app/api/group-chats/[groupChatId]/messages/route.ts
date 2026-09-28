@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSafeMediaUrl, MAX_MESSAGE_LENGTH } from '@/lib/validate';
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
@@ -163,6 +165,17 @@ export async function POST(
         { status: 403 }
       );
     }
+
+    if (hasContent && content.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: 'Message is too long' }, { status: 400 });
+    }
+
+    if (mediaUrl && !isSafeMediaUrl(mediaUrl)) {
+      return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 });
+    }
+
+    const limit = await rateLimit(`send:${userId}`, 120, 60);
+    if (!limit.allowed) return tooManyRequests(60);
 
     // Create the message
     const [newMessage] = await db

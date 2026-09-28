@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
+import { isOnline } from '@/lib/presence';
 import { useRouter } from 'next/navigation';
 import { UserPlus, Users, UserCheck, UserX, Clock, Trash2, MessageSquare } from 'lucide-react';
 import { Button } from './ui/button';
@@ -231,7 +232,7 @@ export default function FriendsDialog() {
                         <UserAvatar
                           src={friend.friend?.photoURL || ''}
                           fallback={(friend.friend?.displayName || friend.friend?.email || 'U').substring(0, 2).toUpperCase()}
-                          status={friend.friend?.lastSeen === 'online' ? 'online' : 'offline'}
+                          status={isOnline(friend.friend?.lastSeen) ? 'online' : 'offline'}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">

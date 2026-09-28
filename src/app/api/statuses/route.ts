@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSafeMediaUrl } from '@/lib/validate';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -109,6 +110,10 @@ export async function POST(request: NextRequest) {
 
     if (!mediaUrl && mediaType !== 'text') {
       return NextResponse.json({ error: 'mediaUrl is required for image/video statuses' }, { status: 400 });
+    }
+
+    if (mediaUrl && !isSafeMediaUrl(mediaUrl)) {
+      return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 });
     }
     if (mediaType === 'text' && !caption) {
       return NextResponse.json({ error: 'caption is required for text statuses' }, { status: 400 });

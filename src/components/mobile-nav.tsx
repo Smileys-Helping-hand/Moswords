@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
+import { useSyncState } from '@/providers/sync-provider';
 import { MessageSquare, Menu, Server, User, Settings, LogOut, X, Radio, Sparkles, Zap, Users } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
@@ -32,27 +33,11 @@ export default function MobileNav() {
   }, [pathname]);
 
   // Fetch pending friend requests count
+  // Pending friend-request count arrives with every sync batch — no polling here.
+  const { friendRequests } = useSyncState();
   useEffect(() => {
-    const fetchPendingRequests = async () => {
-      try {
-        const res = await fetch('/api/friends');
-        if (res.ok) {
-          const data = await res.json();
-          const pending = (data.requests || []).filter((r: any) => r.status === 'pending').length;
-          setPendingRequestCount(pending);
-        }
-      } catch (error) {
-        console.error('Error fetching pending requests:', error);
-      }
-    };
-
-    if (session) {
-      fetchPendingRequests();
-      // Poll every 30 seconds
-      const interval = setInterval(fetchPendingRequests, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [session]);
+    setPendingRequestCount(session ? friendRequests : 0);
+  }, [session, friendRequests]);
 
   const handleNavigate = (href: string | null) => {
     // Haptic feedback on tap

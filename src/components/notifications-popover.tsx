@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSyncBatches } from '@/providers/sync-provider';
 import { Bell, X } from 'lucide-react';
 import { Button } from './ui/button';
 import {
@@ -106,17 +107,10 @@ export default function NotificationsPopover() {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Poll for new messages every 10 seconds (reduced for performance)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Only poll if popover is closed to save resources
-      if (!isOpen) {
-        fetchMessages();
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [fetchMessages, isOpen]);
+  // Refresh when the sync loop delivers a DM addressed to us.
+  useSyncBatches((batch) => {
+    if (batch.dms.some((m) => m.senderId !== m.receiverId)) fetchMessages();
+  });
 
   // Fetch when popover opens
   useEffect(() => {

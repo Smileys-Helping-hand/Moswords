@@ -7,33 +7,19 @@ import { useToast } from '@/hooks/use-toast';
 import { soundEngine } from '@/lib/sound-engine';
 import { useUnread } from '@/providers/unread-provider';
 import { notificationService } from '@/lib/notification-service';
-
-interface Message {
-  id: string;
-  content: string;
-  userId: string;
-  channelId?: string;
-  senderId?: string;
-  receiverId?: string;
-  groupChatId?: string;
-  createdAt: string;
-  user?: {
-    displayName: string | null;
-    name: string | null;
-  };
-}
+import { useSyncBatches } from '@/providers/sync-provider';
+import type { SyncChannelMessage, SyncDirectMessage, SyncGroupMessage } from '@/lib/sync/engine';
 
 /**
- * NotificationManager - Global notification listener.
+ * NotificationManager — turns sync batches into unread badges, sounds, toasts
+ * and OS notifications. It does no fetching of its own; the shared sync loop
+ * (SyncProvider) delivers only messages from conversations the user belongs to.
  *
- * Design principles that fix the old "messages sit in the bell unread" bug:
- *  1. All mutable values are accessed via refs so the polling interval is
- *     NEVER recreated on navigation – only on login/logout.
- *  2. lastCheckedRef is advanced only AFTER a successful fetch, never on
- *     pathname changes (which caused a timing gap that silently dropped
- *     messages arriving just before navigation).
- *  3. Single API call per poll (no type param → returns all types).
- *  4. Poll every 3 s instead of 5 s.
+ * - DMs and group messages: badge + sound + toast + OS notification
+ * - Server channel messages: badge only (business channels are busy; like Slack,
+ *   they shouldn't ping you for every message)
+ * - Nothing fires for the conversation currently on screen, for your own
+ *   messages, or for DMs you muted.
  */
 export default function NotificationManager() {
   const { data: session } = useSession();
@@ -41,158 +27,87 @@ export default function NotificationManager() {
   const { toast } = useToast();
   const { addUnread } = useUnread();
 
-  // ── stable refs so callbacks never go stale ──────────────────────────────
-  const currentUserIdRef = useRef<string | null>(null);
-  const pathnameRef      = useRef<string>(pathname || '/');
-  const toastRef         = useRef(toast);
-  const addUnreadRef     = useRef(addUnread);
+  const myId = (session?.user as { id?: string } | undefined)?.id ?? null;
+  const pathnameRef = useRef(pathname || '/');
+  pathnameRef.current = pathname || '/';
 
-  const lastCheckedRef       = useRef<Date>(new Date());
-  const pollingIntervalRef   = useRef<NodeJS.Timeout | null>(null);
-  const notifiedMessagesRef  = useRef<Set<string>>(new Set());
-  const initializedRef       = useRef(false);
+  useEffect(() => {
+    if (myId) notificationService.initialize().catch(() => {});
+  }, [myId]);
 
-  // keep refs in sync with latest render values
-  const currentUserId = session?.user ? (session.user as any).id : null;
-  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
-  useEffect(() => { pathnameRef.current = pathname || '/'; }, [pathname]);
-  useEffect(() => { toastRef.current = toast; }, [toast]);
-  useEffect(() => { addUnreadRef.current = addUnread; }, [addUnread]);
-
-  // ── helpers (stable – no non-ref deps) ───────────────────────────────────
-  function isViewingConversation(channelId?: string, dmUserId?: string, groupChatId?: string): boolean {
+  useSyncBatches((batch) => {
+    if (!myId) return;
     const path = pathnameRef.current;
-    if (channelId)    return path.includes(`/channels/${channelId}`);
-    if (dmUserId)     return path.includes(`/dm/${dmUserId}`) || path.includes(`/conversations/${dmUserId}`);
-    if (groupChatId)  return path.includes(`/group/${groupChatId}`);
-    return false;
-  }
+    const visible = typeof document !== 'undefined' && !document.hidden;
 
-  function fireNotification(message: Message): void {
-    const uid = currentUserIdRef.current;
+    const incomingDms = batch.dms.filter((m) => m.receiverId === myId && m.senderId !== myId);
+    const groupMsgs = batch.groupMessages.filter((m) => m.userId !== myId);
+    const channelMsgs = batch.channelMessages.filter((m) => m.userId !== myId);
 
-    // skip own messages
-    if (message.userId === uid || message.senderId === uid) return;
-    // skip already-notified
-    if (notifiedMessagesRef.current.has(message.id)) return;
-    // skip if user is looking at that conversation right now
-    if (isViewingConversation(message.channelId, message.senderId || message.receiverId, message.groupChatId)) return;
-
-    notifiedMessagesRef.current.add(message.id);
-    if (notifiedMessagesRef.current.size > 200) {
-      const arr = Array.from(notifiedMessagesRef.current);
-      notifiedMessagesRef.current = new Set(arr.slice(-200));
+    for (const m of incomingDms) {
+      const onScreen = visible && path.includes(`/dm/${m.senderId}`);
+      if (onScreen) continue;
+      addUnread('dm', m.senderId, 1);
+      if (isMuted(myId, m.senderId)) continue;
+      alert(senderName(m), preview(m), `/dm/${m.senderId}`, `dm-${m.senderId}`);
     }
 
-    const senderName = message.user?.displayName || message.user?.name || 'Someone';
-
-    let title = `${senderName}`;
-    let notificationType: 'channel' | 'dm' | 'group' = 'dm';
-    let targetId = '';
-    let targetUrl = '/';
-
-    if (message.channelId) {
-      title = `New message in #channel`;
-      notificationType = 'channel';
-      targetId = message.channelId;
-      targetUrl = `/channels/${message.channelId}`;
-    } else if (message.groupChatId) {
-      title = `${senderName} (group)`;
-      notificationType = 'group';
-      targetId = message.groupChatId;
-      targetUrl = `/group/${message.groupChatId}`;
-    } else if (message.senderId) {
-      title = senderName;
-      notificationType = 'dm';
-      targetId = message.senderId;
-      targetUrl = `/dm/${message.senderId}`;
+    for (const m of groupMsgs) {
+      const onScreen = visible && path.includes(`/group/${m.groupChatId}`);
+      if (onScreen) continue;
+      addUnread('group', m.groupChatId, 1);
+      if (isMuted(myId, m.groupChatId)) continue;
+      alert(`${senderName(m)} (group)`, preview(m), `/group/${m.groupChatId}`, `group-${m.groupChatId}`);
     }
 
-    const body = message.content.length > 100
-      ? `${message.content.substring(0, 100)}…`
-      : message.content;
+    for (const m of channelMsgs) {
+      const onScreen = visible && path.includes(`/channels/${m.channelId}`);
+      if (!onScreen) addUnread('channel', m.channelId, 1);
+    }
+  });
 
-    // increment unread badge
-    addUnreadRef.current(notificationType, targetId, 1);
-
-    // play in-app sound
+  function alert(title: string, body: string, url: string, tag: string) {
     soundEngine.play();
-
-    // ── in-app toast popup (8 s, visible even when tab is in foreground) ──
-    toastRef.current({
-      title,
-      description: body,
-      duration: 8000,
-    });
-
-    // ── OS / native notification via notification service ─────────────────
-    // renotify: true ensures a new OS ping even when re-using the same tag
+    if (!document.hidden) {
+      toast({ title, description: body, duration: 6000 });
+    }
     notificationService.showNotification(title, {
       body,
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      tag: `conv-${targetId || message.id}`,  // group by conversation
+      tag, // one notification per conversation, replaced as new messages arrive
       renotify: true,
-      data: { url: targetUrl },
-      vibrate: [200, 100, 200],
+      data: { url },
       requireInteraction: false,
     } as NotificationOptions);
   }
 
-  async function pollMessages(): Promise<void> {
-    if (!currentUserIdRef.current) return;
-
-    try {
-      // Snapshot the timestamp BEFORE making the request so we never
-      // have a gap between fetch-end and the next lastCheckedRef update.
-      const nextChecked = new Date();
-      const since = lastCheckedRef.current.toISOString();
-
-      const response = await fetch(
-        `/api/notifications/messages?since=${encodeURIComponent(since)}`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        (data.messages as Message[] ?? []).forEach(fireNotification);
-        // Only advance the timestamp after a successful fetch
-        lastCheckedRef.current = nextChecked;
-      }
-    } catch {
-      // network error – keep lastCheckedRef where it was so we retry
-    }
-  }
-
-  // ── single stable effect: starts/stops the interval on login/logout ──────
-  useEffect(() => {
-    if (!currentUserId) {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Request OS notification permission once per session
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      notificationService.initialize().catch(() => {});
-    }
-
-    // Initial immediate poll
-    pollMessages();
-
-    // Poll every 3 s
-    pollingIntervalRef.current = setInterval(pollMessages, 3000);
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId]); // INTENTIONALLY only restarts on login/logout
-
   return null;
+}
+
+function isMuted(myId: string, conversationId: string): boolean {
+  try {
+    return localStorage.getItem(`muted_${myId}_${conversationId}`) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function senderName(m: SyncDirectMessage | SyncGroupMessage | SyncChannelMessage): string {
+  return m.sender?.displayName || m.sender?.name || 'Someone';
+}
+
+/** Never put ciphertext or raw media URLs in a notification. */
+function preview(m: SyncDirectMessage | SyncGroupMessage | SyncChannelMessage): string {
+  if (m.isEncrypted || m.contentNonce) return '🔒 New message';
+  switch (m.mediaType) {
+    case 'image': return '📷 Photo';
+    case 'video': return '🎥 Video';
+    case 'audio': return '🎤 Voice message';
+    case 'gif': return '🎞️ GIF';
+    case 'sticker': return '🎨 Sticker';
+    case 'file': return '📎 File';
+  }
+  const text = (m.content || '').trim();
+  return text.length > 100 ? `${text.slice(0, 100)}…` : text || 'New message';
 }

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean, uuid, uniqueIndex, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, boolean, uuid, uniqueIndex, jsonb, primaryKey } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
@@ -17,6 +17,15 @@ export const users = pgTable('users', {
   themePreference: text('theme_preference').default('obsidian'),
   isPro: boolean('is_pro').notNull().default(false),
   lastSeen: timestamp('last_seen').notNull().defaultNow(),
+  // Both columns are created by scripts/migrations.ts; they were missing in prod once.
+  privacySettings: jsonb('privacy_settings').$type<{
+    readReceipts?: boolean;
+    lastSeenVisibility?: 'everyone' | 'contacts' | 'nobody';
+    profilePictureVisibility?: 'everyone' | 'contacts' | 'nobody';
+    aboutVisibility?: 'everyone' | 'contacts' | 'nobody';
+    statusVisibility?: 'everyone' | 'contacts' | 'nobody';
+  }>(),
+  appearance: jsonb('appearance').$type<Record<string, unknown>>(),
 });
 
 // Accounts table for OAuth providers
@@ -121,6 +130,7 @@ export const directMessages = pgTable('direct_messages', {
   mediaNonce: text('media_nonce'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   read: boolean('read').notNull().default(false),
+  readAt: timestamp('read_at'),
   archived: boolean('archived').notNull().default(false),
 });
 
@@ -553,11 +563,16 @@ export const friendshipsRelations = relations(friendships, ({ one }) => ({
 export const contacts = pgTable('contacts', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  email: text('email').notNull(),
+  email: text('email'),
   name: text('name').notNull(),
   phoneNumber: text('phone_number'),
   photoURL: text('photo_url'),
-  source: text('source').notNull(), // 'moswords', 'awechat', 'import', etc.
+  source: text('source').notNull(), // 'moswords', 'awehchat', 'import', or the ecosystem app name
+  // Lower-cased email / digits-only phone, used to de-duplicate across apps.
+  emailNormalized: text('email_normalized'),
+  phoneNormalized: text('phone_normalized'),
+  // Tombstone so ecosystem apps doing delta sync learn about deletions.
+  deletedAt: timestamp('deleted_at'),
   syncedToApps: text('synced_to_apps').array().notNull().default([]), // ['moswords', 'awechat', 'financeplay']
   metadata: jsonb('metadata').$type<{
     label?: string;
@@ -582,6 +597,10 @@ export const ecosystemApiKeys = pgTable('ecosystem_api_keys', {
   id: uuid('id').defaultRandom().primaryKey(),
   appName: text('app_name').notNull(), // 'awechat', 'financeplay', 'lifestack', etc.
   apiKey: text('api_key').notNull().unique(),
+  // SHA-256 of the key. New keys store only the hash (api_key then holds the
+  // hash too), so a database leak no longer leaks working credentials.
+  keyHash: text('key_hash'),
+  keyPrefix: text('key_prefix'),
   apiSecret: text('api_secret').notNull(), // Used for signing requests
   ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('active'), // 'active', 'revoked', 'expired'
@@ -714,3 +733,29 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
 }));
 
+
+// ===== REALTIME SUPPORT =====
+
+/** Who is typing where. Rows older than a few seconds are simply ignored. */
+export const typingStates = pgTable(
+  'typing_states',
+  {
+    scope: text('scope').notNull(), // 'dm' (scopeId = recipient user id) | 'group' | 'channel'
+    scopeId: text('scope_id').notNull(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    userName: text('user_name'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.scope, t.scopeId, t.userId] }) }),
+);
+
+/** "Clear chat" is per user: messages before clearedAt are hidden for that user only. */
+export const conversationClears = pgTable(
+  'conversation_clears',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    otherUserId: uuid('other_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    clearedAt: timestamp('cleared_at').notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.otherUserId] }) }),
+);

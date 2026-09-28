@@ -149,7 +149,7 @@ export default function ChannelSidebar() {
     };
 
     fetchChannels();
-    const interval = setInterval(fetchChannels, 30000);
+    const interval = setInterval(() => { if (!document.hidden) fetchChannels(); }, 120000);
     return () => clearInterval(interval);
   }, [activeServerId, toast]);
 

@@ -193,7 +193,7 @@ export default function StorageSettingsPage() {
         const key = localStorage.key(i);
         if (key && !keysToKeep.includes(key)) {
           // Only remove cache-related keys
-          if (key.startsWith('muted_convos_') || key.startsWith('mw_cache_')) {
+          if (key.startsWith('muted_') || key.startsWith('mw_cache_')) {
             localStorage.removeItem(key);
           }
         }

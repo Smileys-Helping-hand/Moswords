@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { rtcSignals } from '@/lib/schema';
-import { eq, and, gt, desc } from 'drizzle-orm';
+import { eq, and, gt, desc, or } from 'drizzle-orm';
+import { isUuid } from '@/lib/validate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,8 +25,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { toUserId, type, payload, callId } = body;
 
-    if (!toUserId || !type || !payload || !callId) {
+    if (!isUuid(toUserId) || !type || !payload || typeof callId !== 'string' || callId.length > 200) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    // SDP offers are a few KB; anything far larger is abuse of the signalling table.
+    if (serialized.length > 64_000) {
+      return NextResponse.json({ error: 'Signal too large' }, { status: 413 });
     }
 
     // Validate signal type to prevent injection
@@ -38,7 +45,7 @@ export async function POST(req: NextRequest) {
       fromUserId,
       toUserId,
       type,
-      payload: typeof payload === 'string' ? payload : JSON.stringify(payload),
+      payload: serialized,
       callId,
     });
 
@@ -95,12 +102,21 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userId = (session.user as any).id as string;
     const callId = req.nextUrl.searchParams.get('callId');
     if (!callId) {
       return NextResponse.json({ error: 'Missing callId' }, { status: 400 });
     }
 
-    await db.delete(rtcSignals).where(eq(rtcSignals.callId, callId));
+    // Only the two participants may clean up a call's signals.
+    await db
+      .delete(rtcSignals)
+      .where(
+        and(
+          eq(rtcSignals.callId, callId),
+          or(eq(rtcSignals.fromUserId, userId), eq(rtcSignals.toUserId, userId)),
+        ),
+      );
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('RTC signal DELETE error:', error);

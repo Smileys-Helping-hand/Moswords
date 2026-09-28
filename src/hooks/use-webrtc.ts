@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from './use-auth';
+import { boostSync, useSyncBatches } from '@/providers/sync-provider';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -134,7 +135,9 @@ export function useWebRTC({ onStateChange }: UseWebRTCOptions = {}): UseWebRTCRe
   const callIdRef = useRef<string>('');
   const remoteParticipantRef = useRef<CallParticipant | null>(null);
   const callTypeRef = useRef<'voice' | 'video'>('video');
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Signals can arrive both from the in-call poll and from the global sync feed.
+  const processedSignalsRef = useRef<Set<string>>(new Set());
   const polledSinceRef = useRef<Date>(new Date());
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const stateRef = useRef<CallState>('idle');
@@ -149,7 +152,7 @@ export function useWebRTC({ onStateChange }: UseWebRTCOptions = {}): UseWebRTCRe
 
   const teardown = useCallback((newState: CallState = 'ended') => {
     if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
+      clearTimeout(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
     if (pcRef.current) {
@@ -308,21 +311,46 @@ export function useWebRTC({ onStateChange }: UseWebRTCOptions = {}): UseWebRTCRe
     }
   }, [currentUserId, createPeerConnection, flushPendingCandidates, setCallState, teardown]);
 
-  const startPolling = useCallback(() => {
-    polledSinceRef.current = new Date(Date.now() - 2000);
-    pollIntervalRef.current = setInterval(async () => {
-      const signals = await pollSignals(polledSinceRef.current);
-      if (signals.length > 0) {
-        // Advance the window past the newest signal we received
-        const newest = new Date(signals[0].createdAt);
-        polledSinceRef.current = new Date(newest.getTime() + 1);
-        // Process in chronological order
-        for (const sig of [...signals].reverse()) {
-          await handleSignal(sig);
-        }
-      }
-    }, 1500); // poll every 1.5 s — fast enough to feel real-time, light on the DB
+  // Process each signal exactly once, whichever channel delivered it.
+  const handleSignalOnce = useCallback(async (sig: Signal) => {
+    const seen = processedSignalsRef.current;
+    if (seen.has(sig.id)) return;
+    seen.add(sig.id);
+    if (seen.size > 500) processedSignalsRef.current = new Set(Array.from(seen).slice(-250));
+    try {
+      await handleSignal(sig);
+    } catch (error) {
+      console.error('call signal failed', error);
+    }
   }, [handleSignal]);
+
+  // Dedicated fast poll while a call is being set up or is live: 1.5 s during
+  // ringing/ICE exchange, 4 s once connected (only hang-ups arrive then).
+  const startPolling = useCallback(() => {
+    if (pollIntervalRef.current) clearTimeout(pollIntervalRef.current);
+    polledSinceRef.current = new Date(Date.now() - 2000);
+    boostSync(60_000);
+    const loop = async () => {
+      try {
+        const signals = await pollSignals(polledSinceRef.current);
+        if (signals.length > 0) {
+          // Advance the window past the newest signal we received
+          const newest = new Date(signals[0].createdAt);
+          polledSinceRef.current = new Date(newest.getTime() + 1);
+          // Process in chronological order
+          for (const sig of [...signals].reverse()) {
+            await handleSignalOnce(sig);
+          }
+        }
+      } catch { /* network blip — try again next tick */ }
+      if (stateRef.current === 'idle' || stateRef.current === 'ended') {
+        pollIntervalRef.current = null;
+        return;
+      }
+      pollIntervalRef.current = setTimeout(loop, stateRef.current === 'connected' ? 4000 : 1500);
+    };
+    pollIntervalRef.current = setTimeout(loop, 1500);
+  }, [handleSignalOnce]);
 
   // ── Public: startCall (outgoing) ─────────────────────────────────────────
 
@@ -435,26 +463,27 @@ export function useWebRTC({ onStateChange }: UseWebRTCOptions = {}): UseWebRTCRe
 
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (pollIntervalRef.current) clearTimeout(pollIntervalRef.current);
       if (pcRef.current) pcRef.current.close();
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
-  // ── Passive incoming-call listener (always polling when idle) ────────────
-
-  useEffect(() => {
+  // ── Incoming calls arrive through the global sync feed ───────────────────
+  // No separate idle poll: the sync loop already fetches signals addressed to us.
+  useSyncBatches((batch) => {
     if (!currentUserId) return;
-    // Lightweight passive poll: only 1 GET per 3 s while idle
-    const passivePoll = setInterval(async () => {
-      if (stateRef.current !== 'idle') return;
-      const signals = await pollSignals(new Date(Date.now() - 5000));
-      for (const sig of [...signals].reverse()) {
-        if (sig.type === 'call-offer') await handleSignal(sig);
+    for (const sig of batch.signals as Signal[]) {
+      if (sig.type === 'call-offer') {
+        // Ignore offers that went stale while the app was asleep.
+        const age = Date.now() - new Date(sig.createdAt).getTime();
+        if (age > 45_000) continue;
+      } else if (stateRef.current === 'idle') {
+        continue;
       }
-    }, 3000);
-    return () => clearInterval(passivePoll);
-  }, [currentUserId, handleSignal]);
+      void handleSignalOnce(sig);
+    }
+  });
 
   return {
     callState,
