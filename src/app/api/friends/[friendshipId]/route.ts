@@ -50,7 +50,7 @@ export async function PATCH(
 
       await db
         .update(friends)
-        .set({ status: 'accepted' })
+        .set({ status: 'accepted', acceptedAt: new Date() })
         .where(eq(friends.id, friendshipId));
 
       // Create reverse friendship for easier querying
@@ -61,6 +61,7 @@ export async function PATCH(
           userId: friendship.friendId,
           friendId: friendship.userId,
           status: 'accepted',
+          acceptedAt: new Date(),
         })
         // requires a unique constraint on (user_id, friend_id) to be fully effective
         .onConflictDoNothing();

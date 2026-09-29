@@ -101,4 +101,14 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS eco_keys_hash_idx ON ecosystem_api_keys (key_hash)`,
     ],
   },
+  {
+    // Message search (ILIKE '%q%') uses trigram indexes once tables grow.
+    id: '2026-09-29-search-indexes',
+    statements: [
+      `CREATE EXTENSION IF NOT EXISTS pg_trgm`,
+      `CREATE INDEX IF NOT EXISTS dm_content_trgm_idx ON direct_messages USING gin (content gin_trgm_ops) WHERE is_encrypted = false`,
+      `CREATE INDEX IF NOT EXISTS gcm_content_trgm_idx ON group_chat_messages USING gin (content gin_trgm_ops) WHERE is_encrypted = false`,
+      `CREATE INDEX IF NOT EXISTS messages_content_trgm_idx ON messages USING gin (content gin_trgm_ops) WHERE is_encrypted = false`,
+    ],
+  },
 ];

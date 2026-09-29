@@ -1,25 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Source+Code+Pro:wght@400;500;600&display=swap');
 @import './mobile-responsive.css';
 
 /***** ANTI-FLICKER RULES *****/
-/* Prevent flicker during hydration - suppress all animations and transforms */
-html.hydrating,
-html.hydrating * {
-  animation: none !important;
+/* While the first frames paint, pause CSS transitions/animations so nothing
+   animates from its server-rendered state. Visibility, opacity and transforms
+   are left alone: forcing them made hidden UI flash and elements jump when the
+   class was removed. */
+html.hydrating *,
+html.hydrating *::before,
+html.hydrating *::after {
   transition: none !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: none !important;
-}
-
-/* Prevent layout shift during hydration */
-html.hydrating body {
-  display: block !important;
-}
-
-/* Enable animations after hydration complete */
-html.hydrated {
-  /* Animations re-enabled */
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
 }
 
 /***** THEME VARIABLES *****/
@@ -515,11 +506,11 @@ html, body {
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   code {
-    font-family: 'Source Code Pro', monospace;
+    font-family: var(--font-code), 'Source Code Pro', monospace;
   }
 }
 

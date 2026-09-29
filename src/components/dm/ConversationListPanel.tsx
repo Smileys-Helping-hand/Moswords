@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { isOnline } from '@/lib/presence';
 import { useAuth } from '@/hooks/use-auth';
 import { useSyncBatches } from '@/providers/sync-provider';
+import { openMessageSearch } from '@/components/message-search';
 import { useRouter, usePathname } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -332,10 +333,19 @@ export default function ConversationListPanel({ compact = false }: ConversationL
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
+            placeholder="Search chats"
             className="pl-9 h-9 bg-muted/60 border-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-full text-sm"
           />
         </div>
+        {search.trim().length >= 2 && (
+          <button
+            type="button"
+            onClick={() => openMessageSearch(search.trim())}
+            className="mt-1.5 w-full text-left text-xs text-primary hover:underline px-3"
+          >
+            Search messages for &ldquo;{search.trim()}&rdquo;
+          </button>
+        )}
       </div>
 
       <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">

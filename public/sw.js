@@ -1,4 +1,4 @@
-// Service Worker for Moswords PWA — v3
+// Service Worker for Moswords PWA — v4 (API traffic is never cached)
 // Strategy: WhatsApp-style local-first caching with aggressive version checking
 // Server version is read from /version.json on each deployment
 let APP_VERSION = 'unknown';
@@ -87,6 +87,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Skip chrome-extension and other non-http(s) requests
+  // Only same-origin GETs are handled; uploads (PUT/POST) and third-party
+  // requests go straight to the network.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   if (!event.request.url.startsWith('http')) {
     return;
   }
@@ -156,51 +162,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ── Auth API: ALWAYS network-only, NEVER cache ────────────────────────────
-  // Caching auth endpoints causes stale CSRF tokens → server errors on login
-  if (url.pathname.startsWith('/api/auth/')) {
-    event.respondWith(fetch(request));
-    return;
-  }
-
-  // ── Conversation API: stale-while-revalidate ──────────────────────────────
-  // Return cached response instantly, then update cache in background.
-  // This makes chat open INSTANTLY even on slow connections.
-  if (url.pathname.startsWith('/api/conversations/')) {
-    event.respondWith(
-      caches.open(RUNTIME_CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
-        const networkFetch = fetch(request).then((response) => {
-          if (response.status === 200) {
-            cache.put(request, response.clone());
-          }
-          return response;
-        }).catch(() => null);
-
-        // Return cache immediately if available, otherwise wait for network
-        return cached || networkFetch;
-      })
-    );
-    return;
-  }
-
-  // ── Other API requests: network-first, fallback to cache ─────────────────
+  // ── API: never touched by the service worker ─────────────────────────────
+  // API responses are private and per-user. Caching them here (keyed only by
+  // URL) could show one user's chats to the next person on a shared device.
+  // The app keeps its own per-user cache in IndexedDB instead.
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const responseClone = response.clone();
-          if (response.status === 200) {
-            caches.open(RUNTIME_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request);
-        })
-    );
     return;
   }
 

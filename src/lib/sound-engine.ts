@@ -12,7 +12,7 @@ class SoundEngine {
   private constructor() {
     // Singleton pattern
     if (typeof window !== 'undefined') {
-      this.audio = new Audio('/sounds/notification.mp3');
+      this.audio = new Audio('/sounds/message-pop.mp3');
       this.audio.volume = this.volume;
       
       // Preload the audio
