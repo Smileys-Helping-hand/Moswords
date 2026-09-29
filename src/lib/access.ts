@@ -37,3 +37,25 @@ export async function isGroupMember(groupChatId: string, userId: string): Promis
     .limit(1);
   return !!row;
 }
+
+/** The user's role in a server ('owner' | 'admin' | 'moderator' | 'member'), or null if not a member. */
+export async function serverRole(serverId: string, userId: string): Promise<string | null> {
+  if (!isUuid(serverId)) return null;
+  const [row] = await db
+    .select({ role: serverMembers.role })
+    .from(serverMembers)
+    .where(and(eq(serverMembers.serverId, serverId), eq(serverMembers.userId, userId)))
+    .limit(1);
+  return row?.role ?? null;
+}
+
+/**
+ * LiveKit rooms are named after the conversation they belong to:
+ * `group-<groupChatId>` or `channel-<channelId>`. Only members may join.
+ */
+export async function canJoinCallRoom(room: string, userId: string): Promise<boolean> {
+  const match = /^(group|channel)-([0-9a-f-]{36})$/i.exec(room);
+  if (!match) return false;
+  const [, kind, id] = match;
+  return kind === 'group' ? isGroupMember(id, userId) : !!(await channelAccess(id, userId));
+}

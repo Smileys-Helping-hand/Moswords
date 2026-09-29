@@ -1,19 +1,13 @@
 'use client';
 
 import React, { useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Transition } from 'framer-motion';
 import ChatMessage from './chat-message';
+import type { OptimisticMessage } from '@/hooks/use-chat';
 import { messageAnimations } from '@/lib/animations';
 
-interface Message {
-  id: string;
-  content: string;
-  author: any;
-  timestamp: string;
-  status?: string;
-  tempId?: string;
-  [key: string]: any;
-}
+// Same shape the chat hook produces and ChatMessage renders.
+type Message = OptimisticMessage;
 
 interface VirtualizedChatListProps {
   messages: Message[];
@@ -74,9 +68,9 @@ export function VirtualizedChatList({
                 animate={messageAnimations.animate}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{
-                  ...messageAnimations.transition,
+                  ...(messageAnimations.transition as Record<string, unknown>),
                   delay: Math.min(index * 0.02, 0.1), // Stagger effect (max 100ms)
-                }}
+                } as Transition}
                 layout
               >
                 <ChatMessage

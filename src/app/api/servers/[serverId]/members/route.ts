@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { serverRole } from '@/lib/access';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,9 @@ export async function GET(
     }
 
     const { serverId } = await context.params;
+    if (!(await serverRole(serverId, (session.user as any).id))) {
+      return NextResponse.json({ error: 'Not a member of this server' }, { status: 403 });
+    }
 
     const members = await db
       .select({

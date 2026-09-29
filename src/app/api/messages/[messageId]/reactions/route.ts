@@ -4,10 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { channelAccess } from '@/lib/access';
+import { isUuid } from '@/lib/validate';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { messageReactions } from '@/lib/schema';
+import { messages, messageReactions } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
@@ -28,6 +30,9 @@ export async function GET(
     }
 
     const { messageId } = await params;
+    if (!(await canSeeMessage(messageId, (session.user as any).id))) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
 
     const reactions = await db
       .select()
@@ -82,9 +87,12 @@ export async function POST(
     }
 
     const { messageId } = await params;
+    if (!(await canSeeMessage(messageId, (session.user as any).id))) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
     const { emoji } = await request.json();
 
-    if (!emoji || typeof emoji !== 'string') {
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 16) {
       return NextResponse.json({ error: 'Invalid emoji' }, { status: 400 });
     }
 
@@ -137,4 +145,15 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+/** Reactions belong to channel messages; only members of that server may see or add them. */
+async function canSeeMessage(messageId: string, userId: string): Promise<boolean> {
+  if (!isUuid(messageId)) return false;
+  const [msg] = await db
+    .select({ channelId: messages.channelId })
+    .from(messages)
+    .where(eq(messages.id, messageId))
+    .limit(1);
+  return !!msg && !!(await channelAccess(msg.channelId, userId));
 }

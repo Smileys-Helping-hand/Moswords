@@ -241,13 +241,13 @@ export function useContactAutoDetection() {
 
     window.addEventListener(
       'friend-added',
-      handleFriendAdded as EventListener
+      handleFriendAdded as unknown as EventListener
     );
 
     return () => {
       window.removeEventListener(
         'friend-added',
-        handleFriendAdded as EventListener
+        handleFriendAdded as unknown as EventListener
       );
     };
   }, []);

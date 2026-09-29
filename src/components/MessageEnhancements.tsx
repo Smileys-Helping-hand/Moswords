@@ -139,12 +139,12 @@ export const MessageBubbleAnimation = memo(function MessageBubbleAnimation({
     pop: {
       initial: { opacity: 0, scale: 0.8 },
       animate: { opacity: 1, scale: 1 },
-      transition: { duration: 0.3, type: 'spring', stiffness: 300 },
+      transition: { duration: 0.3, type: 'spring' as const, stiffness: 300 },
     },
     bounce: {
       initial: { opacity: 0, y: 20 },
       animate: { opacity: 1, y: 0 },
-      transition: { duration: 0.4, type: 'spring', bounce: 0.5 },
+      transition: { duration: 0.4, type: 'spring' as const, bounce: 0.5 },
     },
   };
 

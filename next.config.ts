@@ -9,8 +9,9 @@ const nextConfig: NextConfig = {
   // Set NEXT_MOBILE=true to produce a static export for bundling in the APK.
   // NOTE: static export requires removing force-dynamic from all API routes first.
   // ...(isMobileBuild ? { output: 'export' } : {}),
+  // Type errors fail the build (the codebase typechecks clean as of 2026-09-29).
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   // Allow dev server access from mobile devices on local network
   allowedDevOrigins: ['192.168.31.217', '192.168.31.217:3000'],

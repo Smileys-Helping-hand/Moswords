@@ -3,6 +3,7 @@
 import { AccessToken } from "livekit-server-sdk";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { canJoinCallRoom } from "@/lib/access";
 
 /**
  * Generate a LiveKit access token for a user to join a room
@@ -16,6 +17,11 @@ export async function getToken(roomName: string, username?: string) {
 
     if (!session?.user) {
       throw new Error("Unauthorized");
+    }
+
+    const userId = (session.user as { id?: string }).id;
+    if (!userId || !(await canJoinCallRoom(roomName, userId))) {
+      throw new Error("You are not a member of this call");
     }
 
     const apiKey = process.env.LIVEKIT_API_KEY;

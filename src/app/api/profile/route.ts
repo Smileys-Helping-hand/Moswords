@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSafeMediaUrl } from '@/lib/validate';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,21 @@ export async function PATCH(request: NextRequest) {
       newPassword,
     } = body;
 
+    // URLs end up in <img src>/<a href>: http(s) only. Text fields are length-capped.
+    for (const [field, value] of Object.entries({ photoURL, banner, website })) {
+      if (value && !isSafeMediaUrl(value)) {
+        return NextResponse.json({ error: `Invalid ${field}` }, { status: 400 });
+      }
+    }
+    const tooLong = (v: unknown, max: number) => typeof v === 'string' && v.length > max;
+    if (tooLong(displayName, 60) || tooLong(customStatus, 140) || tooLong(bio, 1000) ||
+        tooLong(location, 100) || tooLong(pronouns, 40)) {
+      return NextResponse.json({ error: 'One of the fields is too long' }, { status: 400 });
+    }
+    if (newPassword && (typeof newPassword !== 'string' || newPassword.length < 8)) {
+      return NextResponse.json({ error: 'New password must be at least 8 characters' }, { status: 400 });
+    }
+
     // Update users table
     const userUpdates: any = {};
     if (displayName !== undefined) userUpdates.displayName = displayName;
@@ -116,7 +132,7 @@ export async function PATCH(request: NextRequest) {
         );
       }
 
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
       userUpdates.password = hashedPassword;
     }
 

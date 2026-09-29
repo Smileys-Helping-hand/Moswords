@@ -33,7 +33,7 @@ export function getMobileOS(): 'iOS' | 'Android' | 'Web' {
  * - Handles soft keyboard
  */
 export function optimizeMobileInput(): void {
-  const inputs = document.querySelectorAll('input, textarea');
+  const inputs = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea');
   inputs.forEach((input) => {
     // Prevent zoom on iOS
     input.style.fontSize = '16px';

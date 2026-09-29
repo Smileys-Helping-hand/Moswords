@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { createElement, useCallback, useRef, useState, useEffect } from 'react';
+import { ToastAction, type ToastActionElement } from '@/components/ui/toast';
 import { useToast } from './use-toast';
 
 /**
@@ -78,19 +79,23 @@ export function useOptimizedMessaging() {
         toast({
           title: 'Message failed',
           description: 'Tap to retry',
-          action: {
-            label: 'Retry',
-            onClick: () => {
-              // Retry the message
-              sendMessageOptimistically(
-                receiverId,
-                content,
-                onOptimisticAdd,
-                onConfirm,
-                onError
-              );
+          action: createElement(
+            ToastAction,
+            {
+              altText: 'Retry',
+              onClick: () => {
+                // Retry the message
+                sendMessageOptimistically(
+                  receiverId,
+                  content,
+                  onOptimisticAdd,
+                  onConfirm,
+                  onError
+                );
+              },
             },
-          },
+            'Retry',
+          ) as unknown as ToastActionElement,
         });
       }
     },

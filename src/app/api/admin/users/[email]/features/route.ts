@@ -10,8 +10,9 @@ import { validateFeatures } from '@/lib/features';
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { email: string } }
+  { params: paramsPromise }: { params: Promise<{ email: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     const session = await getServerSession(authOptions);
     const userEmail = session?.user?.email;
@@ -98,8 +99,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { email: string } }
+  { params: paramsPromise }: { params: Promise<{ email: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     const session = await getServerSession(authOptions);
     const userEmail = session?.user?.email;

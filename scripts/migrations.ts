@@ -42,6 +42,7 @@ export const migrations: Migration[] = [
         PRIMARY KEY (user_id, other_user_id)
       )`,
       `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS read_at timestamp`,
+      `ALTER TABLE friends ADD COLUMN IF NOT EXISTS accepted_at timestamp`,
     ],
   },
   {

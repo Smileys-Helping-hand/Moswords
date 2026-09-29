@@ -17,12 +17,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [friendRequests, setFriendRequests] = useState(0);
 
   useEffect(() => {
-    if (!userId || !syncEngine) return;
-    const unsubscribe = syncEngine.subscribe((batch) => setFriendRequests(batch.friendRequests));
-    syncEngine.start();
+    const engine = syncEngine;
+    if (!userId || !engine) return;
+    const unsubscribe = engine.subscribe((batch) => setFriendRequests(batch.friendRequests));
+    engine.start();
     return () => {
       unsubscribe();
-      syncEngine.stop();
+      engine.stop();
     };
   }, [userId]);
 

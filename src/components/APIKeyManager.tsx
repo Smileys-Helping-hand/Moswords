@@ -38,7 +38,7 @@ const APIKeyManager = memo(function APIKeyManager() {
       const response = await fetch('/api/keys/api-keys');
       if (!response.ok) throw new Error('Failed to load API keys');
       const data = await response.json();
-      setAPIKeys(data.keys || []);
+      setApiKeys(data.keys || []);
     } catch (error) {
       console.error('Error loading API keys:', error);
       toast({
@@ -101,7 +101,7 @@ const APIKeyManager = memo(function APIKeyManager() {
 
         if (!response.ok) throw new Error('Failed to delete API key');
 
-        setAPIKeys((prev) => prev.filter((k) => k.id !== keyId));
+        setApiKeys((prev) => prev.filter((k) => k.id !== keyId));
 
         toast({
           title: 'API Key Deleted',
@@ -301,7 +301,7 @@ const APIKeyManager = memo(function APIKeyManager() {
                   <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                     <span>Created: {new Date(apiKey.createdAt).toLocaleDateString()}</span>
                     {apiKey.lastUsed && (
-                      <span>Last used: {new Date(apiKey.lastUsed).toRelativeTime?.() || 'Never'}</span>
+                      <span>Last used: {new Date(apiKey.lastUsed).toLocaleString()}</span>
                     )}
                     <span className={`flex items-center gap-1 ${apiKey.isActive ? 'text-green-400' : 'text-red-400'}`}>
                       {apiKey.isActive ? (

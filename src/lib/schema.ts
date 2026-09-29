@@ -143,6 +143,7 @@ export const friends = pgTable(
     friendId: uuid('friend_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'blocked'
     createdAt: timestamp('created_at').notNull().defaultNow(),
+    acceptedAt: timestamp('accepted_at'),
   },
   (t) => ({
     userFriendUnique: uniqueIndex('friends_user_friend_unique').on(t.userId, t.friendId),
