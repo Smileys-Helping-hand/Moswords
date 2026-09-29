@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { isOnline } from '@/lib/presence';
 import { useAuth } from '@/hooks/use-auth';
+import { useSyncBatches } from '@/providers/sync-provider';
+import { openMessageSearch } from '@/components/message-search';
 import { useRouter, usePathname } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -133,21 +136,44 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   const [showQRSheet, setShowQRSheet] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
 
-  // Mute state stored in localStorage
+  // Mute state lives in localStorage as `muted_<me>_<conversationId>` — the same
+  // key the chat screen and NotificationManager use, so muting anywhere applies everywhere.
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!currentUserId) return;
     try {
-      const raw = localStorage.getItem(`muted_convos_${currentUserId}`);
-      if (raw) setMutedIds(new Set(JSON.parse(raw)));
+      const ids = new Set<string>();
+      const prefix = `muted_${currentUserId}_`;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(prefix) && localStorage.getItem(key) === '1') ids.add(key.slice(prefix.length));
+      }
+      // One-time migration from the old list-only format.
+      const legacy = localStorage.getItem(`muted_convos_${currentUserId}`);
+      if (legacy) {
+        for (const id of JSON.parse(legacy) as string[]) {
+          ids.add(id);
+          localStorage.setItem(`${prefix}${id}`, '1');
+        }
+        localStorage.removeItem(`muted_convos_${currentUserId}`);
+      }
+      setMutedIds(ids);
     } catch {}
   }, [currentUserId]);
 
   const toggleMute = (otherUserId: string) => {
     setMutedIds(prev => {
       const next = new Set(prev);
-      if (next.has(otherUserId)) next.delete(otherUserId); else next.add(otherUserId);
-      try { localStorage.setItem(`muted_convos_${currentUserId}`, JSON.stringify([...next])); } catch {}
+      const key = `muted_${currentUserId}_${otherUserId}`;
+      try {
+        if (next.has(otherUserId)) {
+          next.delete(otherUserId);
+          localStorage.removeItem(key);
+        } else {
+          next.add(otherUserId);
+          localStorage.setItem(key, '1');
+        }
+      } catch {}
       return next;
     });
   };
@@ -203,20 +229,24 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     }
     if (status === 'authenticated') {
       load(true);
-      const getDelay = () => (document.hidden ? 15000 : 5000);
-      let interval = setInterval(() => load(false), getDelay());
       const onVisibility = () => {
-        clearInterval(interval);
         if (!document.hidden) load(false);
-        interval = setInterval(() => load(false), getDelay());
       };
       document.addEventListener('visibilitychange', onVisibility);
-      return () => {
-        clearInterval(interval);
-        document.removeEventListener('visibilitychange', onVisibility);
-      };
+      return () => document.removeEventListener('visibilitychange', onVisibility);
     }
   }, [status, router, load]);
+
+  // Refresh only when the sync loop reports activity that changes this list,
+  // debounced so a burst of messages costs one reload.
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current); }, []);
+  useSyncBatches((batch) => {
+    const changed = batch.reset || batch.dms.length > 0 || batch.groupMessages.length > 0 || batch.reads.length > 0;
+    if (!changed) return;
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => load(false), 800);
+  });
 
   const filteredConversations = conversations.filter((c) => {
     if (!search) return true;
@@ -303,10 +333,19 @@ export default function ConversationListPanel({ compact = false }: ConversationL
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
+            placeholder="Search chats"
             className="pl-9 h-9 bg-muted/60 border-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-full text-sm"
           />
         </div>
+        {search.trim().length >= 2 && (
+          <button
+            type="button"
+            onClick={() => openMessageSearch(search.trim())}
+            className="mt-1.5 w-full text-left text-xs text-primary hover:underline px-3"
+          >
+            Search messages for &ldquo;{search.trim()}&rdquo;
+          </button>
+        )}
       </div>
 
       <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -383,7 +422,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                             )
                               .substring(0, 2)
                               .toUpperCase()}
-                            status={c.otherUser?.lastSeen === 'online' ? 'online' : 'offline'}
+                            status={isOnline(c.otherUser?.lastSeen) ? 'online' : 'offline'}
                           />
                           {isMuted && (
                             <BellOff className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-muted-foreground bg-background rounded-full p-px" />

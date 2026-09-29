@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ai } from '@/ai/genkit';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,15 +13,21 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
+  const limit = await rateLimit(`ai:${(session.user as { id?: string }).id}`, 30, 60);
+  if (!limit.allowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), { status: 429 });
+  }
+
   const { messages, systemPrompt } = await request.json();
-  if (!messages || !Array.isArray(messages)) {
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return new Response(JSON.stringify({ error: 'messages array required' }), { status: 400 });
   }
 
   // Build conversation history for Genkit
-  const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
-    role: m.role as 'user' | 'model',
-    content: [{ text: m.content }],
+  // Last 20 turns only: keeps token cost bounded on long chats.
+  const history = messages.slice(-21, -1).map((m: { role: string; content: string }) => ({
+    role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
+    content: [{ text: String(m.content ?? '').slice(0, 8000) }],
   }));
   const lastMessage = messages[messages.length - 1];
 
@@ -31,8 +38,10 @@ export async function POST(request: NextRequest) {
         const { stream: genStream } = ai.generateStream({
           model: 'googleai/gemini-2.5-flash',
           system: systemPrompt || `You are Moswords AI — a smart, helpful assistant built into the Moswords team communication platform. You help users with tasks, answer questions, draft messages, summarize content, and assist with workflow approvals. Be concise and helpful.`,
-          history,
-          prompt: lastMessage.content,
+          // Genkit's option is `messages`; the old `history` key was silently ignored,
+          // so the assistant never saw earlier turns.
+          messages: history,
+          prompt: String(lastMessage.content ?? '').slice(0, 8000),
         });
 
         for await (const chunk of genStream) {

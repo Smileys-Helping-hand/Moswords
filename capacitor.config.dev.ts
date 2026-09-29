@@ -4,7 +4,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.moswords.app',
   appName: 'Moswords Dev',
-  webDir: 'public', // Use public folder with capacitor-index.html
+  webDir: 'capacitor-shell', // Use public folder with capacitor-index.html
   server: {
     url: 'http://10.0.2.2:3000', // Android emulator localhost
     // For real device, use: 'http://YOUR_LOCAL_IP:3000'

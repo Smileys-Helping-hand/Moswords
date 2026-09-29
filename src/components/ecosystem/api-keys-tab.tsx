@@ -12,12 +12,21 @@ import { useToast } from '@/hooks/use-toast';
 interface ApiKey {
   id: string;
   appName: string;
-  apiKey: string;
+  keyPrefix?: string | null;
+  permissions?: string[];
   status: string;
   createdAt: string;
   lastUsedAt?: string;
   totalRequests: number;
 }
+
+const SCOPES = [
+  { id: 'contacts.read', help: "Read a user's synced contacts and AwehChat connections" },
+  { id: 'contacts.write', help: 'Add, update and delete contacts on behalf of a user' },
+  { id: 'friends.read', help: "List a user's friends and pending requests" },
+  { id: 'friends.write', help: 'Send and answer friend requests on behalf of a user' },
+  { id: 'profile.read', help: 'Look up whether an email has an AwehChat account' },
+];
 
 export default function ApiKeysTab() {
   const { toast } = useToast();
@@ -26,6 +35,8 @@ export default function ApiKeysTab() {
   const [isCreating, setIsCreating] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
+  const [scopes, setScopes] = useState<string[]>(['contacts.read', 'profile.read']);
+  const [revealed, setRevealed] = useState<{ appName: string; apiKey: string } | null>(null);
 
   useEffect(() => {
     fetchKeys();
@@ -57,33 +68,17 @@ export default function ApiKeysTab() {
       const res = await fetch('/api/ecosystem/keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appName: newKeyName }),
+        body: JSON.stringify({ appName: newKeyName.trim(), permissions: scopes }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create API key');
 
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(`API key created for ${newKeyName}`);
-
-        // Show the key details in a dialog
-        alert(`
-API Key Created!
-
-App: ${newKeyName}
-Key: ${data.apiKey}
-Secret: ${data.apiSecret}
-
-⚠️ IMPORTANT: Save these credentials securely. You won't see them again!
-
-Add to your app's .env:
-API_KEY=${data.apiKey}
-API_SECRET=${data.apiSecret}
-        `);
-
-        setNewKeyName('');
-        fetchKeys();
-      }
+      // Shown once, in the page — the server only keeps a hash.
+      setRevealed({ appName: newKeyName.trim(), apiKey: data.apiKey });
+      setNewKeyName('');
+      fetchKeys();
     } catch (error) {
-      toast.error('Failed to create API key');
+      toast.error((error as Error).message || 'Failed to create API key');
     } finally {
       setIsCreating(false);
     }
@@ -124,13 +119,13 @@ API_SECRET=${data.apiSecret}
         <CardHeader>
           <CardTitle>🔑 Create New API Key</CardTitle>
           <CardDescription>
-            Generate a new API key for an app to authenticate with Second Brain
+            Issue a key for an ecosystem app. Pick only the permissions it needs.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
             <Input
-              placeholder="App name (e.g., awechat, financeplay)"
+              placeholder="App name (e.g., nexus, financeplay)"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && createKey()}
@@ -140,6 +135,39 @@ API_SECRET=${data.apiSecret}
               {isCreating ? 'Creating...' : 'Create Key'}
             </Button>
           </div>
+          <div className="mt-3 flex flex-wrap gap-3 text-sm">
+            {SCOPES.map((scope) => (
+              <label key={scope.id} className="flex items-center gap-1.5 cursor-pointer" title={scope.help}>
+                <input
+                  type="checkbox"
+                  checked={scopes.includes(scope.id)}
+                  onChange={(e) =>
+                    setScopes((prev) =>
+                      e.target.checked ? [...prev, scope.id] : prev.filter((s) => s !== scope.id),
+                    )
+                  }
+                />
+                <span className="font-mono text-xs">{scope.id}</span>
+              </label>
+            ))}
+          </div>
+          {revealed && (
+            <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+              <p className="text-sm font-medium">
+                Key for {revealed.appName} — copy it now. It is stored hashed and can&apos;t be shown again.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 break-all rounded bg-muted px-2 py-1 text-xs">{revealed.apiKey}</code>
+                <Button size="sm" variant="outline" onClick={() => copyToClipboard(revealed.apiKey)}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Send it as <code>Authorization: Bearer &lt;key&gt;</code>. See /api/v1 docs in ECOSYSTEM_API.md.
+              </p>
+              <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>I&apos;ve saved it</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -166,15 +194,12 @@ API_SECRET=${data.apiSecret}
                         <h3 className="font-semibold text-lg mb-1">{key.appName}</h3>
                         <div className="space-y-2 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono bg-muted px-2 py-1 rounded">
-                              {key.apiKey.substring(0, 12)}...
+                            <span className="font-mono bg-muted px-2 py-1 rounded" title="Keys are stored hashed; the full key was shown once at creation">
+                              {key.keyPrefix ?? 'legacy key'}…
                             </span>
-                            <button
-                              onClick={() => copyToClipboard(key.apiKey)}
-                              className="p-1 hover:bg-muted rounded"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </button>
+                            {key.permissions && key.permissions.length > 0 && (
+                              <span className="text-xs">{key.permissions.join(' · ')}</span>
+                            )}
                           </div>
                           <div className="flex gap-4">
                             <span>Status: <span className="text-green-500">{key.status}</span></span>

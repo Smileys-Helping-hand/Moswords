@@ -4,7 +4,11 @@ import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
 import { messages, users } from '@/lib/schema';
-import { eq, desc } from 'drizzle-orm';
+import { and, eq, desc, lt } from 'drizzle-orm';
+import { channelAccess } from '@/lib/access';
+import { moderateText } from '@/lib/moderation';
+import { isSafeMediaUrl, MAX_MESSAGE_LENGTH } from '@/lib/validate';
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
 // GET /api/channels/[channelId]/messages - Get messages for a channel
 export async function GET(
@@ -19,6 +23,16 @@ export async function GET(
     }
 
     const { channelId } = await context.params;
+    if (!(await channelAccess(channelId, (session.user as any).id))) {
+      return NextResponse.json({ error: 'Not a member of this server' }, { status: 403 });
+    }
+
+    // ?before=<ISO timestamp> pages further back in history.
+    const before = request.nextUrl.searchParams.get('before');
+    const beforeDate = before ? new Date(before) : null;
+    const where = beforeDate && !isNaN(beforeDate.getTime())
+      ? and(eq(messages.channelId, channelId), lt(messages.createdAt, beforeDate))
+      : eq(messages.channelId, channelId);
 
     // Get messages with user info
     const channelMessages = await db
@@ -48,7 +62,7 @@ export async function GET(
       })
       .from(messages)
       .innerJoin(users, eq(messages.userId, users.id))
-      .where(eq(messages.channelId, channelId))
+      .where(where)
       .orderBy(desc(messages.createdAt))
       .limit(50);
 
@@ -96,31 +110,29 @@ export async function POST(
       );
     }
 
-    // Skip AI moderation for media messages (they just have placeholder text)
-    if (!mediaUrl && !isEncrypted) {
-      // AI moderation (fail-open handled by API)
-      try {
-        const baseUrl = request.nextUrl.origin;
-        const modRes = await fetch(`${baseUrl}/api/ai/moderate-message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // forward cookies for session auth on internal fetch
-            cookie: request.headers.get('cookie') ?? '',
-          },
-          body: JSON.stringify({ text: content.trim() }),
-        });
-        if (modRes.ok) {
-          const mod = await modRes.json();
-          if (mod?.isToxic) {
-            return NextResponse.json(
-              { error: 'Message flagged by auto-moderation', toxicityReason: mod.toxicityReason },
-              { status: 400 }
-            );
-          }
-        }
-      } catch {
-        // fail open
+    if (!(await channelAccess(channelId, userId))) {
+      return NextResponse.json({ error: 'Not a member of this server' }, { status: 403 });
+    }
+
+    if (hasContent && content.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: 'Message is too long' }, { status: 400 });
+    }
+
+    if (hasMedia && !isSafeMediaUrl(mediaUrl)) {
+      return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 });
+    }
+
+    const limit = await rateLimit(`send:${userId}`, 120, 60);
+    if (!limit.allowed) return tooManyRequests(60);
+
+    // Encrypted payloads are opaque to the server; only plaintext is screened.
+    if (hasContent && !isEncrypted) {
+      const mod = await moderateText(content.trim());
+      if (mod.isToxic) {
+        return NextResponse.json(
+          { error: 'Message flagged by auto-moderation', toxicityReason: mod.reason },
+          { status: 400 }
+        );
       }
     }
 

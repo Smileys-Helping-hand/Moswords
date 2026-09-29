@@ -1,59 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-export const dynamic = 'force-dynamic';
+import { and, ilike, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
-import { ilike, or } from 'drizzle-orm';
+import { requireUser } from '@/lib/session';
+import { normalizeEmail } from '@/lib/validate';
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
-// GET /api/users/search?q=<query> - Search for users by email or name
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/users/search?q=<query>
+ *
+ * - A full email address finds exactly that account (you already know it).
+ * - Anything else matches the start of a name or display name, and emails come
+ *   back masked — substring search on emails would let anyone enumerate every
+ *   address on the platform.
+ */
 export async function GET(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.response) return auth.response;
+  const me = auth.user.id;
+
+  const limit = await rateLimit(`search:${me}`, 60, 60);
+  if (!limit.allowed) return tooManyRequests(60);
+
+  const query = (request.nextUrl.searchParams.get('q') || '').trim().slice(0, 100);
+  if (query.length < 2) return NextResponse.json({ users: [] });
+
+  const columns = {
+    id: users.id,
+    email: users.email,
+    name: users.name,
+    displayName: users.displayName,
+    photoURL: users.photoURL,
+    customStatus: users.customStatus,
+  };
+
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (query.includes('@')) {
+      const found = await db
+        .select(columns)
+        .from(users)
+        .where(and(sql`lower(${users.email}) = ${normalizeEmail(query)}`, ne(users.id, me)))
+        .limit(1);
+      return NextResponse.json({ users: found });
     }
 
-    const currentUserId = (session.user as any).id;
-    const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('q');
-
-    if (!query || query.trim().length < 2) {
-      return NextResponse.json({ users: [] });
-    }
-
-    const searchQuery = `%${query.trim()}%`;
-
-    // Search for users by email or name, excluding the current user
-    const foundUsers = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        displayName: users.displayName,
-        photoURL: users.photoURL,
-        customStatus: users.customStatus,
-      })
+    const escaped = query.replace(/[\%_]/g, (c) => `\${c}`);
+    const found = await db
+      .select(columns)
       .from(users)
       .where(
-        or(
-          ilike(users.email, searchQuery),
-          ilike(users.name, searchQuery),
-          ilike(users.displayName, searchQuery)
-        )
+        and(
+          ne(users.id, me),
+          or(
+            ilike(users.displayName, `${escaped}%`),
+            ilike(users.name, `${escaped}%`),
+            ilike(users.displayName, `% ${escaped}%`),
+            ilike(users.name, `% ${escaped}%`),
+          ),
+        ),
       )
       .limit(10);
 
-    // Filter out current user
-    const filteredUsers = foundUsers.filter(u => u.id !== currentUserId);
-
-    return NextResponse.json({ users: filteredUsers });
+    return NextResponse.json({ users: found.map((u) => ({ ...u, email: maskEmail(u.email) })) });
   } catch (error) {
     console.error('Error searching users:', error);
-    return NextResponse.json(
-      { error: 'Failed to search users' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to search users' }, { status: 500 });
   }
+}
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '';
+  return `${local.slice(0, 2)}${'•'.repeat(Math.max(1, Math.min(6, local.length - 2)))}@${domain}`;
 }

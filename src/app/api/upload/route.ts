@@ -1,73 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { put } from '@/lib/storage';
-import crypto from 'crypto';
+import { requireUser } from '@/lib/session';
+import { MAX_PROXY_UPLOAD_BYTES, mediaKey, putObject } from '@/lib/storage';
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Vercel server uploads are limited to 4.5 MB (Next.js serverless body limit).
-// For larger files, switch to Vercel Blob client uploads.
-const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
-
-// Allowed MIME types
-// NOTE: Allow all file types for file sharing; size limit still enforced.
-const ALLOWED_TYPES: string[] = [];
-
+/**
+ * POST /api/upload (multipart, field "file") — upload through the server.
+ * Capped by the Lambda request limit; large photos/videos should use
+ * /api/upload/presign (see src/lib/upload-client.ts, which picks automatically).
+ */
 export async function POST(request: NextRequest) {
-  try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+  const auth = await requireUser();
+  if (auth.response) return auth.response;
 
+  const limit = await rateLimit(`upload:${auth.user.id}`, 60, 60 * 10);
+  if (!limit.allowed) return tooManyRequests(600);
+
+  try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+    if (file.size > MAX_PROXY_UPLOAD_BYTES) {
+      return NextResponse.json({ error: 'File too large. Maximum size is 4.5MB.' }, { status: 400 });
     }
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 4.5MB.' },
-        { status: 400 }
-      );
-    }
+    const key = mediaKey('uploads', file.name);
+    const { url } = await putObject(key, new Uint8Array(await file.arrayBuffer()), file.type);
 
-    // Validate file type
-    if (ALLOWED_TYPES.length > 0 && !ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'File type not allowed.' },
-        { status: 400 }
-      );
-    }
-
-    // Generate unique filename
-    const uniqueId = crypto.randomUUID();
-    const sanitizedName = file.name
-      .replace(/[^a-zA-Z0-9.-]/g, '_')
-      .substring(0, 50);
-    const key = `uploads/${uniqueId}-${sanitizedName}`;
-
-    // Upload to Vercel Blob
-    const blob = await put(key, file.stream(), {
-      access: 'public',
-      contentType: file.type,
-      addRandomSuffix: false,
-    });
-
-    const url = blob.url;
-
-    // Determine media type
     let mediaType: 'image' | 'video' | 'audio' | 'file' = 'file';
     if (file.type.startsWith('image/')) mediaType = 'image';
     else if (file.type.startsWith('video/')) mediaType = 'video';
@@ -81,11 +44,8 @@ export async function POST(request: NextRequest) {
       type: mediaType,
       mimeType: file.type,
     });
-  } catch (error: any) {
-    console.error('Upload error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to upload file' },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error('Upload error:', (error as Error).message);
+    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
   }
 }

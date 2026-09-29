@@ -1,9 +1,13 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/providers/auth-provider';
 import { UnreadProvider } from '@/providers/unread-provider';
+import { SyncProvider } from '@/providers/sync-provider';
+import { CallProvider } from '@/providers/call-provider';
 import NotificationManager from '@/components/notification-manager';
+import MessageSearch from '@/components/message-search';
 import MobileNav from '@/components/mobile-nav';
 import InstallPrompt from '@/components/install-prompt';
 import ClientOnlyProviders from '@/components/client-only-providers';
@@ -12,6 +16,10 @@ import OfflineBanner from '@/components/OfflineBanner';
 import UpdateChecker from '@/components/UpdateChecker';
 import { AntiFlicker } from '@/components/anti-flicker';
 import { HydrationProvider } from '@/contexts/hydration-context';
+
+// Self-hosted at build time: no render-blocking request to Google, no font swap.
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
+const code = Source_Code_Pro({ subsets: ['latin'], display: 'swap', variable: '--font-code' });
 
 export const viewport: Viewport = {
   themeColor: '#030014',
@@ -24,8 +32,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Moswords - Professional Team Communication',
-  description: 'Real-time collaboration platform with AI-powered features, messaging, and team workspaces',
+  title: 'Moswords — Messaging for friends, family and teams',
+  description: 'Fast, private messaging, calls and team workspaces. Your contacts, synced across every app you use.',
   manifest: '/manifest.json',
   applicationName: 'Moswords',
   appleWebApp: {
@@ -71,7 +79,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className={`dark ${inter.variable} ${code.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -89,17 +97,22 @@ export default function RootLayout({
         <AntiFlicker />
         <HydrationProvider>
           <AuthProvider>
+            <SyncProvider>
             <UnreadProvider>
+              <CallProvider>
               <ClientMobileWrapper>
               <UpdateChecker />
               <OfflineBanner />
               <ClientOnlyProviders />
               {children}
               <NotificationManager />
+              <MessageSearch />
               <MobileNav />
               <InstallPrompt />
               </ClientMobileWrapper>
+              </CallProvider>
             </UnreadProvider>
+            </SyncProvider>
           </AuthProvider>
         </HydrationProvider>
         <Toaster />

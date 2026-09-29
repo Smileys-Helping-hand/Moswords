@@ -19,6 +19,7 @@ import ChatMessage from '@/components/chat-message';
 import ChatInput from '@/components/chat/ChatInput';
 import { ArrowLeft, Users, Settings, Phone, Video, ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { formatTyping, useSyncBatches, useTyping } from '@/providers/sync-provider';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -125,8 +126,8 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   const hasInitialLoadRef = useRef(false);
   const canDecryptRef = useRef(false);
   const encryptionInitRef = useRef(false);
-  const migratedIdsRef = useRef<Set<string>>(new Set());
   const groupNameRef = useRef<string>(''); // for toast without state dep
+  const decryptRef = useRef<((msg: Message, memberIds: string[]) => Promise<Message>) | null>(null);
 
   const revokeMediaUrls = useCallback(() => {
     for (const url of mediaUrlsRef.current) {
@@ -192,22 +193,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           const decrypted = await decryptMessage('group', groupChatId, msg.content, contentNonce);
           content = decrypted ?? '[Encrypted message]';
         }
-      } else if (!isEncrypted && msg.content && !looksEncrypted && !migratedIdsRef.current.has(msg.id)) {
-        // One-time migration: encrypt plaintext messages ΓÇö track to avoid repeating
-        migratedIdsRef.current.add(msg.id);
-        try {
-          const encrypted = await encryptMessage('group', groupChatId, memberIds, msg.content);
-          await fetch('/api/messages/encrypt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'group',
-              id: msg.id,
-              content: encrypted.ciphertext,
-              contentNonce: encrypted.nonce,
-            }),
-          });
-        } catch { /* migration errors are non-fatal */ }
       }
 
       let mediaUrl = msg.mediaUrl || undefined;
@@ -227,7 +212,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       return { ...msg, content, mediaUrl } as Message;
     };
 
-    // ΓöÇΓöÇ Initial load ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Initial load ────────────────────────────────────────────────────────
     const initialLoad = async () => {
       try {
         const [detailsRes, messagesRes] = await Promise.all([
@@ -269,63 +254,36 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       }
     };
 
-    // ΓöÇΓöÇ Incremental poll: only new messages ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-    const pollNewMessages = async () => {
-      if (!hasInitialLoadRef.current) return;
-      const afterId = lastMessageIdRef.current;
-      if (!afterId) return;
-
-      try {
-        const response = await fetch(`/api/group-chats/${groupChatId}/messages?after=${afterId}`);
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!data.messages || data.messages.length === 0) return;
-
-        const memberIds = memberIdsRef.current;
-        const newDecrypted: Message[] = await Promise.all(
-          (data.messages as Message[]).map((m) => decryptAndMigrateMsg(m, memberIds))
-        );
-
-        setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const trulyNew = newDecrypted.filter((m) => !existingIds.has(m.id));
-          if (trulyNew.length === 0) return prev;
-          if (!checkIfAtBottom()) setHasNewMessages(true);
-          return [...prev, ...trulyNew];
-        });
-
-        lastMessageIdRef.current = data.messages[data.messages.length - 1].id;
-
-        // Toast for new messages from others ΓÇö only when not actively reading
-        const lastNew = newDecrypted[newDecrypted.length - 1];
-        if (lastNew && lastNew.userId !== currentUserId && document.hidden) {
-          toast({
-            title: `≡ƒæÑ New message in ${groupNameRef.current}`,
-            description: `${lastNew.sender?.displayName || lastNew.sender?.name || 'Someone'}: ${lastNew.content.substring(0, 50)}${lastNew.content.length > 50 ? '...' : ''}`,
-            duration: 5000,
-          });
-        }
-      } catch { /* silently ignore poll errors */ }
-    };
-
+    decryptRef.current = decryptAndMigrateMsg;
     initialLoad();
 
-    const getInterval = () => (document.hidden ? 10000 : 4000);
-    let intervalId = setInterval(pollNewMessages, getInterval());
-    const onVisibilityChange = () => {
-      clearInterval(intervalId);
-      if (!document.hidden) pollNewMessages();
-      intervalId = setInterval(pollNewMessages, getInterval());
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
     return () => {
-      clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
       revokeMediaUrls();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, groupChatId, router]); // minimal deps ΓÇö all other state accessed via refs
+  }, [status, groupChatId, router]); // minimal deps — all other state accessed via refs
+
+  // ── Live updates from the shared sync loop (no per-chat polling) ─────────
+  useSyncBatches(async (batch) => {
+    if (!hasInitialLoadRef.current) return;
+    const relevant = batch.groupMessages.filter((m) => m.groupChatId === groupChatId);
+    if (relevant.length === 0) return;
+    const decrypt = decryptRef.current;
+    if (!decrypt) return;
+    const memberIds = memberIdsRef.current;
+    const incoming = await Promise.all(relevant.map((m) => decrypt(m as unknown as Message, memberIds)));
+    setMessages((prev) => {
+      const existingIds = new Set(prev.map((m) => m.id));
+      const trulyNew = incoming.filter((m) => !existingIds.has(m.id));
+      if (trulyNew.length === 0) return prev;
+      if (!checkIfAtBottom()) setHasNewMessages(true);
+      return [...prev, ...trulyNew];
+    });
+    lastMessageIdRef.current = relevant[relevant.length - 1].id;
+  });
+
+  const { typingNames, notifyTyping, stopTyping } = useTyping('group', groupChatId, currentUserId);
+  const typingText = formatTyping(typingNames);
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
@@ -569,7 +527,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           <div className="min-w-0 flex-1">
             <h1 className="font-semibold text-sm leading-tight truncate">{groupChat.name}</h1>
             <p className="text-[11px] leading-tight text-muted-foreground">
-              {members.length} {members.length === 1 ? 'member' : 'members'}
+              {typingText ?? `${members.length} ${members.length === 1 ? 'member' : 'members'}`}
             </p>
           </div>
         </div>
@@ -656,12 +614,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
         )}
       </div>
 
-      {/* Input ΓÇö extra bottom space on mobile to clear fixed nav */}
+      {/* Input — extra bottom space on mobile to clear fixed nav */}
       <div className="bg-background/95 backdrop-blur-sm border-t border-border/50 px-4 pt-3 pb-3 shrink-0">
         <ChatInput
           value={newMessage}
-          onChange={setNewMessage}
-          onSend={(text, files) => handleSendMessage(text, files)}
+          onChange={(value) => {
+            setNewMessage(value);
+            if (value.trim()) notifyTyping();
+          }}
+          onSend={(text, files) => {
+            stopTyping();
+            handleSendMessage(text, files);
+          }}
           placeholder={`Message ${groupChat.name}`}
           disabled={sending}
         />

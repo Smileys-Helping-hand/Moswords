@@ -67,7 +67,7 @@ export default function ServerSidebar() {
 
     fetchServers();
     // Poll for updates every 30 seconds
-    const interval = setInterval(fetchServers, 30000);
+    const interval = setInterval(() => { if (!document.hidden) fetchServers(); }, 120000);
     return () => clearInterval(interval);
   }, [toast]);
 

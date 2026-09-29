@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid imageUrl' }, { status: 400 });
   }
 
-  // Only allow URLs from our own Vercel Blob store
-  const { isBlobUrl } = await import('@/lib/storage');
-  if (!isBlobUrl(imageUrl)) {
+  // Only allow media this app stored (S3, or the older Vercel Blob store)
+  const { isOwnMediaUrl } = await import('@/lib/storage');
+  if (!isOwnMediaUrl(imageUrl)) {
     return NextResponse.json({ error: 'imageUrl not from allowed domain' }, { status: 400 });
   }
 

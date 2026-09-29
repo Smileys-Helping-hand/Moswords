@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { enforceAdminAccess, hasFeature } from '@/lib/admin';
 import { db } from '@/lib/db';
 import { auditLogs } from '@/lib/schema';
-import { desc, limit, offset } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
   try {

@@ -13,6 +13,7 @@ import FriendsDialog from './friends-dialog';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import UnreadBadge from './unread-badge';
+import { openMessageSearch } from './message-search';
 import { useUnread } from '@/providers/unread-provider';
 import {
   DropdownMenu,
@@ -149,7 +150,7 @@ export default function ChannelSidebar() {
     };
 
     fetchChannels();
-    const interval = setInterval(fetchChannels, 30000);
+    const interval = setInterval(() => { if (!document.hidden) fetchChannels(); }, 120000);
     return () => clearInterval(interval);
   }, [activeServerId, toast]);
 
@@ -190,9 +191,14 @@ export default function ChannelSidebar() {
           className="px-2 space-y-2"
           whileHover={{ scale: 1.02 }}
         >
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground gap-2 glass-card">
-                <Search className="w-4 h-4" /> 
+            <Button
+                variant="ghost"
+                className="w-full justify-start text-muted-foreground gap-2 glass-card"
+                onClick={openMessageSearch}
+            >
+                <Search className="w-4 h-4" />
                 <span className="text-sm">Search</span>
+                <kbd className="ml-auto hidden md:inline text-[10px] opacity-60">Ctrl K</kbd>
             </Button>
             <div className="relative">
               <Button 

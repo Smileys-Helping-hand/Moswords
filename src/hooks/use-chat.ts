@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSyncBatches } from '@/providers/sync-provider';
 import { useToast } from './use-toast';
 import { useAuth } from './use-auth';
 import { useMessageSound } from './use-sound-effect';
@@ -58,6 +59,8 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
   const lastMessageCountRef = useRef(0);
   const channelMembersRef = useRef<string[]>([]);
   const mediaUrlsRef = useRef<string[]>([]);
+  const refetchRef = useRef<(() => Promise<void>) | null>(null);
+  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sound effect for incoming messages
   const currentUserId = (session?.user as any)?.id || (session?.user as any)?.uid;
@@ -153,24 +156,6 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
               }
             }
 
-            if (!isEncrypted && content && memberIds.length > 0 && !looksEncrypted) {
-              try {
-                const encrypted = await encryptMessage('channel', channelId, memberIds, content);
-                await fetch('/api/messages/encrypt', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    type: 'channel',
-                    id: msg.message.id,
-                    content: encrypted.ciphertext,
-                    contentNonce: encrypted.nonce,
-                  }),
-                });
-              } catch (error) {
-                console.error('Failed to migrate message encryption:', error);
-              }
-            }
-
             let mediaUrl = msg.message.mediaUrl || undefined;
             if (msg.message.mediaEncrypted && msg.message.mediaNonce && mediaUrl) {
               try {
@@ -238,20 +223,22 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
     };
 
     fetchMessages();
-    const getInterval = () => document.hidden ? 10000 : 4000;
-    let interval = setInterval(fetchMessages, getInterval());
-    const onVisibilityChange = () => {
-      clearInterval(interval);
-      if (!document.hidden) fetchMessages();
-      interval = setInterval(fetchMessages, getInterval());
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
+    refetchRef.current = fetchMessages;
     return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
+      refetchRef.current = null;
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
       revokeMediaUrls();
     };
   }, [channelId, enabled, toast, checkIfAtBottom, fetchChannelMembers, revokeMediaUrls]);
+
+  // Reload only when the sync loop reports a new message in this channel
+  // (debounced so a burst of messages costs a single reload).
+  useSyncBatches((batch) => {
+    if (!channelId || !refetchRef.current) return;
+    if (!batch.reset && !batch.channelMessages.some((m) => m.channelId === channelId)) return;
+    if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+    refetchTimerRef.current = setTimeout(() => refetchRef.current?.(), 300);
+  });
 
   // Auto-scroll when new messages arrive (only if at bottom)
   useEffect(() => {

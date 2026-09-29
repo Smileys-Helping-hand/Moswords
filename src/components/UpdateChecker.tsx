@@ -57,8 +57,10 @@ export default function UpdateChecker() {
         sessionStorage.setItem('app-version', version);
         console.log(`✅ App initialized at version: ${version}`);
 
-        // Check for updates every 60 seconds
-        checkInterval = setInterval(checkForUpdates, 60000);
+        // Check for a new deploy every 10 minutes while visible
+        checkInterval = setInterval(() => {
+          if (!document.hidden) checkForUpdates();
+        }, 10 * 60 * 1000);
       }
     });
 

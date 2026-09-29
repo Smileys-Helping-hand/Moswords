@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { servers, serverMembers } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,7 +13,7 @@ export async function GET(
   context: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

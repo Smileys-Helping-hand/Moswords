@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params: paramsPromise }: { params: Promise<{ keyId: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id && !(session?.user as any)?.uid) {
@@ -40,8 +41,9 @@ export async function DELETE(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params: paramsPromise }: { params: Promise<{ keyId: string }> }
 ) {
+  const params = await paramsPromise;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id && !(session?.user as any)?.uid) {

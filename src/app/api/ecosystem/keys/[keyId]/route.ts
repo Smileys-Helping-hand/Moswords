@@ -5,6 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ALL_SCOPES, hashApiKey, type EcosystemScope } from '@/lib/ecosystem-auth';
+import { requireAdmin } from '@/lib/session';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -14,9 +16,12 @@ import crypto from 'crypto';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params: paramsPromise }: { params: Promise<{ keyId: string }> }
 ) {
+  const params = await paramsPromise;
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -67,9 +72,12 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params: paramsPromise }: { params: Promise<{ keyId: string }> }
 ) {
+  const params = await paramsPromise;
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -99,25 +107,40 @@ export async function PATCH(
       updates.status = 'revoked';
     }
 
-    if (permissions) {
+    if (Array.isArray(permissions)) {
+      const invalid = permissions.filter((p: string) => !ALL_SCOPES.includes(p as EcosystemScope));
+      if (invalid.length > 0) {
+        return NextResponse.json({ error: `Unknown permissions: ${invalid.join(', ')}`, allowed: ALL_SCOPES }, { status: 400 });
+      }
       updates.permissions = permissions;
     }
 
+    // A rotated secret is shown once and stored hashed, like the key itself.
+    let newSecret: string | undefined;
     if (rotateSecret) {
-      updates.apiSecret = crypto.randomBytes(32).toString('hex');
+      newSecret = crypto.randomBytes(32).toString('hex');
+      updates.apiSecret = hashApiKey(newSecret);
     }
 
-    if (rateLimitPerMinute) {
-      updates.rateLimitPerMinute = rateLimitPerMinute;
+    if (typeof rateLimitPerMinute === 'number' && rateLimitPerMinute > 0) {
+      updates.rateLimitPerMinute = Math.min(Math.floor(rateLimitPerMinute), 10_000);
     }
 
     const updated = await db
       .update(ecosystemApiKeys)
       .set(updates)
       .where(eq(ecosystemApiKeys.id, params.keyId))
-      .returning({ apiSecret: false });
+      .returning({
+        id: ecosystemApiKeys.id,
+        appName: ecosystemApiKeys.appName,
+        keyPrefix: ecosystemApiKeys.keyPrefix,
+        status: ecosystemApiKeys.status,
+        permissions: ecosystemApiKeys.permissions,
+        rateLimitPerMinute: ecosystemApiKeys.rateLimitPerMinute,
+      });
 
     return NextResponse.json({
+      ...(newSecret ? { apiSecret: newSecret } : {}),
       success: true,
       key: updated[0],
       ...(rotateSecret && {
@@ -132,9 +155,12 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params: paramsPromise }: { params: Promise<{ keyId: string }> }
 ) {
+  const params = await paramsPromise;
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

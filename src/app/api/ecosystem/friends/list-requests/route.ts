@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { friends, users, ecosystemApiKeys } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { friends, users } from '@/lib/schema';
+import { authenticateApp } from '@/lib/ecosystem-auth';
+import { eq, sql } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,43 +37,22 @@ export async function GET(request: NextRequest) {
     const apiKey = searchParams.get('apiKey');
     const userEmail = searchParams.get('userEmail');
 
-    if (!apiKey || !userEmail) {
+    if (!userEmail) {
       return NextResponse.json(
-        { error: 'Missing required query params: apiKey, userEmail' },
+        { error: 'Missing required query params: userEmail' },
         { status: 400 }
       );
     }
 
-    // Verify API key
-    const [apiKeyRecord] = await db
-      .select({
-        id: ecosystemApiKeys.id,
-        appName: ecosystemApiKeys.appName,
-        status: ecosystemApiKeys.status,
-      })
-      .from(ecosystemApiKeys)
-      .where(eq(ecosystemApiKeys.apiKey, apiKey))
-      .limit(1);
-
-    if (!apiKeyRecord) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
-    }
-
-    if (apiKeyRecord.status !== 'active') {
-      return NextResponse.json(
-        { error: `API key is ${apiKeyRecord.status}` },
-        { status: 403 }
-      );
-    }
+    const auth = await authenticateApp(request, 'friends.read', apiKey);
+    if (auth.response) return auth.response;
+    const apiKeyRecord = auth.app;
 
     // Get the user
     const [user] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, userEmail.toLowerCase()))
+      .where(sql`lower(${users.email}) = ${String(userEmail).trim().toLowerCase()}`)
       .limit(1);
 
     if (!user) {
@@ -102,11 +82,6 @@ export async function GET(request: NextRequest) {
     // Filter to only pending requests
     const pendingRequests = requests.filter((r) => r.status === 'pending');
 
-    // Update API key last used timestamp
-    await db
-      .update(ecosystemApiKeys)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(ecosystemApiKeys.id, apiKeyRecord.id));
 
     return NextResponse.json(
       {

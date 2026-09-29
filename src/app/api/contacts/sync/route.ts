@@ -1,40 +1,45 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUser } from '@/lib/session';
+import { allContacts, deleteContact, toUiContact, updateContact, upsertContacts } from '@/lib/contacts-hub';
+import { isUuid } from '@/lib/validate';
+
+export const dynamic = 'force-dynamic';
+
+interface UiEvent {
+  type: 'add' | 'update' | 'delete' | 'sync';
+  contact: { id?: string; name?: string; email?: string; phone?: string; avatar?: string };
+}
 
 /**
- * POST /api/contacts/sync
- * Batch sync multiple contacts to external systems
+ * POST /api/contacts/sync { events } — apply the contact editor's queued
+ * changes in order, then return the full, authoritative list.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if (auth.response) return auth.response;
+  const me = auth.user.id;
+
+  const { events } = await req.json().catch(() => ({ events: null }));
+  if (!Array.isArray(events)) {
+    return NextResponse.json({ error: 'Events must be an array' }, { status: 400 });
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id && !(session?.user as any)?.uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    for (const event of (events as UiEvent[]).slice(0, 200)) {
+      const c = event.contact || {};
+      const input = { name: c.name, email: c.email, phone: c.phone, photoURL: c.avatar };
+      if (event.type === 'add') {
+        await upsertContacts(me, 'awehchat', [input]);
+      } else if (event.type === 'update' && isUuid(c.id)) {
+        await updateContact(me, c.id, input);
+      } else if (event.type === 'delete' && isUuid(c.id)) {
+        await deleteContact(me, c.id);
+      }
     }
-
-    const userId = (session?.user as any)?.id || (session?.user as any)?.uid;
-    const { events } = await req.json();
-
-    if (!Array.isArray(events)) {
-      return NextResponse.json(
-        { error: 'Events must be an array' },
-        { status: 400 }
-      );
-    }
-
-    // TODO: Process sync events
-    // - Filter events by type (add, update, delete, sync)
-    // - Save changes to database
-    // - Sync to external systems based on event type
-    const syncedContacts = events.map((event) => ({
-      ...event.contact,
-      lastSynced: new Date(),
-    }));
-
-    return NextResponse.json({ contacts: syncedContacts });
+    const list = await allContacts(me);
+    return NextResponse.json({ contacts: list.map((c) => toUiContact(c, me)) });
   } catch (error) {
-    console.error('Error syncing contacts:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error syncing contacts:', (error as Error).message);
+    return NextResponse.json({ error: 'Failed to sync contacts' }, { status: 500 });
   }
 }

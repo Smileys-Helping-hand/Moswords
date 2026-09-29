@@ -3,7 +3,9 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { db } from './db';
 import { users } from './schema';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
+import { normalizeEmail } from './validate';
+import { rateLimit, clientIp } from './rate-limit';
 import bcrypt from 'bcryptjs';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -18,15 +20,23 @@ const providers: any[] = [
       email: { label: 'Email', type: 'email' },
       password: { label: 'Password', type: 'password' },
     },
-    async authorize(credentials) {
+    async authorize(credentials, req) {
       try {
-        console.log('Authorization attempt for:', credentials?.email);
+        const email = normalizeEmail(credentials?.email);
+        const password = credentials?.password;
+        if (!email || !password) return null;
 
-        if (!credentials?.email || !credentials?.password) {
-          console.error('Missing email or password');
-          return null;
+        // Throttle guessing per account and per client IP.
+        const ip = clientIp(new Headers((req?.headers as Record<string, string>) || {}));
+        const [perAccount, perIp] = await Promise.all([
+          rateLimit(`login:acct:${email}`, 10, 15 * 60),
+          rateLimit(`login:ip:${ip}`, 50, 15 * 60),
+        ]);
+        if (!perAccount.allowed || !perIp.allowed) {
+          throw new Error('Too many sign-in attempts. Try again in 15 minutes.');
         }
 
+        // Emails were historically stored exactly as typed, so match case-insensitively.
         const [user] = await db
           .select({
             id: users.id,
@@ -38,25 +48,12 @@ const providers: any[] = [
             photoURL: users.photoURL,
           })
           .from(users)
-          .where(eq(users.email, credentials.email))
+          .where(sql`lower(${users.email}) = ${email}`)
           .limit(1);
 
-        if (!user || !user.password) {
-          console.error('User not found:', credentials.email);
-          return null;
-        }
+        if (!user?.password) return null;
+        if (!(await bcrypt.compare(password, user.password))) return null;
 
-        const passwordMatch = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!passwordMatch) {
-          console.error('Password mismatch for:', credentials.email);
-          return null;
-        }
-
-        console.log('Authorization successful for:', credentials.email);
         return {
           id: user.id,
           email: user.email,
@@ -64,7 +61,9 @@ const providers: any[] = [
           image: user.photoURL || user.image,
         };
       } catch (error) {
-        console.error('Authorization error:', error);
+        // Rate-limit errors surface to the login form; everything else is a plain failure.
+        if (error instanceof Error && error.message.startsWith('Too many')) throw error;
+        console.error('Authorization error:', (error as Error).message);
         return null;
       }
     },
@@ -141,6 +140,4 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
-  // Required for production deployment on Vercel and mobile browsers
-  trustHost: true,
 } as NextAuthOptions;

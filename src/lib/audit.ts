@@ -14,7 +14,7 @@ export interface AuditLogData {
   resourceId?: string;
   details?: Record<string, any>;
   mfaVerified?: boolean;
-  ipAddress?: string;
+  ipAddress?: string | null;
   userAgent?: string;
 }
 

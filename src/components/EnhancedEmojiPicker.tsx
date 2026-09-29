@@ -2,10 +2,10 @@
 
 import { memo, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Tabs } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 const EMOJI_CATEGORIES = {
-  recent: { name: '⏰ Recent', emojis: [] },
+  recent: { name: '⏰ Recent', emojis: [] as string[] },
   smileys: {
     name: '😀 Smileys',
     emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😌', '😔', '😑', '😐', '😏', '🥳'],
@@ -46,9 +46,11 @@ const EnhancedEmojiPicker = memo(function EnhancedEmojiPicker({
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
 
   const categories = useMemo(() => {
-    const result = { ...EMOJI_CATEGORIES };
-    result.recent.emojis = recentEmojis.slice(0, 12);
-    return result;
+    // Copy the recent category instead of mutating the shared module constant.
+    return {
+      ...EMOJI_CATEGORIES,
+      recent: { ...EMOJI_CATEGORIES.recent, emojis: recentEmojis.slice(0, 12) as string[] },
+    };
   }, [recentEmojis]);
 
   const filteredEmojis = useMemo(() => {

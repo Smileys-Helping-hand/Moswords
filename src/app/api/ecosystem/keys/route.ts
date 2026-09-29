@@ -4,26 +4,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/session';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { ecosystemApiKeys } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
-
-/**
- * Generate app-specific key prefix from app name
- * e.g., "Moswords" -> "mosw", "Nexus Integration" -> "nexus"
- */
-function generateKeyPrefix(appName: string): string {
-  return appName
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 5) || 'app';
-}
+import { ALL_SCOPES, generateApiKey, hashApiKey, type EcosystemScope } from '@/lib/ecosystem-auth';
 
 export async function GET(request: NextRequest) {
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -36,6 +29,8 @@ export async function GET(request: NextRequest) {
       where: eq(ecosystemApiKeys.ownerId, userId),
       columns: {
         apiSecret: false, // Never return secret in list
+        apiKey: false, // Only the hash is stored; show keyPrefix instead
+        keyHash: false,
       },
     });
 
@@ -55,6 +50,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const admin = await requireAdmin();
+    if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -71,26 +68,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate secure API key with app-name prefix and secret
-    const keyPrefix = generateKeyPrefix(appName);
-    const apiKey = `${keyPrefix}_${crypto.randomBytes(24).toString('hex')}`;
+    const requested: string[] = Array.isArray(permissions) ? permissions : [];
+    const invalid = requested.filter((p) => !ALL_SCOPES.includes(p as EcosystemScope));
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        { error: `Unknown permissions: ${invalid.join(', ')}`, allowed: ALL_SCOPES },
+        { status: 400 }
+      );
+    }
+
+    // Only the SHA-256 hash is stored; the plaintext key is shown exactly once.
+    const { key: apiKey, hash, displayPrefix } = generateApiKey(appName);
     const apiSecret = crypto.randomBytes(32).toString('hex');
 
-    // Create the key
     const newKey = await db
       .insert(ecosystemApiKeys)
       .values({
-        appName,
-        apiKey,
-        apiSecret,
+        appName: String(appName).slice(0, 60),
+        apiKey: hash,
+        keyHash: hash,
+        keyPrefix: displayPrefix,
+        apiSecret: hashApiKey(apiSecret),
         ownerId: userId,
-        permissions,
+        permissions: requested,
         metadata: {
           description,
           createdBy: session.user.email,
-        },
+        } as any,
       })
-      .returning();
+      .returning({
+        id: ecosystemApiKeys.id,
+        appName: ecosystemApiKeys.appName,
+        keyPrefix: ecosystemApiKeys.keyPrefix,
+        permissions: ecosystemApiKeys.permissions,
+        status: ecosystemApiKeys.status,
+        createdAt: ecosystemApiKeys.createdAt,
+      });
 
     return NextResponse.json(
       {

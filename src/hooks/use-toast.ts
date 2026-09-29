@@ -142,7 +142,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function baseToast({ ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -170,6 +170,19 @@ function toast({ ...props }: Toast) {
     update,
   }
 }
+
+/**
+ * `toast({...})` plus sonner-style shorthands. Several admin screens were
+ * written against `toast.success('…')` / `toast.error('…')`, which used to
+ * throw because `toast` had no such methods.
+ */
+const toast = Object.assign(baseToast, {
+  success: (description: React.ReactNode) => baseToast({ title: 'Done', description }),
+  error: (description: React.ReactNode) =>
+    baseToast({ variant: 'destructive', title: 'Something went wrong', description }),
+  info: (description: React.ReactNode) => baseToast({ description }),
+  warning: (description: React.ReactNode) => baseToast({ title: 'Heads up', description }),
+})
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)

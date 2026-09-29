@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSafeMediaUrl, isUuid, MAX_MESSAGE_LENGTH } from '@/lib/validate';
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -154,7 +156,7 @@ export async function POST(request: NextRequest) {
     const hasContent = typeof content === 'string' && content.trim().length > 0;
     const hasMedia = !!mediaUrl;
 
-    if (!receiverId || (!hasContent && !hasMedia)) {
+    if (!isUuid(receiverId) || (!hasContent && !hasMedia)) {
       return NextResponse.json(
         { error: 'Receiver and content or media are required' },
         { status: 400 }
@@ -167,6 +169,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (hasContent && content.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: 'Message is too long' }, { status: 400 });
+    }
+
+    if (hasMedia && !isSafeMediaUrl(mediaUrl)) {
+      return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 });
+    }
+
+    const limit = await rateLimit(`send:${userId}`, 120, 60);
+    if (!limit.allowed) return tooManyRequests(60);
 
     // Create the message
     const [newMessage] = await db

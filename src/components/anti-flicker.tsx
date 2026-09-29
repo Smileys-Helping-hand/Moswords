@@ -3,31 +3,28 @@
 import { useEffect } from 'react';
 
 /**
- * Prevents visual flicker during page hydration by disabling animations
- * until the page is fully loaded and all dynamically-loaded components
- * have mounted and started their animations.
+ * Removes the `hydrating` class (set by an inline script before first paint)
+ * once React has mounted and two frames have painted, re-enabling CSS
+ * transitions. Only transitions are paused while it is set — see globals.css.
  */
 export function AntiFlicker() {
   useEffect(() => {
     const html = document.documentElement;
-
-    // Ensure hydrating class is set
-    if (!html.classList.contains('hydrating')) {
-      html.classList.add('hydrating');
-    }
-
-    // Wait longer to allow dynamically-loaded components (NetworkStatus, DeviceIndicator)
-    // to mount and complete their animations before removing the hydrating class.
-    // This ensures all framer-motion animations are suppressed during hydration.
-    // Increased to 700ms to ensure all components use the hydration context properly.
-    const timer = setTimeout(() => {
+    const done = () => {
       html.classList.remove('hydrating');
       html.classList.add('hydrated');
-      // Force a repaint to ensure the transition is clean
-      void html.offsetHeight;
-    }, 700);
-
-    return () => clearTimeout(timer);
+    };
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(done);
+    });
+    // Background tabs pause animation frames; never leave transitions disabled.
+    const fallback = setTimeout(done, 400);
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+      clearTimeout(fallback);
+    };
   }, []);
 
   return null;

@@ -51,7 +51,7 @@ export default function SettingsTab({ isSuperAdmin, userEmail }: SettingsTabProp
   const [showIntegrationGuide, setShowIntegrationGuide] = useState(false);
   const [newAdminEmail, setNewAdminEmail] = useState('');
 
-  const API_SUBDOMAIN = 'api.awechat.co.za';
+  const API_SUBDOMAIN = 'awehchat.co.za';
 
   // Fetch admin users (superadmin only)
   const fetchAdminUsers = async () => {
@@ -235,23 +235,11 @@ export default function SettingsTab({ isSuperAdmin, userEmail }: SettingsTabProp
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Master Token</label>
-                  <div className="flex gap-2">
-                    <code className="flex-1 bg-muted px-4 py-2 rounded-lg font-mono text-sm break-all">
-                      a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        copyToClipboard('a7f2e9c4d1b8f3a6e5c2d9f1a4b7e0c3', 'Master Token')
-                      }
-                      className="gap-2"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy
-                    </Button>
-                  </div>
+                  <label className="text-sm font-medium">App keys</label>
+                  <p className="text-sm text-muted-foreground">
+                    Each app gets its own scoped key from the API Keys tab. Keys are stored hashed and shown
+                    once; send them as <code>Authorization: Bearer &lt;key&gt;</code>. There is no shared master token.
+                  </p>
                 </div>
               </CardContent>
             </Card>

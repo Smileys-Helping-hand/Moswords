@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { registeredApps, emailLogs } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { sendEmail } from '@/lib/email';
+import { isEmail } from '@/lib/validate';
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,6 +57,14 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    if (!isEmail(recipient) || String(subject).length > 300) {
+      return NextResponse.json({ error: 'Invalid recipient or subject' }, { status: 400 });
+    }
+
+    // A leaked app key must not become an unlimited spam relay.
+    const limit = await rateLimit(`nexusmail:${app.id}`, 300, 60 * 60);
+    if (!limit.allowed) return tooManyRequests(3600);
 
     // Send email via AWS SES
     let emailStatus = 'sent';
@@ -112,7 +122,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Dispatch error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

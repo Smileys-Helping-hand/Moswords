@@ -36,8 +36,10 @@ import {
   getDmScopeId,
 } from '@/lib/crypto/e2e-client';
 import { compressImage } from '@/lib/image-compress';
-import { useWebRTC } from '@/hooks/use-webrtc';
-import CallScreen from '@/components/call/CallScreen';
+import { uploadFile } from '@/lib/upload-client';
+import { useCall } from '@/providers/call-provider';
+import { usePresence, useSyncBatches, useTyping } from '@/providers/sync-provider';
+import { formatDistanceToNowStrict } from 'date-fns';
 
 interface Message {
   id: string;
@@ -79,23 +81,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const router = useRouter();
   const currentUserId = (session?.user as any)?.id || (session?.user as any)?.uid;
 
-  // ΓöÇΓöÇ WebRTC calling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  const {
-    callState,
-    remoteParticipant,
-    localStream,
-    remoteStream,
-    isMuted,
-    isCameraOff,
-    startCall,
-    acceptCall,
-    declineCall,
-    endCall,
-    toggleMute,
-    toggleCamera,
-  } = useWebRTC();
+  // ── WebRTC calling ──────────────────────────────────────────────────────────
+  const { startCall } = useCall();
 
-  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ────────────────────────────────────────────────────────────────────────────
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<User | null>(null);
@@ -106,6 +95,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const otherUserRef = useRef<User | null>(null);
   const canDecryptRef = useRef(false);
   const encryptionInitRef = useRef(false);
+  const decryptRef = useRef<((msg: Message) => Promise<Message>) | null>(null);
+  const initEncryptionRef = useRef<(() => Promise<void>) | null>(null);
 
   const handleVoiceCall = useCallback(() => {
     if (!otherUser) return;
@@ -174,7 +165,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   }, [messages.length, isAtBottom]);
 
-  // ΓöÇΓöÇ Step 1: instant cache load on mount ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 1: instant cache load on mount ────────────────────────────────
   useEffect(() => {
     if (status !== 'authenticated' || !currentUserId) return;
     // Try IDB first (larger capacity), then fall back to localStorage
@@ -196,7 +187,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, currentUserId, userId]);
 
-  // ΓöÇΓöÇ Step 2: initial load + incremental poll ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 2: initial load + incremental poll ──────────────────────────────
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -239,15 +230,15 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       if (isEnc) {
         if (canDecryptRef.current && msg.contentNonce) {
           const plain = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce).catch(() => null);
-          content = plain ?? '≡ƒöÆ Encrypted message';
+          content = plain ?? '🔒 Encrypted message';
         } else {
-          content = '≡ƒöÆ Encrypted message';
+          content = '🔒 Encrypted message';
         }
       }
       return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
     };
 
-    // ΓöÇΓöÇ Initial load: fetch most-recent 50 messages ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Initial load: fetch most-recent 50 messages ─────────────────────
     const initialLoad = async () => {
       try {
         const [otherRes, response] = await Promise.all([
@@ -292,74 +283,72 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       }
     };
 
-    // ΓöÇΓöÇ Incremental poll: only fetch messages after lastMessageId ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-    const pollNewMessages = async () => {
-      if (!hasInitialLoadRef.current) return;
-      const afterId = lastMessageIdRef.current;
-      if (!afterId) return;
-
-      try {
-        const response = await fetch(`/api/conversations/${userId}?after=${afterId}`);
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!data.messages || data.messages.length === 0) return;
-
-        if (!encryptionInitRef.current) await initEncryption();
-        const newDecrypted: Message[] = await Promise.all(
-          (data.messages as Message[]).map(decryptOne)
-        );
-
-        setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const trulyNew = newDecrypted.filter((m) => !existingIds.has(m.id));
-          if (trulyNew.length === 0) return prev;
-
-          const merged = [...prev, ...trulyNew];
-          saveMessagesToCache(userId, currentUserId, merged as any);
-          saveMessagesToCacheIDB(userId, currentUserId, merged as any);
-
-          // Show "new messages" scroll button if not at bottom
-          if (!checkIfAtBottom()) setHasNewMessages(true);
-
-          return merged;
-        });
-
-        // Update anchor ID
-        lastMessageIdRef.current = data.messages[data.messages.length - 1].id;
-
-        // Toast for incoming messages ΓÇö only when user is not actively reading
-        const lastNew = newDecrypted[newDecrypted.length - 1];
-        if (lastNew && lastNew.senderId === userId && document.hidden) {
-          const u = otherUserRef.current;
-          toast({
-            title: '≡ƒÆ¼ New message',
-            description: `${u?.displayName || u?.name || 'User'}: ${lastNew.content.substring(0, 50)}${lastNew.content.length > 50 ? '...' : ''}`,
-            duration: 3000,
-          });
-        }
-      } catch {
-        // Silently swallow poll errors to avoid spamming the UI
-      }
-    };
-
+    decryptRef.current = decryptOne;
+    initEncryptionRef.current = initEncryption;
     initialLoad();
 
-    const getInterval = () => (document.hidden ? 10000 : 4000);
-    let intervalId = setInterval(pollNewMessages, getInterval());
-
-    const onVisibilityChange = () => {
-      clearInterval(intervalId);
-      if (!document.hidden) pollNewMessages();
-      intervalId = setInterval(pollNewMessages, getInterval());
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
     return () => {
-      clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
       revokeMediaUrls();
     };
-  }, [status, userId, router, currentUserId]); // minimal deps ΓÇö callbacks use refs
+  }, [status, userId, router, currentUserId]); // minimal deps — callbacks use refs
+
+  // Tell the server we've read this chat (drives the sender's read ticks).
+  const markConversationRead = useCallback(() => {
+    fetch(`/api/conversations/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ read: true }),
+    }).catch(() => {});
+  }, [userId]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden && hasInitialLoadRef.current) markConversationRead();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [markConversationRead]);
+
+  // ── Live updates from the shared sync loop (no per-chat polling) ─────────
+  useSyncBatches(async (batch) => {
+    if (!hasInitialLoadRef.current || !currentUserId) return;
+
+    const readIds = new Set(batch.reads.filter((r) => r.receiverId === userId).map((r) => r.id));
+    if (readIds.size > 0) {
+      setMessages((prev) => prev.map((m) => (readIds.has(m.id) ? { ...m, read: true } : m)));
+    }
+
+    const relevant = batch.dms.filter(
+      (m) =>
+        (m.senderId === userId && m.receiverId === currentUserId) ||
+        (m.senderId === currentUserId && m.receiverId === userId),
+    );
+    if (relevant.length === 0) return;
+
+    if (!encryptionInitRef.current) await initEncryptionRef.current?.();
+    const decrypt = decryptRef.current;
+    if (!decrypt) return;
+    const incoming = await Promise.all(relevant.map((m) => decrypt(m as unknown as Message)));
+
+    setMessages((prev) => {
+      const existingIds = new Set(prev.map((m) => m.id));
+      const trulyNew = incoming.filter((m) => !existingIds.has(m.id));
+      if (trulyNew.length === 0) return prev;
+      const merged = [...prev, ...trulyNew];
+      saveMessagesToCache(userId, currentUserId, merged as any);
+      saveMessagesToCacheIDB(userId, currentUserId, merged as any);
+      if (!checkIfAtBottom()) setHasNewMessages(true);
+      return merged;
+    });
+    lastMessageIdRef.current = relevant[relevant.length - 1].id;
+
+    if (!document.hidden && relevant.some((m) => m.senderId === userId)) markConversationRead();
+  });
+
+  const lastSeen = usePresence(userId);
+  const { typingNames, notifyTyping, stopTyping } = useTyping('dm', userId, currentUserId);
+  const typingText = typingNames.length > 0 ? 'typing…' : null;
+  const isOnline = !!lastSeen && Date.now() - new Date(lastSeen).getTime() < 90_000; // minimal deps — callbacks use refs
 
   const handleSendMessage = async (text?: string, files?: File[]) => {
     const messageText = text || newMessage;
@@ -376,24 +365,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         if (file.type.startsWith('image/')) {
           file = await compressImage(file);
         }
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!uploadRes.ok) {
-          throw new Error('Failed to upload file');
-        }
-        const uploadData = await uploadRes.json();
-        mediaUrl = uploadData.url;
-        mediaType = file.type.startsWith('image/')
-          ? 'image'
-          : file.type.startsWith('video/')
-            ? 'video'
-            : file.type.startsWith('audio/')
-              ? 'audio'
-              : 'file';
+        // Direct-to-S3 for photos/videos (up to 50 MB), server upload otherwise.
+        const uploaded = await uploadFile(file);
+        mediaUrl = uploaded.url;
+        mediaType = uploaded.mediaType;
       }
 
       const response = await fetch('/api/direct-messages', {
@@ -425,7 +400,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   };
 
-  /** Send an unencrypted GIF (public Giphy URL ΓÇö no sensitive content) */
+  /** Send an unencrypted GIF (public Giphy URL — no sensitive content) */
   const handleSendGif = async (gifUrl: string) => {
     if (sending) return;
     setSending(true);
@@ -435,7 +410,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receiverId: userId,
-          content: '≡ƒÄ₧∩╕Å GIF',
+          content: '🎞️ GIF',
           isEncrypted: false,
           mediaUrl: gifUrl,
           mediaType: 'gif',
@@ -461,7 +436,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           receiverId: userId,
-          content: '≡ƒÄ¿ Sticker',
+          content: '🎨 Sticker',
           isEncrypted: false,
           mediaUrl: stickerUrl,
           mediaType: 'sticker',
@@ -503,7 +478,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
   };
 
-  // Mute stored in localStorage ΓÇö no DB migration needed
+  // Mute stored in localStorage — no DB migration needed
   const getMuteKey = () => `muted_${currentUserId}_${userId}`;
   const [isMutedConvo, setIsMutedConvo] = useState(false);
   // Sync mute state once currentUserId is available
@@ -530,7 +505,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     try {
       const response = await fetch(`/api/conversations/${userId}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete');
-      toast({ title: 'Conversation deleted' });
+      toast({ title: 'Chat cleared' });
       router.push('/dm');
     } catch (error) {
       console.error('Error deleting conversation:', error);
@@ -584,20 +559,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   return (
     <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen min-h-0 bg-background">
-      {/* WebRTC Call Overlay */}
-      <CallScreen
-        callState={callState}
-        remoteParticipant={remoteParticipant}
-        localStream={localStream}
-        remoteStream={remoteStream}
-        isMuted={isMuted}
-        isCameraOff={isCameraOff}
-        onAccept={acceptCall}
-        onDecline={declineCall}
-        onEnd={endCall}
-        onToggleMute={toggleMute}
-        onToggleCamera={toggleCamera}
-      />
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -622,7 +583,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 <UserAvatar
                   src={otherUser.photoURL || ''}
                   fallback={(otherUser.displayName || otherUser.name || otherUser.email || 'U').substring(0, 2).toUpperCase()}
-                  status={otherUser.lastSeen === 'online' ? 'online' : 'offline'}
+                  status={isOnline ? 'online' : 'offline'}
                 />
               </div>
               <div className="min-w-0 flex-1">
@@ -630,8 +591,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                   {otherUser.displayName || otherUser.name || otherUser.email?.split('@')[0] || 'User'}
                 </h2>
                 <p className="text-[11px] leading-tight truncate text-muted-foreground">
-                  {otherUser.lastSeen === 'online' ? (
+                  {typingText ? (
+                    <span className="text-primary font-medium">{typingText}</span>
+                  ) : isOnline ? (
                     <span className="text-green-400 font-medium">Online</span>
+                  ) : lastSeen ? (
+                    `last seen ${formatDistanceToNowStrict(new Date(lastSeen), { addSuffix: true })}`
                   ) : (
                     'tap for info'
                   )}
@@ -777,12 +742,18 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         )}
       </div>
 
-      {/* Input ΓÇö extra bottom space on mobile to clear fixed nav */}
+      {/* Input — extra bottom space on mobile to clear fixed nav */}
       <div className="bg-background/95 backdrop-blur-sm border-t border-border/50 px-4 pt-3 pb-3 shrink-0">
         <ChatInput
           value={newMessage}
-          onChange={setNewMessage}
-          onSend={(text, files) => handleSendMessage(text, files)}
+          onChange={(value) => {
+            setNewMessage(value);
+            if (value.trim()) notifyTyping();
+          }}
+          onSend={(text, files) => {
+            stopTyping();
+            handleSendMessage(text, files);
+          }}
           onSendGif={handleSendGif}
           onSendSticker={handleSendSticker}
           placeholder={`Message ${otherUser?.displayName || otherUser?.name || 'user'}...`}
@@ -794,9 +765,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="glass-card border-white/20">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogTitle>Clear this chat?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the entire chat history. This action cannot be undone.
+              This clears the chat history on your side only. The other person keeps their copy.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
