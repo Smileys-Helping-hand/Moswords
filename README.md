@@ -32,14 +32,23 @@ stored hashed, and scoped (`contacts.read`, `contacts.write`, …).
 ## Develop
 
 ```bash
-cp .env.example .env.local   # point DATABASE_URL at a Neon dev branch, never production
 npm ci --legacy-peer-deps
+cp .env.example .env.local
 npm run dev
 ```
+
+Point `DATABASE_URL` in `.env.local` at a **local** Postgres, never production. A
+`localhost`/`127.0.0.1` URL makes the app use node-postgres (production uses Neon over
+HTTP), so any Postgres 14+ works, e.g. inside WSL:
+`postgresql://awehchat:<password>@127.0.0.1:5433/awehchat_dev`. Create the schema with
+`npx drizzle-kit push`, then `npx tsx scripts/migrate.ts`.
 
 Schema changes go in `scripts/migrations.ts` — additive and idempotent only. The Amplify
 build runs `scripts/migrate.ts`, which applies them and prints a drift report (tables/columns
 the code expects that the database lacks).
+
+End-to-end check (49 assertions over the whole user journey, local only):
+`npm run build && npm start -- -p 3100`, then `node scripts/e2e.mjs http://localhost:3100`.
 
 ## Deploy
 

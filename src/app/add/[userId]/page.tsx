@@ -90,16 +90,17 @@ export default function AddUserPage() {
         body: JSON.stringify({ friendId: user.id }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Failed to send friend request');
       }
 
       haptic.success?.();
-      toast({
-        title: 'Friend request sent!',
-        description: `Waiting for ${user.displayName || user.name}'s response.`,
-      });
+      toast(
+        data.accepted
+          ? { title: "You're now friends!", description: `You and ${user.displayName || user.name} are connected.` }
+          : { title: 'Friend request sent!', description: `Waiting for ${user.displayName || user.name}'s response.` },
+      );
 
       router.replace('/people');
     } catch (err: any) {

@@ -140,16 +140,18 @@ export default function AddContactSheet({ open, onOpenChange, onFriendAdded }: A
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Failed to send friend request');
       }
 
+      const who = selectedUser.displayName || selectedUser.name || selectedUser.email;
       haptic.success?.();
-      toast({
-        title: 'Friend request sent!',
-        description: `Request sent to ${selectedUser.displayName || selectedUser.name || selectedUser.email}`,
-      });
+      toast(
+        data.accepted
+          ? { title: "You're now friends!", description: `${who} had already added you.` }
+          : { title: 'Friend request sent!', description: `Request sent to ${who}` },
+      );
 
       onOpenChange(false);
       resetState();

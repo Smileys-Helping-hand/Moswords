@@ -20,7 +20,7 @@ async function main() {
     console.warn('[migrate] DATABASE_URL not set — skipping migrations.');
     return;
   }
-  const sql = neon(url);
+  const sql = await connect(url);
   const reportOnly = process.argv.includes('--report');
 
   if (!reportOnly) {
@@ -85,6 +85,19 @@ async function main() {
     console.warn(`[migrate] schema drift: missing tables: ${missingTables.join(', ') || 'none'}`);
     console.warn(`[migrate] schema drift: missing columns: ${missingColumns.join(', ') || 'none'}`);
   }
+}
+
+/** Neon over HTTP in production; node-postgres for a local database. Both return row arrays. */
+async function connect(url: string): Promise<{ query: (text: string, params?: unknown[]) => Promise<any[]> }> {
+  const host = new URL(url).hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    const { Pool } = await import('pg');
+    const pool = new Pool({ connectionString: url, max: 1, options: '-c timezone=UTC' });
+    process.on('beforeExit', () => void pool.end());
+    return { query: async (text, params) => (await pool.query(text, params as unknown[])).rows };
+  }
+  const neonSql = neon(url);
+  return { query: (text, params) => neonSql.query(text, params) as Promise<any[]> };
 }
 
 main().catch((error) => {

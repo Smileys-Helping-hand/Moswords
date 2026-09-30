@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Users, Loader2, X } from 'lucide-react';
 import { Button } from './ui/button';
@@ -43,6 +44,7 @@ export default function CreateGroupChatDialog() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleOpen = async (open: boolean) => {
     setIsOpen(open);
@@ -147,8 +149,6 @@ export default function CreateGroupChatDialog() {
         throw new Error('Invalid response: Missing group ID');
       }
 
-      console.log('Group created successfully:', data.groupChat);
-
       // Show success message
       toast({
         title: 'Success!',
@@ -162,7 +162,7 @@ export default function CreateGroupChatDialog() {
       setIsOpen(false);
 
       // Navigate to the newly created group
-      window.location.href = `/group/${data.groupChat.id}`;
+      router.push(`/group/${data.groupChat.id}`);
       
     } catch (error: any) {
       console.error('Error creating group:', error);

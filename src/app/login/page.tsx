@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import AuthForm from "@/components/auth-form";
 import { motion } from 'framer-motion';
 import { MoswordsIcon } from '@/components/icons';
@@ -57,7 +58,9 @@ export default function LoginPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
                 >
-                    <AuthForm />
+                    <Suspense fallback={null}>
+                        <AuthForm />
+                    </Suspense>
                 </motion.div>
             </motion.div>
         </div>
