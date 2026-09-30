@@ -15,9 +15,12 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
     if (status === 'loading') return;
 
     if (status === 'unauthenticated' && pathname !== '/login') {
-      router.push('/login');
+      // Remember where they were going (e.g. an invite link) so sign-in / sign-up returns there.
+      const target = pathname && pathname !== '/' ? `?callbackUrl=${encodeURIComponent(pathname)}` : '';
+      router.push(`/login${target}`);
     } else if (status === 'authenticated' && pathname === '/login') {
-      router.replace('/');
+      const next = new URLSearchParams(window.location.search).get('callbackUrl') || '/';
+      router.replace(next.startsWith('/') && !next.startsWith('//') ? next : '/');
     }
   }, [status, router, pathname]);
 

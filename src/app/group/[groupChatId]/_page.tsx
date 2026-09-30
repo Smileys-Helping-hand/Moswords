@@ -369,6 +369,22 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     }
   };
 
+  // Archive is per user: the group moves to "Archived" in *your* list only.
+  const handleArchiveGroup = async () => {
+    try {
+      const res = await fetch('/api/chats/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatType: 'group', chatId: groupChatId, archived: true }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: 'Group archived', description: 'Find it under Archived in your chat list.' });
+      router.push('/dm');
+    } catch {
+      toast({ variant: 'destructive', title: 'Could not archive group' });
+    }
+  };
+
   const handleLeaveGroup = async () => {
 
     try {
@@ -549,6 +565,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="glass-card border-white/20">
               <DropdownMenuItem onClick={() => setShowMembers(true)}>View Members</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleArchiveGroup}>Archive group</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowLeaveDialog(true)} className="text-destructive">Leave Group</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

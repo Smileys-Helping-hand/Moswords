@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isUuid } from '@/lib/validate';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     const { friendId } = body;
 
-    if (!friendId) {
+    if (!isUuid(friendId)) {
       return NextResponse.json(
         { error: 'Friend ID is required' },
         { status: 400 }
@@ -210,6 +211,19 @@ export async function POST(request: NextRequest) {
 
     if (existingFriendship.length > 0) {
       const existing = existingFriendship[0];
+      // They already asked us: adding them back simply accepts their request.
+      if (existing.status === 'pending' && existing.userId === friendId) {
+        const now = new Date();
+        await db
+          .update(friends)
+          .set({ status: 'accepted', acceptedAt: now })
+          .where(eq(friends.id, existing.id));
+        await db
+          .insert(friends)
+          .values({ userId, friendId, status: 'accepted', acceptedAt: now })
+          .onConflictDoNothing();
+        return NextResponse.json({ friendship: { ...existing, status: 'accepted' }, accepted: true }, { status: 200 });
+      }
       if (existing.status === 'pending') {
         return NextResponse.json(
           { error: 'Friend request already pending' },

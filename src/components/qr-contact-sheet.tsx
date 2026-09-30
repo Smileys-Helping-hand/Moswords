@@ -43,7 +43,10 @@ export default function QRContactSheet({ open, onOpenChange }: QRContactSheetPro
   const [loadingUser, setLoadingUser] = useState(false);
 
   const userId = (session?.user as any)?.id || (session?.user as any)?.uid;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://moswords.app';
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : 'https://awehchat.co.za');
   const qrValue = userId ? `${appUrl}/add/${userId}` : '';
 
   useEffect(() => {

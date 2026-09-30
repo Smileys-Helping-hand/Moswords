@@ -13,6 +13,165 @@ export interface Migration {
 
 export const migrations: Migration[] = [
   {
+    // Production never received these tables (found by the drift report on
+    // 2026-09-30). Must run first: later migrations index/alter them.
+    id: '2026-09-30-create-missing-tables',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS message_reactions (
+        id text PRIMARY KEY,
+        message_id uuid NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_name text NOT NULL,
+        emoji text NOT NULL,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS approvals (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        title text NOT NULL,
+        description text,
+        requested_by text NOT NULL,
+        app_source text,
+        assigned_to_id uuid REFERENCES users(id) ON DELETE SET NULL,
+        decided_by_id uuid REFERENCES users(id) ON DELETE SET NULL,
+        status text NOT NULL DEFAULT 'pending',
+        priority text NOT NULL DEFAULT 'normal',
+        metadata jsonb,
+        callback_url text,
+        note text,
+        created_at timestamp NOT NULL DEFAULT now(),
+        decided_at timestamp,
+        expires_at timestamp
+      )`,
+      `CREATE TABLE IF NOT EXISTS friendships (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        friend_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status text NOT NULL DEFAULT 'pending',
+        created_at timestamp NOT NULL DEFAULT now(),
+        accepted_at timestamp,
+        blocked_at timestamp
+      )`,
+      `CREATE TABLE IF NOT EXISTS contacts (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email text,
+        name text NOT NULL,
+        phone_number text,
+        photo_url text,
+        source text NOT NULL,
+        email_normalized text,
+        phone_normalized text,
+        deleted_at timestamp,
+        synced_to_apps text[] NOT NULL DEFAULT '{}',
+        metadata jsonb,
+        created_at timestamp NOT NULL DEFAULT now(),
+        updated_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS ecosystem_api_keys (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        app_name text NOT NULL,
+        api_key text NOT NULL UNIQUE,
+        key_hash text,
+        key_prefix text,
+        api_secret text NOT NULL,
+        owner_id uuid REFERENCES users(id) ON DELETE CASCADE,
+        status text NOT NULL DEFAULT 'active',
+        permissions text[] NOT NULL DEFAULT ARRAY['contacts.read','profile.read'],
+        webhook_url text,
+        rate_limit_per_minute integer NOT NULL DEFAULT 100,
+        requests_this_minute integer NOT NULL DEFAULT 0,
+        last_reset_time timestamp NOT NULL DEFAULT now(),
+        total_requests integer NOT NULL DEFAULT 0,
+        metadata jsonb,
+        created_at timestamp NOT NULL DEFAULT now(),
+        updated_at timestamp NOT NULL DEFAULT now(),
+        last_used_at timestamp,
+        expires_at timestamp
+      )`,
+      `CREATE TABLE IF NOT EXISTS connected_apps (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        app_name text NOT NULL,
+        api_key_id uuid REFERENCES ecosystem_api_keys(id) ON DELETE SET NULL,
+        status text NOT NULL DEFAULT 'connected',
+        last_health_check timestamp NOT NULL DEFAULT now(),
+        last_error text,
+        consecutive_errors integer NOT NULL DEFAULT 0,
+        permission_scope text[] NOT NULL DEFAULT ARRAY['contacts','profile'],
+        metadata jsonb,
+        connected_at timestamp NOT NULL DEFAULT now(),
+        disconnected_at timestamp
+      )`,
+      `CREATE TABLE IF NOT EXISTS api_request_logs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        api_key_id uuid NOT NULL REFERENCES ecosystem_api_keys(id) ON DELETE CASCADE,
+        endpoint text NOT NULL,
+        method text NOT NULL,
+        status_code integer NOT NULL,
+        response_time integer NOT NULL,
+        error_message text,
+        ip_address text,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS admin_users (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email text NOT NULL UNIQUE,
+        role text NOT NULL DEFAULT 'admin',
+        features text[] NOT NULL DEFAULT ARRAY['can_manage_api_keys','can_manage_users','can_view_audit_logs','can_configure_subdomain','can_manage_contacts'],
+        mfa_enabled boolean NOT NULL DEFAULT false,
+        mfa_secret text,
+        mfa_backup_codes text,
+        mfa_email_code text,
+        mfa_email_code_expiry timestamp,
+        mfa_email_enabled boolean NOT NULL DEFAULT false,
+        last_mfa_verified timestamp,
+        last_login timestamp,
+        created_at timestamp NOT NULL DEFAULT now(),
+        updated_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS audit_logs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email text NOT NULL,
+        action text NOT NULL,
+        resource text NOT NULL,
+        resource_id text,
+        details jsonb,
+        mfa_verified boolean NOT NULL DEFAULT false,
+        ip_address text,
+        user_agent text,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+    ],
+  },
+  {
+    // Per-user chat organisation: archive, pin and custom folders for DMs and
+    // groups. Replaces the old DM "archive", which flipped a flag on the shared
+    // message rows and so archived the chat for both people.
+    id: '2026-09-30-chat-organisation',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS chat_folders (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name text NOT NULL,
+        position integer NOT NULL DEFAULT 0,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS chat_folders_user_idx ON chat_folders (user_id, position)`,
+      `CREATE TABLE IF NOT EXISTS chat_preferences (
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        chat_type text NOT NULL,
+        chat_id uuid NOT NULL,
+        archived boolean NOT NULL DEFAULT false,
+        pinned boolean NOT NULL DEFAULT false,
+        folder_id uuid REFERENCES chat_folders(id) ON DELETE SET NULL,
+        updated_at timestamp NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, chat_type, chat_id)
+      )`,
+    ],
+  },
+  {
     id: '2026-09-28-restore-user-columns',
     statements: [
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_settings jsonb DEFAULT '{}'::jsonb`,

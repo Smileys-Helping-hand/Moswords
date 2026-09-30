@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isUuid } from '@/lib/validate';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -22,7 +23,10 @@ export async function PATCH(
 
     const userId = (session.user as any).id;
     const { friendshipId } = await context.params;
-    const { action } = await request.json(); // 'accept', 'reject', 'block'
+    if (!isUuid(friendshipId)) {
+      return NextResponse.json({ error: 'Friendship not found' }, { status: 404 });
+    }
+    const { action } = await request.json().catch(() => ({})); // 'accept', 'reject', 'block'
 
     // Get the friendship
     const [friendship] = await db
@@ -102,6 +106,9 @@ export async function DELETE(
 
     const userId = (session.user as any).id;
     const { friendshipId } = await context.params;
+    if (!isUuid(friendshipId)) {
+      return NextResponse.json({ error: 'Friendship not found' }, { status: 404 });
+    }
 
     // Get the friendship
     const [friendship] = await db

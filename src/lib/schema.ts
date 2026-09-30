@@ -760,3 +760,29 @@ export const conversationClears = pgTable(
   },
   (t) => ({ pk: primaryKey({ columns: [t.userId, t.otherUserId] }) }),
 );
+
+// ===== CHAT ORGANISATION (per user) =====
+
+/** A user's own chat categories ("Work", "Family", …). */
+export const chatFolders = pgTable('chat_folders', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/** Archive / pin / folder for one chat, as seen by one user. chatId is the other user (dm) or the group id. */
+export const chatPreferences = pgTable(
+  'chat_preferences',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    chatType: text('chat_type').notNull(), // 'dm' | 'group'
+    chatId: uuid('chat_id').notNull(),
+    archived: boolean('archived').notNull().default(false),
+    pinned: boolean('pinned').notNull().default(false),
+    folderId: uuid('folder_id').references(() => chatFolders.id, { onDelete: 'set null' }),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.chatType, t.chatId] }) }),
+);

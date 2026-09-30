@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { isOnline } from '@/lib/presence';
 import { useAuth } from '@/hooks/use-auth';
 import { useSyncBatches } from '@/providers/sync-provider';
@@ -24,9 +24,15 @@ import {
   Radio,
   QrCode,
   Plus,
+  Pin,
+  PinOff,
+  FolderInput,
+  ArchiveRestore,
+  ArrowLeft,
+  Pencil,
+  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CreateGroupChatDialog from '@/components/create-group-chat-dialog';
 import FriendsDialog from '@/components/friends-dialog';
 import QRContactSheet from '@/components/qr-contact-sheet';
@@ -38,10 +44,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import SponsoredChatRow from '@/components/ads/SponsoredChatRow';
-import { MOCK_ADS } from '@/lib/mock-ads';
+import {
+  FolderNameDialog,
+  ManageFoldersDialog,
+  useChatOrganisation,
+  type ChatFolder,
+  type ChatType,
+} from './chat-organisation';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { signOut } from 'next-auth/react';
 import {
@@ -90,6 +104,39 @@ type GroupChat = {
   imageUrl: string | null;
   memberCount: number;
   userRole: string;
+  createdAt?: string;
+  lastActivityAt?: string | null;
+  lastMessage?: {
+    content: string;
+    isEncrypted: boolean | null;
+    mediaType: string | null;
+    senderName: string | null;
+    createdAt: string;
+  } | null;
+};
+
+/** One row in the unified list: a DM or a group. */
+type ListItem = {
+  type: ChatType;
+  id: string;
+  name: string;
+  photoURL: string | null;
+  lastAt: string;
+  preview: string;
+  unread: number;
+  sentByMe: boolean;
+  read: boolean;
+  online: boolean;
+  isAdmin: boolean;
+};
+
+const MEDIA_LABELS: Record<string, string> = {
+  image: '📷 Photo',
+  video: '🎥 Video',
+  audio: '🎤 Voice message',
+  gif: '🎞️ GIF',
+  sticker: '🎨 Sticker',
+  file: '📎 File',
 };
 
 /** Detect if a message preview is encrypted */
@@ -178,15 +225,6 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     });
   };
 
-  const handleArchiveConvo = async (otherUserId: string) => {
-    await fetch(`/api/conversations/${otherUserId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ archived: true }),
-    });
-    setConversations(prev => prev.filter(c => c.otherUserId !== otherUserId));
-  };
-
   const handleDeleteConvo = async (otherUserId: string) => {
     await fetch(`/api/conversations/${otherUserId}`, { method: 'DELETE' });
     setConversations(prev => prev.filter(c => c.otherUserId !== otherUserId));
@@ -248,18 +286,92 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     reloadTimerRef.current = setTimeout(() => load(false), 800);
   });
 
-  const filteredConversations = conversations.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    const name =
-      (c.otherUser?.displayName || c.otherUser?.name || c.otherUser?.email || '').toLowerCase();
-    return name.includes(q);
-  });
+  // ── Organisation: archive / pin / folders (per user) ─────────────────────
+  const org = useChatOrganisation(status === 'authenticated');
+  const [filter, setFilter] = useState<string>('all'); // all | unread | dms | groups | archived | folder:<id>
+  const [folderDialog, setFolderDialog] = useState<{ mode: 'create' } | { mode: 'rename'; folder: ChatFolder } | null>(null);
+  const [moveAfterCreate, setMoveAfterCreate] = useState<{ type: ChatType; id: string } | null>(null);
+  const [manageFolders, setManageFolders] = useState(false);
 
-  const filteredGroups = groupChats.filter((g) => {
-    if (!search) return true;
-    return g.name.toLowerCase().includes(search.toLowerCase());
-  });
+  // A deleted folder can't stay selected.
+  useEffect(() => {
+    if (filter.startsWith('folder:') && !org.folders.some((f) => `folder:${f.id}` === filter)) setFilter('all');
+  }, [filter, org.folders]);
+
+  const items = useMemo<ListItem[]>(() => [
+    ...conversations.map((c) => {
+      const sentByMe = c.lastMessage.senderId === currentUserId;
+      const mediaType = (c.lastMessage as { mediaType?: string | null }).mediaType;
+      const body =
+        mediaType && MEDIA_LABELS[mediaType] && !c.lastMessage.content
+          ? MEDIA_LABELS[mediaType]
+          : getPreviewText(c.lastMessage.content, c.lastMessage.isEncrypted);
+      return {
+        type: 'dm' as const,
+        id: c.otherUserId,
+        name: c.otherUser?.displayName || c.otherUser?.name || c.otherUser?.email?.split('@')[0] || 'User',
+        photoURL: c.otherUser?.photoURL ?? null,
+        lastAt: String(c.lastMessage.createdAt),
+        preview: (sentByMe ? 'You: ' : '') + body,
+        unread: sentByMe ? 0 : c.unreadCount,
+        sentByMe,
+        read: c.lastMessage.read,
+        online: isOnline(c.otherUser?.lastSeen),
+        isAdmin: false,
+      };
+    }),
+    ...groupChats.map((g) => {
+      const lm = g.lastMessage;
+      const body = lm
+        ? lm.mediaType && MEDIA_LABELS[lm.mediaType]
+          ? MEDIA_LABELS[lm.mediaType]
+          : getPreviewText(lm.content, lm.isEncrypted)
+        : '';
+      return {
+        type: 'group' as const,
+        id: g.id,
+        name: g.name,
+        photoURL: g.imageUrl,
+        lastAt: String(g.lastActivityAt || g.createdAt || ''),
+        preview: lm ? `${lm.senderName || 'Someone'}: ${body}` : `${g.memberCount} member${g.memberCount !== 1 ? 's' : ''}`,
+        unread: 0,
+        sentByMe: false,
+        read: true,
+        online: false,
+        isAdmin: g.userRole === 'admin',
+      };
+    }),
+  ], [conversations, groupChats, currentUserId]);
+
+  const q = search.trim().toLowerCase();
+  const visible = items
+    .filter((it) => {
+      const p = org.get(it.type, it.id);
+      if (q && !it.name.toLowerCase().includes(q)) return false;
+      if (filter === 'archived') return p.archived;
+      if (p.archived) return false;
+      if (filter === 'unread') return it.unread > 0;
+      if (filter === 'dms') return it.type === 'dm';
+      if (filter === 'groups') return it.type === 'group';
+      if (filter.startsWith('folder:')) return p.folderId === filter.slice(7);
+      return true;
+    })
+    .sort((a, b) => {
+      const pin = Number(org.get(b.type, b.id).pinned) - Number(org.get(a.type, a.id).pinned);
+      return pin || new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime();
+    });
+  const archivedCount = items.filter((it) => org.get(it.type, it.id).archived).length;
+  const unreadCount = items.filter((it) => it.unread > 0 && !org.get(it.type, it.id).archived).length;
+
+  const chips: { id: string; label: string; count?: number }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'unread', label: 'Unread', count: unreadCount },
+    { id: 'dms', label: 'Chats' },
+    { id: 'groups', label: 'Groups' },
+    ...org.folders.map((f) => ({ id: `folder:${f.id}`, label: f.name })),
+  ];
+
+  const openChat = (it: ListItem) => router.push(it.type === 'dm' ? `/dm/${it.id}` : `/group/${it.id}`);
 
   if (loading) {
     return (
@@ -348,251 +460,231 @@ export default function ConversationListPanel({ compact = false }: ConversationL
         )}
       </div>
 
-      <Tabs defaultValue="dms" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <TabsList className="mx-3 mt-2 mb-1 shrink-0 grid grid-cols-2 h-8 bg-muted/50 rounded-lg">
-          <TabsTrigger value="dms" className="text-xs font-semibold gap-1 rounded-md">
-            <MessageSquare className="w-3 h-3" />
-            Chats
-            {conversations.reduce((n, c) => n + (c.unreadCount > 0 ? 1 : 0), 0) > 0 && (
-              <span className="ml-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-                {conversations.reduce((n, c) => n + (c.unreadCount > 0 ? 1 : 0), 0)}
+      {/* ── Filter chips: All · Unread · Chats · Groups · folders ── */}
+      {filter === 'archived' ? (
+        <div className="flex items-center gap-2 px-3 py-2 shrink-0 border-b border-border/20">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFilter('all')} aria-label="Back to chats">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <p className="font-semibold text-sm">Archived</p>
+          <p className="text-xs text-muted-foreground ml-auto">Hidden only for you</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 shrink-0 [scrollbar-width:none]" role="tablist" aria-label="Chat filters">
+          {chips.map((chip) => (
+            <button
+              key={chip.id}
+              role="tab"
+              aria-selected={filter === chip.id}
+              onClick={() => setFilter(chip.id)}
+              className={`shrink-0 rounded-full px-3 h-7 text-xs font-medium transition-colors ${
+                filter === chip.id ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {chip.label}
+              {chip.count ? <span className="ml-1 font-bold">{chip.count}</span> : null}
+            </button>
+          ))}
+          <button
+            onClick={() => setFolderDialog({ mode: 'create' })}
+            className="shrink-0 rounded-full px-2.5 h-7 text-xs text-primary hover:bg-primary/10 flex items-center gap-1"
+            aria-label="New folder"
+          >
+            <Plus className="h-3.5 w-3.5" /> Folder
+          </button>
+          {org.folders.length > 0 && (
+            <button
+              onClick={() => setManageFolders(true)}
+              className="shrink-0 rounded-full h-7 w-7 flex items-center justify-center text-muted-foreground hover:bg-muted"
+              aria-label="Edit folders"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      <ScrollArea className="flex-1 min-h-0 overflow-hidden pb-20 md:pb-2">
+        <div className="px-2 pb-2">
+          {filter === 'all' && archivedCount > 0 && !q && (
+            <button
+              onClick={() => setFilter('archived')}
+              className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-muted/60 text-left"
+            >
+              <span className="w-11 h-11 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Archive className="w-5 h-5 text-muted-foreground" />
               </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="groups" className="text-xs font-semibold gap-1 rounded-md">
-            <Users className="w-3 h-3" />
-            Groups ({groupChats.length})
-          </TabsTrigger>
-        </TabsList>
+              <span className="flex-1 text-sm font-medium">Archived</span>
+              <span className="text-xs text-muted-foreground">{archivedCount}</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
 
-        <ScrollArea className="flex-1 min-h-0 overflow-hidden pb-20 md:pb-2">
-          {/* —— DMs tab —— */}
-          <TabsContent value="dms" className="mt-0 px-2">
-            <AnimatePresence initial={false}>
-              {filteredConversations.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground px-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <MessageSquare className="w-8 h-8 text-primary/50" />
-                  </div>
-                  {search ? (
-                    <p className="text-sm">No conversations matching "{search}"</p>
-                  ) : (
-                    <>
-                      <p className="font-medium mb-1">No conversations yet</p>
-                      <p className="text-xs">Add friends and start chatting!</p>
-                    </>
-                  )}
-                </div>
+          {visible.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground px-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                {filter === 'archived' ? <Archive className="w-8 h-8 text-primary/50" /> : <MessageSquare className="w-8 h-8 text-primary/50" />}
+              </div>
+              {q ? (
+                <p className="text-sm">Nothing matches &ldquo;{search}&rdquo;</p>
+              ) : filter === 'archived' ? (
+                <p className="text-sm">No archived chats. Archive a chat from its ⋮ menu to tidy your list.</p>
+              ) : filter.startsWith('folder:') ? (
+                <p className="text-sm">This folder is empty. Use a chat&apos;s ⋮ menu → Move to folder.</p>
+              ) : filter === 'unread' ? (
+                <p className="text-sm">You&apos;re all caught up.</p>
+              ) : filter === 'groups' ? (
+                <>
+                  <p className="font-medium mb-1">No groups yet</p>
+                  <p className="text-xs mb-4">Create a group to chat with several people at once.</p>
+                  <CreateGroupChatDialog />
+                </>
               ) : (
-                filteredConversations.flatMap((c, index) => {
-                  const isSentByMe = c.lastMessage.senderId === currentUserId;
-                  const isUnread = c.unreadCount > 0 && !isSentByMe;
-                  const activePath = pathname === `/dm/${c.otherUserId}`;
-                  const preview = getPreviewText(c.lastMessage.content, c.lastMessage.isEncrypted);
-
-                  const isMuted = mutedIds.has(c.otherUserId);
-
-                  const row = (
-                    <motion.div
-                      key={c.otherUserId}
-                      layout
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -12 }}
-                      transition={{ duration: 0.15, delay: index * 0.02 }}
-                      className="relative group/row"
-                    >
-                      <button
-                        onClick={() => router.push(`/dm/${c.otherUserId}`)}
-                        className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-150 flex items-center gap-3 ${
-                          activePath
-                            ? 'bg-primary/15 border border-primary/30'
-                            : 'hover:bg-muted/60 active:bg-muted/80 border border-transparent'
-                        }`}
-                      >
-                        {/* Avatar */}
-                        <div className="relative shrink-0">
-                          <UserAvatar
-                            src={c.otherUser?.photoURL || ''}
-                            fallback={(
-                              c.otherUser?.displayName ||
-                              c.otherUser?.name ||
-                              c.otherUser?.email ||
-                              'U'
-                            )
-                              .substring(0, 2)
-                              .toUpperCase()}
-                            status={isOnline(c.otherUser?.lastSeen) ? 'online' : 'offline'}
-                          />
-                          {isMuted && (
-                            <BellOff className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-muted-foreground bg-background rounded-full p-px" />
+                <>
+                  <p className="font-medium mb-1">No conversations yet</p>
+                  <p className="text-xs mb-4">Add people by name or email, or share your QR code.</p>
+                  <Button size="sm" onClick={() => setShowAddSheet(true)}>
+                    <Plus className="w-4 h-4 mr-1" /> Add someone
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : (
+            visible.map((it) => {
+              const pref = org.get(it.type, it.id);
+              const active = pathname === (it.type === 'dm' ? `/dm/${it.id}` : `/group/${it.id}`);
+              const muted = mutedIds.has(it.id);
+              return (
+                <div key={`${it.type}:${it.id}`} className="relative group/row">
+                  <button
+                    onClick={() => openChat(it)}
+                    className={`w-full text-left rounded-xl px-3 py-2.5 pr-10 transition-colors flex items-center gap-3 ${
+                      active ? 'bg-primary/15 border border-primary/30' : 'hover:bg-muted/60 active:bg-muted/80 border border-transparent'
+                    }`}
+                  >
+                    <div className="relative shrink-0">
+                      {it.type === 'dm' ? (
+                        <UserAvatar
+                          src={it.photoURL || ''}
+                          fallback={it.name.substring(0, 2).toUpperCase()}
+                          status={it.online ? 'online' : 'offline'}
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-indigo-700 flex items-center justify-center ring-1 ring-violet-500/20">
+                          <span className="text-white font-bold text-sm select-none">{it.name.substring(0, 2).toUpperCase()}</span>
+                        </div>
+                      )}
+                      {muted && (
+                        <BellOff className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-muted-foreground bg-background rounded-full p-px" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <p className={`truncate text-sm flex items-center gap-1.5 ${it.unread ? 'font-bold' : 'font-medium text-foreground/85'}`}>
+                          {it.type === 'group' && <Users className="w-3.5 h-3.5 text-violet-400 shrink-0" />}
+                          <span className="truncate">{it.name}</span>
+                        </p>
+                        <span className={`text-[11px] shrink-0 tabular-nums ${it.unread ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                          {it.lastAt ? formatConvoTime(it.lastAt) : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 min-w-0">
+                          {it.type === 'dm' && it.sentByMe &&
+                            (it.read ? (
+                              <CheckCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+                            ) : (
+                              <Check className="w-3 h-3 text-muted-foreground shrink-0" />
+                            ))}
+                          <p className={`text-xs truncate ${it.unread ? 'text-foreground/80 font-medium' : 'text-muted-foreground'}`}>
+                            {it.preview}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {pref.pinned && <Pin className="w-3 h-3 text-muted-foreground rotate-45" aria-label="Pinned" />}
+                          {it.unread > 0 && (
+                            <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                              {it.unread > 99 ? '99+' : it.unread}
+                            </span>
                           )}
                         </div>
+                      </div>
+                    </div>
+                  </button>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <p
-                              className={`truncate text-sm ${
-                                isUnread ? 'font-bold text-foreground' : 'font-medium text-foreground/80'
-                              }`}
+                  {/* Actions — always visible on touch, on hover for mouse */}
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="p-1.5 rounded-lg hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                          aria-label={`Options for ${it.name}`}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => org.update(it.type, it.id, { pinned: !pref.pinned })}>
+                          {pref.pinned ? <PinOff className="w-4 h-4 mr-2" /> : <Pin className="w-4 h-4 mr-2" />}
+                          {pref.pinned ? 'Unpin' : 'Pin to top'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => org.update(it.type, it.id, { archived: !pref.archived })}>
+                          {pref.archived ? <ArchiveRestore className="w-4 h-4 mr-2" /> : <Archive className="w-4 h-4 mr-2" />}
+                          {pref.archived ? 'Unarchive' : 'Archive'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <FolderInput className="w-4 h-4 mr-2" />
+                            Move to folder
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-48">
+                            {org.folders.map((f) => (
+                              <DropdownMenuItem key={f.id} onClick={() => org.update(it.type, it.id, { folderId: f.id })}>
+                                <span className="flex-1 truncate">{f.name}</span>
+                                {pref.folderId === f.id && <Check className="w-4 h-4 ml-2" />}
+                              </DropdownMenuItem>
+                            ))}
+                            {org.folders.length > 0 && <DropdownMenuSeparator />}
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setMoveAfterCreate({ type: it.type, id: it.id });
+                                setFolderDialog({ mode: 'create' });
+                              }}
                             >
-                              {c.otherUser?.displayName ||
-                                c.otherUser?.name ||
-                                c.otherUser?.email}
-                            </p>
-                            <span
-                              className={`text-[11px] shrink-0 tabular-nums whitespace-nowrap ml-1 ${
-                                isUnread ? 'text-primary font-semibold' : 'text-muted-foreground'
-                              }`}
-                            >
-                              {formatConvoTime(c.lastMessage.createdAt)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1 min-w-0">
-                              {isSentByMe &&
-                                (c.lastMessage.read ? (
-                                  <CheckCheck className="w-3.5 h-3.5 text-primary shrink-0" />
-                                ) : (
-                                  <Check className="w-3 h-3 text-muted-foreground shrink-0" />
-                                ))}
-                              <p
-                                className={`text-xs truncate ${
-                                  isUnread ? 'text-foreground/80 font-medium' : 'text-muted-foreground'
-                                }`}
-                              >
-                                {isSentByMe ? 'You: ' : ''}
-                                {preview}
-                              </p>
-                            </div>
-                            {c.unreadCount > 0 && !isSentByMe && (
-                              <div className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 shrink-0 shadow-sm">
-                                {c.unreadCount > 99 ? '99+' : c.unreadCount}
-                              </div>
+                              <Plus className="w-4 h-4 mr-2" /> New folder…
+                            </DropdownMenuItem>
+                            {pref.folderId && (
+                              <DropdownMenuItem onClick={() => org.update(it.type, it.id, { folderId: null })}>
+                                Remove from folder
+                              </DropdownMenuItem>
                             )}
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Three-dot action menu — always visible on mobile, hover on desktop */}
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100 md:transition-opacity">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="p-1.5 rounded-lg hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
-                              onClick={e => e.stopPropagation()}
-                              aria-label="Conversation options"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="glass-card border-white/20 w-44">
-                            <DropdownMenuItem onClick={() => toggleMute(c.otherUserId)}>
-                              {isMuted ? (
-                                <><Bell className="w-4 h-4 mr-2" />Unmute</>
-                              ) : (
-                                <><BellOff className="w-4 h-4 mr-2" />Mute</>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleArchiveConvo(c.otherUserId)}>
-                              <Archive className="w-4 h-4 mr-2" />
-                              Archive
-                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuItem onClick={() => toggleMute(it.id)}>
+                          {muted ? <Bell className="w-4 h-4 mr-2" /> : <BellOff className="w-4 h-4 mr-2" />}
+                          {muted ? 'Unmute' : 'Mute notifications'}
+                        </DropdownMenuItem>
+                        {it.type === 'dm' && (
+                          <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => setDeleteTarget(c.otherUserId)}
+                              onClick={() => setDeleteTarget(it.id)}
                               className="text-destructive focus:text-destructive focus:bg-destructive/10"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete chat
+                              Clear chat
                             </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </motion.div>
-                  );
-
-                  const items: React.ReactNode[] = [row];
-                  if ((index + 1) % 4 === 0 && MOCK_ADS.length > 0) {
-                    const adIndex = Math.floor(index / 4) % MOCK_ADS.length;
-                    items.push(
-                      <SponsoredChatRow
-                        key={`ad-${index}`}
-                        ad={MOCK_ADS[adIndex]}
-                        animationDelay={(index + 1) * 0.04}
-                      />,
-                    );
-                  }
-                  return items;
-                })
-              )}
-            </AnimatePresence>
-          </TabsContent>
-
-          {/* —— Groups tab —— */}
-          <TabsContent value="groups" className="mt-0 px-2">
-            {filteredGroups.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground px-4">
-                <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-8 h-8 text-violet-400/60" />
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-                {search ? (
-                  <p className="text-sm">No groups matching "{search}"</p>
-                ) : (
-                  <>
-                    <p className="font-medium mb-1">No group chats yet</p>
-                    <p className="text-xs mb-4">Create a group to chat with multiple friends!</p>
-                    <CreateGroupChatDialog />
-                  </>
-                )}
-              </div>
-            ) : (
-              <AnimatePresence initial={false}>
-                {filteredGroups.map((group, index) => {
-                  const activePath = pathname === `/group/${group.id}`;
-                  return (
-                    <motion.button
-                      key={group.id}
-                      layout
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -12 }}
-                      transition={{ duration: 0.15, delay: index * 0.02 }}
-                      onClick={() => router.push(`/group/${group.id}`)}
-                      className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-150 flex items-center gap-3 ${
-                        activePath
-                          ? 'bg-violet-500/15 border border-violet-500/30'
-                          : 'hover:bg-muted/60 active:bg-muted/80 border border-transparent'
-                      }`}
-                    >
-                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-indigo-700 flex items-center justify-center shadow-sm ring-1 ring-violet-500/20 shrink-0">
-                        <span className="text-white font-bold text-sm select-none">
-                          {group.name.substring(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-sm truncate">{group.name}</p>
-                          {group.userRole === 'admin' && (
-                            <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded shrink-0">
-                              Admin
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
-                          {group.description ? ` · ${group.description}` : ''}
-                        </p>
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </AnimatePresence>
-            )}
-          </TabsContent>
-        </ScrollArea>
-      </Tabs>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
 
       {/* ── Profile strip at bottom (desktop only) — like WhatsApp's bottom bar ── */}
       <div className="hidden md:flex items-center gap-2 px-3 py-2.5 border-t border-border/20 bg-background shrink-0">
@@ -633,9 +725,9 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
       <AlertDialogContent className="glass-card border-white/20">
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+          <AlertDialogTitle>Clear this chat?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete the chat history. This action cannot be undone.
+            This clears the chat history on your side only. The other person keeps their copy.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -644,11 +736,41 @@ export default function ConversationListPanel({ compact = false }: ConversationL
             className="bg-destructive hover:bg-destructive/90"
             onClick={() => { if (deleteTarget) handleDeleteConvo(deleteTarget); setDeleteTarget(null); }}
           >
-            Delete
+            Clear chat
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <FolderNameDialog
+      open={!!folderDialog}
+      title={folderDialog?.mode === 'rename' ? 'Rename folder' : 'New folder'}
+      initialName={folderDialog?.mode === 'rename' ? folderDialog.folder.name : ''}
+      onOpenChange={(open) => {
+        if (!open) {
+          setFolderDialog(null);
+          setMoveAfterCreate(null);
+        }
+      }}
+      onSubmit={async (name) => {
+        if (folderDialog?.mode === 'rename') {
+          await org.renameFolder(folderDialog.folder.id, name);
+          return;
+        }
+        const folder = await org.createFolder(name);
+        if (folder && moveAfterCreate) await org.update(moveAfterCreate.type, moveAfterCreate.id, { folderId: folder.id });
+        if (folder && !moveAfterCreate) setFilter(`folder:${folder.id}`);
+        setMoveAfterCreate(null);
+      }}
+    />
+    <ManageFoldersDialog
+      open={manageFolders}
+      onOpenChange={setManageFolders}
+      folders={org.folders}
+      onRename={(folder) => setFolderDialog({ mode: 'rename', folder })}
+      onDelete={(folder) => org.deleteFolder(folder.id)}
+      onCreate={() => setFolderDialog({ mode: 'create' })}
+    />
 
     {/* QR Code Sheet */}
     <QRContactSheet open={showQRSheet} onOpenChange={setShowQRSheet} />

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { conversationClears, directMessages, users } from '@/lib/schema';
+import { chatPreferences, conversationClears, directMessages, users } from '@/lib/schema';
 import { eq, or, and, gt, desc, asc, sql } from 'drizzle-orm';
 import { isUuid } from '@/lib/validate';
 export const runtime = 'nodejs';
@@ -150,23 +150,18 @@ export async function PATCH(
       if (typeof body.archived !== 'boolean') return NextResponse.json({ ok: true });
     }
 
-    const updatePayload: Record<string, unknown> = {};
-    if (typeof body.archived === 'boolean') updatePayload.archived = body.archived;
-
-    if (Object.keys(updatePayload).length === 0) {
+    if (typeof body.archived !== 'boolean') {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
-    // Apply update to all messages in this conversation
+    // Archiving is per user: it only hides the chat from *my* list.
     await db
-      .update(directMessages)
-      .set(updatePayload as any)
-      .where(
-        or(
-          and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
-          and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
-        )
-      );
+      .insert(chatPreferences)
+      .values({ userId: currentUserId, chatType: 'dm', chatId: otherUserId, archived: body.archived })
+      .onConflictDoUpdate({
+        target: [chatPreferences.userId, chatPreferences.chatType, chatPreferences.chatId],
+        set: { archived: body.archived, updatedAt: new Date() },
+      });
 
     return NextResponse.json({ message: 'Conversation updated' });
   } catch (error) {
