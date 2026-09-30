@@ -4,7 +4,8 @@ import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
+import { isGroupMember } from '@/lib/access';
 import { groupChatMessages, groupChatMembers, users } from '@/lib/schema';
 import { eq, and, desc, asc, gt } from 'drizzle-orm';
 
@@ -148,24 +149,6 @@ export async function POST(
       );
     }
 
-    // Check if user is a member
-    const [membership] = await db
-      .select()
-      .from(groupChatMembers)
-      .where(
-        and(
-          eq(groupChatMembers.groupChatId, groupChatId),
-          eq(groupChatMembers.userId, userId)
-        )
-      );
-
-    if (!membership) {
-      return NextResponse.json(
-        { error: 'Not a member of this group' },
-        { status: 403 }
-      );
-    }
-
     if (hasContent && content.length > MAX_MESSAGE_LENGTH) {
       return NextResponse.json({ error: 'Message is too long' }, { status: 400 });
     }
@@ -174,36 +157,46 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid media URL' }, { status: 400 });
     }
 
-    const limit = await rateLimit(`send:${userId}`, 120, 60);
+    // Membership and rate limit are independent: check them together.
+    const [member, limit] = await Promise.all([
+      isGroupMember(groupChatId, userId),
+      rateLimit(`send:${userId}`, 120, 60),
+    ]);
+    if (!member) {
+      return NextResponse.json(
+        { error: 'Not a member of this group' },
+        { status: 403 }
+      );
+    }
     if (!limit.allowed) return tooManyRequests(60);
 
-    // Create the message
-    const [newMessage] = await db
-      .insert(groupChatMessages)
-      .values({
-        groupChatId,
-        userId,
-        content: hasContent ? content.trim() : '',
-        contentNonce: contentNonce || null,
-        isEncrypted: !!isEncrypted,
-        ...(mediaUrl && { mediaUrl }),
-        ...(mediaType && { mediaType }),
-        mediaEncrypted: !!mediaEncrypted,
-        mediaNonce: mediaNonce || null,
-      })
-      .returning();
-
-    // Get sender info
-    const [sender] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        displayName: users.displayName,
-        photoURL: users.photoURL,
-      })
-      .from(users)
-      .where(eq(users.id, userId));
+    // Insert and hydrate the sender in one round trip.
+    const [[newMessage], [sender]] = await runBatch([
+      db
+        .insert(groupChatMessages)
+        .values({
+          groupChatId,
+          userId,
+          content: hasContent ? content.trim() : '',
+          contentNonce: contentNonce || null,
+          isEncrypted: !!isEncrypted,
+          ...(mediaUrl && { mediaUrl }),
+          ...(mediaType && { mediaType }),
+          mediaEncrypted: !!mediaEncrypted,
+          mediaNonce: mediaNonce || null,
+        })
+        .returning(),
+      db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          displayName: users.displayName,
+          photoURL: users.photoURL,
+        })
+        .from(users)
+        .where(eq(users.id, userId)),
+    ]);
 
     return NextResponse.json({
       message: {

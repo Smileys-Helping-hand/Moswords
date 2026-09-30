@@ -1,4 +1,4 @@
-// End-to-end journey test: sign up → find & add each other → DMs → groups →
+// End-to-end journey test (51 assertions): sign up → find & add each other → DMs → groups →
 // archive / folders / pin → search, plus the checks that outsiders are kept out.
 //
 // Creates throwaway accounts, so it only runs against a LOCAL server backed by a
@@ -115,6 +115,10 @@ const dm = await A.req('POST', '/api/direct-messages', { receiverId: B.id, conte
 check('Amara messages Bongani', dm.status === 201, JSON.stringify(dm.data).slice(0, 200));
 const xss = await A.req('POST', '/api/direct-messages', { receiverId: B.id, content: 'x', mediaUrl: 'javascript:alert(1)' });
 check('javascript: media URL rejected', xss.status === 400);
+const ghost = await A.req('POST', '/api/direct-messages', { receiverId: crypto.randomUUID(), content: 'anyone there?' });
+check('message to a non-existent user → 404 (not 500)', ghost.status === 404, String(ghost.status));
+const malformed = await A.req('GET', '/api/group-chats/not-a-uuid/messages');
+check('malformed id → 404 before hitting the database', malformed.status === 404, String(malformed.status));
 const syncB = await B.req('GET', `/api/sync?cursor=${encodeURIComponent(cursorB)}`);
 check('Bongani receives it through sync', syncB.data.dms?.some((m) => m.content === `hello bongani ${run}`));
 const convB = await B.req('GET', '/api/conversations');

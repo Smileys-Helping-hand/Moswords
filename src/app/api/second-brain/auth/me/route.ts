@@ -1,91 +1,49 @@
 /**
- * GET /api/second-brain/auth/me
+ * GET /api/second-brain/auth/me — look up an AwehChat user's public profile.
  *
- * Master endpoint for all connected apps to verify authentication
- * and get the authenticated user's profile.
- *
- * Authorization: Bearer <SECOND_BRAIN_API_KEY>
- *
- * Response:
- * {
- *   uid: string,
- *   email: string,
- *   displayName: string | null,
- *   photoURL: string | null,
- *   role: "admin" | "user",
- *   authenticated: true,
- *   timestamp: number
- * }
- *
- * Errors:
- * 401: Unauthorized - Invalid or missing token
- * 403: Forbidden - Token valid but user deactivated
- * 500: Server error
+ * Legacy path kept for existing integrations. Auth: an ecosystem app key with
+ * `profile.read` (Authorization: Bearer <key>) plus the user via X-User-Email.
+ * The old shared "master token" is gone — it was committed publicly.
  */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { validateMasterToken, MasterTokenError } from '@/lib/master-token';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { users } from '@/lib/schema';
+import { authenticateApp, resolveActingUser } from '@/lib/ecosystem-auth';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  try {
-    // Validate master token first
-    const token = await validateMasterToken();
+  const auth = await authenticateApp(request, 'profile.read');
+  if (auth.response) return auth.response;
+  const acting = await resolveActingUser(request);
+  if (acting.response) return acting.response;
 
-    // Get the actual user session from the database
-    const session = await getServerSession(authOptions);
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      displayName: users.displayName,
+      photoURL: users.photoURL,
+      customStatus: users.customStatus,
+    })
+    .from(users)
+    .where(eq(users.id, acting.user.id))
+    .limit(1);
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No session found', authenticated: false },
-        { status: 401 }
-      );
-    }
-
-    const user = session.user as any;
-
-    // Return user profile in standardized format
-    return NextResponse.json(
-      {
-        uid: user.id || user.uid,
-        email: user.email,
-        displayName: user.displayName || user.name || null,
-        photoURL: user.photoURL || user.image || null,
-        role: user.role || 'user',
-        authenticated: true,
-        timestamp: Date.now(),
-        // Include connected apps info if available
-        connectedApps: user.connectedApps || [],
-      },
-      {
-        status: 200,
-        headers: {
-          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
-          'X-Token-Valid': 'true',
-        },
-      }
-    );
-  } catch (error) {
-    if (error instanceof MasterTokenError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          authenticated: false,
-          code: 'AUTH_FAILED',
-        },
-        { status: error.status }
-      );
-    }
-
-    console.error('[Second Brain Auth] Unexpected error:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        authenticated: false,
-        code: 'SERVER_ERROR',
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      uid: user.id,
+      email: user.email,
+      displayName: user.displayName || user.name || null,
+      photoURL: user.photoURL,
+      customStatus: user.customStatus,
+      authenticated: true,
+      appName: auth.app.appName,
+      timestamp: Date.now(),
+    },
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  );
 }

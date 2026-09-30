@@ -33,7 +33,7 @@ export async function GET() {
   } catch (error: any) {
     console.error('Error fetching apps:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch apps', details: error.message },
+      { error: 'Failed to fetch apps' },
       { status: 500 }
     );
   }
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error registering app:', error);
     return NextResponse.json(
-      { error: 'Failed to register app', details: error.message },
+      { error: 'Failed to register app' },
       { status: 500 }
     );
   }
@@ -158,7 +158,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error: any) {
     console.error('Error updating app:', error);
     return NextResponse.json(
-      { error: 'Failed to update app', details: error.message },
+      { error: 'Failed to update app' },
       { status: 500 }
     );
   }

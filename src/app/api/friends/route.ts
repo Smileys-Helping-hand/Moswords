@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isUuid } from '@/lib/validate';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
 import { friends, users } from '@/lib/schema';
 import { eq, or, and } from 'drizzle-orm';
 
@@ -32,76 +32,64 @@ export async function GET(request: NextRequest) {
       whereParts.push(eq(friends.status, status));
     }
 
-    // Get friends where current user is userId
-    let userFriends = [];
-    let reverseFriends = [];
-    let pendingRequests = [];
+    const person = {
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      displayName: users.displayName,
+      photoURL: users.photoURL,
+      customStatus: users.customStatus,
+      lastSeen: users.lastSeen,
+    };
+
+    // Three independent lists, fetched in one round trip.
+    let userFriends;
+    let reverseFriends;
+    let pendingRequests;
 
     try {
-      userFriends = await db
+      [userFriends, reverseFriends, pendingRequests] = await runBatch([
+      db
         .select({
           id: friends.id,
           userId: friends.userId,
           friendId: friends.friendId,
           status: friends.status,
           createdAt: friends.createdAt,
-          friend: {
-            id: users.id,
-            email: users.email,
-            name: users.name,
-            displayName: users.displayName,
-            photoURL: users.photoURL,
-            customStatus: users.customStatus,
-            lastSeen: users.lastSeen,
-          },
+          friend: person,
         })
         .from(friends)
         .leftJoin(users, eq(friends.friendId, users.id))
-        .where(and(...whereParts));
+        .where(and(...whereParts)),
 
       // Also get friends where current user is friendId (accepted friendships)
-      reverseFriends = await db
+      db
         .select({
           id: friends.id,
           userId: friends.userId,
           friendId: friends.friendId,
           status: friends.status,
           createdAt: friends.createdAt,
-          friend: {
-            id: users.id,
-            email: users.email,
-            name: users.name,
-            displayName: users.displayName,
-            photoURL: users.photoURL,
-            customStatus: users.customStatus,
-            lastSeen: users.lastSeen,
-          },
+          friend: person,
         })
         .from(friends)
         .leftJoin(users, eq(friends.userId, users.id))
-        .where(and(eq(friends.friendId, userId), eq(friends.status, 'accepted')));
+        .where(and(eq(friends.friendId, userId), eq(friends.status, 'accepted'))),
 
       // Also get pending requests sent to this user
-      pendingRequests = await db
+      db
         .select({
           id: friends.id,
           userId: friends.userId,
           friendId: friends.friendId,
           status: friends.status,
           createdAt: friends.createdAt,
-          requester: {
-            id: users.id,
-            email: users.email,
-            name: users.name,
-            displayName: users.displayName,
-            photoURL: users.photoURL,
-            customStatus: users.customStatus,
-            lastSeen: users.lastSeen,
-          },
+          requester: person,
         })
         .from(friends)
         .leftJoin(users, eq(friends.userId, users.id))
-        .where(and(eq(friends.friendId, userId), eq(friends.status, 'pending')));
+        .where(and(eq(friends.friendId, userId), eq(friends.status, 'pending'))),
+      ]);
     } catch (dbError) {
       console.error('Database error fetching friends:', dbError);
       // Return empty arrays if friends table doesn't exist or has issues

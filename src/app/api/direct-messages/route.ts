@@ -3,7 +3,8 @@ import { isSafeMediaUrl, isUuid, MAX_MESSAGE_LENGTH } from '@/lib/validate';
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
+import { isForeignKeyViolation } from '@/lib/db-errors';
 import { directMessages, users } from '@/lib/schema';
 import { eq, or, desc, and, lt } from 'drizzle-orm';
 import { decodeCursor, createCursor, createPaginatedResponse } from '@/lib/pagination';
@@ -181,33 +182,33 @@ export async function POST(request: NextRequest) {
     const limit = await rateLimit(`send:${userId}`, 120, 60);
     if (!limit.allowed) return tooManyRequests(60);
 
-    // Create the message
-    const [newMessage] = await db
-      .insert(directMessages)
-      .values({
-        senderId: userId,
-        receiverId,
-        content: hasContent ? content.trim() : '',
-        contentNonce: contentNonce || null,
-        isEncrypted: !!isEncrypted,
-        ...(mediaUrl && { mediaUrl }),
-        ...(mediaType && { mediaType }),
-        mediaEncrypted: !!mediaEncrypted,
-        mediaNonce: mediaNonce || null,
-      })
-      .returning();
-
-    // Hydrate sender info so clients can render immediately
-    const [sender] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        displayName: users.displayName,
-        photoURL: users.photoURL,
-      })
-      .from(users)
-      .where(eq(users.id, userId));
+    // Insert and hydrate the sender in one round trip.
+    const [[newMessage], [sender]] = await runBatch([
+      db
+        .insert(directMessages)
+        .values({
+          senderId: userId,
+          receiverId,
+          content: hasContent ? content.trim() : '',
+          contentNonce: contentNonce || null,
+          isEncrypted: !!isEncrypted,
+          ...(mediaUrl && { mediaUrl }),
+          ...(mediaType && { mediaType }),
+          mediaEncrypted: !!mediaEncrypted,
+          mediaNonce: mediaNonce || null,
+        })
+        .returning(),
+      db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          displayName: users.displayName,
+          photoURL: users.photoURL,
+        })
+        .from(users)
+        .where(eq(users.id, userId)),
+    ]);
 
     return NextResponse.json(
       {
@@ -219,6 +220,9 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      return NextResponse.json({ error: 'Recipient not found' }, { status: 404 });
+    }
     console.error('Error sending direct message:', error);
     return NextResponse.json(
       { error: 'Failed to send message' },

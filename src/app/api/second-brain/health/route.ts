@@ -24,7 +24,8 @@ export async function GET() {
       version: '1.0.0',
       endpoints: {
         auth: '/api/second-brain/auth/me',
-        gateway: '/api/second-brain/data/gateway',
+        contacts: '/api/second-brain/contacts',
+        v1: '/api/v1/health',
         health: '/api/second-brain/health',
       },
     },

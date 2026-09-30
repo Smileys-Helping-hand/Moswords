@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, asc, eq, gt, inArray, ne, or, sql, count } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
 import {
   channels,
   directMessages,
@@ -66,19 +66,16 @@ export async function GET(request: NextRequest) {
 
   // Presence is cheap to piggy-back and saves the chat header its own poll.
   const presenceIds = (params.get('presence') || '').split(',').filter(isUuid).slice(0, 50);
-  const presenceQuery = presenceIds.length
-    ? db
-        .select({ id: users.id, lastSeen: users.lastSeen, privacy: users.privacySettings })
-        .from(users)
-        .where(inArray(users.id, presenceIds))
-    : Promise.resolve([]);
+  const presenceQuery = db
+    .select({ id: users.id, lastSeen: users.lastSeen, privacy: users.privacySettings })
+    .from(users)
+    .where(presenceIds.length ? inArray(users.id, presenceIds) : sql`false`);
 
   // Throttled heartbeat: at most one write per user per minute.
   const heartbeat = db
     .update(users)
     .set({ lastSeen: now })
-    .where(and(eq(users.id, me), sql`${users.lastSeen} < now() - interval '60 seconds'`))
-    .catch(() => {});
+    .where(and(eq(users.id, me), sql`${users.lastSeen} < now() - interval '60 seconds'`));
 
   // Occasional housekeeping so the short-lived tables never grow unbounded.
   if (Math.random() < 0.02) {
@@ -91,7 +88,7 @@ export async function GET(request: NextRequest) {
 
   try {
     if (!cursor || isNaN(cursor.getTime()) || now.getTime() - cursor.getTime() > MAX_GAP_MS) {
-      const [[requests], presence] = await Promise.all([friendRequestsQuery, presenceQuery, heartbeat]);
+      const [[requests], presence] = await runBatch([friendRequestsQuery, presenceQuery, heartbeat]);
       return json({
         ...base,
         reset: !!cursorParam,
@@ -119,7 +116,8 @@ export async function GET(request: NextRequest) {
       .innerJoin(serverMembers, eq(serverMembers.serverId, channels.serverId))
       .where(eq(serverMembers.userId, me));
 
-    const [dms, groupMsgs, channelMsgs, signals, typing, reads, [requests], presence] = await Promise.all([
+    // All eight reads plus the heartbeat go to Neon in a single HTTP round trip.
+    const [dms, groupMsgs, channelMsgs, signals, typing, reads, [requests], presence] = await runBatch([
       db
         .select({
           id: directMessages.id,
@@ -233,15 +231,13 @@ export async function GET(request: NextRequest) {
             ),
           ),
         )
-        .limit(50)
-        .catch(() => []),
+        .limit(50),
 
       db
         .select({ id: directMessages.id, receiverId: directMessages.receiverId, readAt: directMessages.readAt })
         .from(directMessages)
         .where(and(eq(directMessages.senderId, me), gt(directMessages.readAt, since)))
-        .limit(500)
-        .catch(() => []),
+        .limit(500),
 
       friendRequestsQuery,
       presenceQuery,

@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (err: any) {
-        const errData = `data: ${JSON.stringify({ error: err.message || 'Stream error' })}\n\n`;
+        console.error('AI chat stream failed:', err?.message);
+        const errData = `data: ${JSON.stringify({ error: 'The assistant is unavailable right now. Please try again.' })}\n\n`;
         controller.enqueue(encoder.encode(errData));
       } finally {
         controller.close();

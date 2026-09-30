@@ -10,7 +10,7 @@ import {
   groupChatMembers,
   serverMembers,
 } from '@/lib/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 function isUserInDmScope(scopeId: string, userId: string): boolean {
   const parts = scopeId.split(':').filter(Boolean);
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { scope, scopeId, entries } = body || {};
 
-    if (!scope || !scopeId || !Array.isArray(entries) || entries.length === 0) {
+    if (!scope || !scopeId || !Array.isArray(entries) || entries.length === 0 || entries.length > 1000) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
@@ -114,26 +114,26 @@ export async function POST(request: NextRequest) {
 
     const userByDevice = new Map(deviceRecords.map((record) => [record.deviceId, record.userId]));
 
-    for (const entry of entries) {
-      const targetUserId = userByDevice.get(entry.deviceId);
-      if (!targetUserId) continue;
+    // One multi-row upsert instead of a round trip per device.
+    const now = new Date();
+    const rows = (entries as { deviceId: string; encryptedKey: string }[])
+      .filter((entry) => userByDevice.has(entry.deviceId) && typeof entry.encryptedKey === 'string')
+      .map((entry) => ({
+        scope,
+        scopeId,
+        userId: userByDevice.get(entry.deviceId)!,
+        deviceId: entry.deviceId,
+        encryptedKey: entry.encryptedKey,
+        updatedAt: now,
+      }));
 
+    if (rows.length > 0) {
       await db
         .insert(conversationKeys)
-        .values({
-          scope,
-          scopeId,
-          userId: targetUserId,
-          deviceId: entry.deviceId,
-          encryptedKey: entry.encryptedKey,
-          updatedAt: new Date(),
-        })
+        .values(rows)
         .onConflictDoUpdate({
           target: [conversationKeys.scope, conversationKeys.scopeId, conversationKeys.deviceId],
-          set: {
-            encryptedKey: entry.encryptedKey,
-            updatedAt: new Date(),
-          },
+          set: { encryptedKey: sql`excluded.encrypted_key`, updatedAt: now },
         });
     }
 

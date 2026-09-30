@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
 import { chatPreferences, conversationClears, directMessages, users } from '@/lib/schema';
 import { eq, or, and, gt, desc, asc, sql } from 'drizzle-orm';
 import { isUuid } from '@/lib/validate';
@@ -56,13 +56,9 @@ export async function GET(
     const afterId = searchParams.get('after'); // incremental fetch (older clients)
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 100);
 
-    // "Clear chat" hides everything before the clear point for this user only.
-    const [cleared] = await db
-      .select({ at: conversationClears.clearedAt })
-      .from(conversationClears)
-      .where(and(eq(conversationClears.userId, currentUserId), eq(conversationClears.otherUserId, otherUserId)))
-      .limit(1)
-      .catch(() => [] as { at: Date }[]);
+    if (afterId && !isUuid(afterId)) {
+      return NextResponse.json({ error: 'Invalid cursor' }, { status: 400 });
+    }
 
     const pair = or(
       and(
@@ -74,46 +70,38 @@ export async function GET(
         eq(directMessages.receiverId, currentUserId),
       ),
     );
-    const messagesBetween = cleared?.at ? and(pair, gt(directMessages.createdAt, cleared.at)) : pair;
+    // "Clear chat" hides everything before the clear point for this user only.
+    const afterClear = gt(
+      directMessages.createdAt,
+      sql`COALESCE((SELECT cleared_at FROM conversation_clears WHERE user_id = ${currentUserId} AND other_user_id = ${otherUserId}), '-infinity'::timestamp)`,
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let messages: any[] = [];
-
-    if (afterId) {
-      // ── Incremental fetch: only messages newer than afterId ──────────────
-      // First look up the createdAt timestamp of the anchor message so we can
-      // use a range query (avoids a full table scan).
-      const [anchor] = await db
-        .select({ createdAt: directMessages.createdAt })
-        .from(directMessages)
-        .where(eq(directMessages.id, afterId))
-        .limit(1);
-
-      if (anchor) {
-        messages = await db
+    // Messages + mark-as-read in a single round trip.
+    const query = afterId
+      ? db
           .select(MESSAGE_SELECT)
           .from(directMessages)
           .leftJoin(users, eq(directMessages.senderId, users.id))
-          .where(and(messagesBetween!, gt(directMessages.createdAt, anchor.createdAt)))
+          .where(
+            and(
+              pair,
+              afterClear,
+              gt(directMessages.createdAt, sql`(SELECT created_at FROM direct_messages WHERE id = ${afterId})`),
+            ),
+          )
           .orderBy(asc(directMessages.createdAt))
-          .limit(200); // Allow up to 200 new messages per poll burst
-      } else {
-        messages = [];
-      }
-    } else {
-      // ── Initial load: most recent N messages ─────────────────────────────
-      const rows = await db
-        .select(MESSAGE_SELECT)
-        .from(directMessages)
-        .leftJoin(users, eq(directMessages.senderId, users.id))
-        .where(messagesBetween!)
-        .orderBy(desc(directMessages.createdAt))
-        .limit(limit);
-      // Reverse so they display oldest→newest in the UI
-      messages = rows.reverse();
-    }
+          .limit(200)
+      : db
+          .select(MESSAGE_SELECT)
+          .from(directMessages)
+          .leftJoin(users, eq(directMessages.senderId, users.id))
+          .where(and(pair, afterClear))
+          .orderBy(desc(directMessages.createdAt))
+          .limit(limit);
 
-    await markRead(currentUserId, otherUserId);
+    const [rows] = await runBatch([query, markReadQuery(currentUserId, otherUserId)]);
+    // Initial loads come newest-first from the index; show oldest→newest.
+    const messages = afterId ? rows : [...rows].reverse();
 
     return NextResponse.json({ messages });
   } catch (error) {
@@ -210,26 +198,27 @@ export async function DELETE(
   }
 }
 
-/** Mark the other user's messages to me as read, unless I turned read receipts off. */
+/**
+ * Mark the other user's messages to me as read — unless I turned read receipts
+ * off (checked inside the same statement, so it costs no extra round trip).
+ */
+function markReadQuery(currentUserId: string, otherUserId: string) {
+  return db
+    .update(directMessages)
+    .set({ read: true, readAt: sql`now()` })
+    .where(
+      and(
+        eq(directMessages.receiverId, currentUserId),
+        eq(directMessages.senderId, otherUserId),
+        eq(directMessages.read, false),
+        sql`COALESCE((SELECT (privacy_settings->>'readReceipts')::boolean FROM users WHERE id = ${currentUserId}), true)`,
+      ),
+    );
+}
+
 async function markRead(currentUserId: string, otherUserId: string) {
   try {
-    const [me] = await db
-      .select({ privacySettings: users.privacySettings })
-      .from(users)
-      .where(eq(users.id, currentUserId))
-      .limit(1);
-    if (me?.privacySettings?.readReceipts === false) return;
-
-    await db
-      .update(directMessages)
-      .set({ read: true, readAt: sql`now()` })
-      .where(
-        and(
-          eq(directMessages.receiverId, currentUserId),
-          eq(directMessages.senderId, otherUserId),
-          eq(directMessages.read, false),
-        ),
-      );
+    await markReadQuery(currentUserId, otherUserId);
   } catch (error) {
     console.warn('markRead failed:', (error as Error).message);
   }

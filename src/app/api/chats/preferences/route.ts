@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
 import { chatFolders, chatPreferences } from '@/lib/schema';
 import { requireUser } from '@/lib/session';
 import { isGroupMember } from '@/lib/access';
@@ -15,7 +15,7 @@ export async function GET() {
   if (auth.response) return auth.response;
   const me = auth.user.id;
 
-  const [folders, prefs] = await Promise.all([
+  const [folders, prefs] = await runBatch([
     db
       .select({ id: chatFolders.id, name: chatFolders.name, position: chatFolders.position })
       .from(chatFolders)

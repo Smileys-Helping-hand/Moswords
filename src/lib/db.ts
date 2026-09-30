@@ -46,3 +46,17 @@ function createDb(): NeonHttpDatabase<typeof schema> {
 }
 
 export const db = createDb();
+
+/**
+ * Run independent queries together. On Neon they travel in ONE HTTP request
+ * (drizzle's db.batch — a single round trip and a single short transaction)
+ * instead of one request each; on a local Postgres they run in parallel.
+ * Pass drizzle query builders (not already-awaited promises).
+ */
+export async function runBatch<T extends unknown[]>(queries: [...{ [K in keyof T]: PromiseLike<T[K]> }]): Promise<T> {
+  const batch = (db as unknown as { batch?: (q: unknown[]) => Promise<unknown[]> }).batch;
+  if (queries.length > 1 && typeof batch === 'function' && !isLocalDatabase(process.env.DATABASE_URL)) {
+    return (await batch.call(db, queries as unknown[])) as T;
+  }
+  return (await Promise.all(queries)) as T;
+}
