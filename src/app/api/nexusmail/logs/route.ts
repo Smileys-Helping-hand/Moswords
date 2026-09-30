@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching logs:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch logs', details: error.message },
+      { error: 'Failed to fetch logs' },
       { status: 500 }
     );
   }

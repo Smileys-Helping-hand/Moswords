@@ -19,9 +19,7 @@ const ALLOW = [
   /^SES_(REGION|FROM_EMAIL|ACCESS_KEY_ID|SECRET_ACCESS_KEY)$/,
   /^MFA_ENCRYPTION_KEY$/,
   /^BLOB_READ_WRITE_TOKEN$/,
-  /^SECOND_BRAIN_[A-Z_]+$/,
-  /^NEXUS_[A-Z_]+$/,
-  /^[A-Z_]+_API_KEY$/,
+  /^NEXUS_(EMAIL|OS)_API_URL$/,
 ];
 
 const lines = [];

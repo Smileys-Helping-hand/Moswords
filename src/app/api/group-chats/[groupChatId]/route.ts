@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
-import { db } from '@/lib/db';
+import { db, runBatch } from '@/lib/db';
 import { groupChats, groupChatMembers, users } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 
@@ -20,16 +20,34 @@ export async function GET(
 
     const userId = (session.user as any).id;
 
-    // Check if user is a member
-    const [membership] = await db
-      .select()
-      .from(groupChatMembers)
-      .where(
-        and(
-          eq(groupChatMembers.groupChatId, groupChatId),
-          eq(groupChatMembers.userId, userId)
-        )
-      );
+    // Membership, group and member list in one round trip; nothing is
+    // returned unless the caller turns out to be a member.
+    const [[membership], [groupChat], members] = await runBatch([
+      db
+        .select({ role: groupChatMembers.role })
+        .from(groupChatMembers)
+        .where(and(eq(groupChatMembers.groupChatId, groupChatId), eq(groupChatMembers.userId, userId)))
+        .limit(1),
+      db.select().from(groupChats).where(eq(groupChats.id, groupChatId)).limit(1),
+      db
+        .select({
+          id: groupChatMembers.id,
+          userId: groupChatMembers.userId,
+          role: groupChatMembers.role,
+          joinedAt: groupChatMembers.joinedAt,
+          user: {
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            displayName: users.displayName,
+            photoURL: users.photoURL,
+            lastSeen: users.lastSeen,
+          },
+        })
+        .from(groupChatMembers)
+        .leftJoin(users, eq(groupChatMembers.userId, users.id))
+        .where(eq(groupChatMembers.groupChatId, groupChatId)),
+    ]);
 
     if (!membership) {
       return NextResponse.json(
@@ -37,36 +55,9 @@ export async function GET(
         { status: 403 }
       );
     }
-
-    // Get group chat details
-    const [groupChat] = await db
-      .select()
-      .from(groupChats)
-      .where(eq(groupChats.id, groupChatId));
-
     if (!groupChat) {
       return NextResponse.json({ error: 'Group chat not found' }, { status: 404 });
     }
-
-    // Get all members with user details
-    const members = await db
-      .select({
-        id: groupChatMembers.id,
-        userId: groupChatMembers.userId,
-        role: groupChatMembers.role,
-        joinedAt: groupChatMembers.joinedAt,
-        user: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          displayName: users.displayName,
-          photoURL: users.photoURL,
-          lastSeen: users.lastSeen,
-        },
-      })
-      .from(groupChatMembers)
-      .leftJoin(users, eq(groupChatMembers.userId, users.id))
-      .where(eq(groupChatMembers.groupChatId, groupChatId));
 
     return NextResponse.json({
       groupChat,
