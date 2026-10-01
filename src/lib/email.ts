@@ -21,10 +21,35 @@ export interface EmailOptions {
 }
 
 /**
- * Send email via AWS SES
+ * Send a transactional email.
+ *
+ * Resend when RESEND_API_KEY is set (no manual sending review), otherwise AWS
+ * SES. SES only delivers to verified addresses until AWS grants production
+ * access, so Resend is the way to get password resets working immediately.
  */
 export async function sendEmail({ to, subject, htmlBody, textBody }: EmailOptions): Promise<void> {
-  const fromEmail = process.env.SES_FROM_EMAIL || process.env.AWS_SES_FROM_EMAIL || 'AwehChat <noreply@awehchat.co.za>';
+  const fromEmail =
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.SES_FROM_EMAIL ||
+    process.env.AWS_SES_FROM_EMAIL ||
+    'Moswords <noreply@awehchat.co.za>';
+
+  if (process.env.RESEND_API_KEY) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: fromEmail, to: [to], subject, html: htmlBody, text: textBody }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      console.error('Resend rejected email:', res.status, (await res.text()).slice(0, 300));
+      throw new Error('Failed to send email');
+    }
+    return;
+  }
 
   try {
     const command = new SendEmailCommand({
