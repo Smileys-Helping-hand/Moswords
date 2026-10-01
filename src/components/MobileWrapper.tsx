@@ -10,14 +10,18 @@ import { useEffect } from 'react';
  */
 export default function MobileWrapper() {
   useEffect(() => {
+    // The native shell injects window.Capacitor; plain browsers skip all of this.
+    if (!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) return;
     (async () => {
-      const { Capacitor } = await import('@capacitor/core');
-      if (!Capacitor.isNativePlatform()) return;
-
-      const [{ StatusBar, Style }, { Keyboard }] = await Promise.all([
+      const [{ SplashScreen }, { StatusBar, Style }, { Keyboard }] = await Promise.all([
+        import('@capacitor/splash-screen'),
         import('@capacitor/status-bar'),
         import('@capacitor/keyboard'),
       ]);
+
+      // The app has rendered: drop the splash now instead of waiting out its
+      // maximum duration (capacitor.config launchShowDuration).
+      SplashScreen.hide({ fadeOutDuration: 150 }).catch(() => {});
 
       await StatusBar.setOverlaysWebView({ overlay: true });
       await StatusBar.setStyle({ style: Style.Dark });

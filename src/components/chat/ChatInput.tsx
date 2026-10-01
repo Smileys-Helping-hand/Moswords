@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { Send, Smile, Plus, Mic, X } from 'lucide-react';
+import { Send, Smile, Plus, Mic, X, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import dynamic from 'next/dynamic';
-import { Theme } from 'emoji-picker-react';
+// Theme.DARK is the string 'dark'; importing the enum would bundle the whole picker eagerly.
+const EMOJI_THEME_DARK = 'dark' as const;
 import TextareaAutosize from 'react-textarea-autosize';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
@@ -68,6 +69,7 @@ export default function ChatInput({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showStickerDrawer, setShowStickerDrawer] = useState(false);
+  const [showMore, setShowMore] = useState(false); // phone-only + menu
   const [files, setFiles] = useState<FilePreview[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
@@ -252,9 +254,9 @@ export default function ChatInput({
             <div className="bg-black/80 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
               <EmojiPicker
                 onEmojiClick={handleEmojiClick}
-                theme={Theme.DARK}
+                theme={EMOJI_THEME_DARK as never}
                 searchPlaceHolder="Search emoji..."
-                width={350}
+                width={typeof window !== 'undefined' ? Math.min(350, window.innerWidth - 24) : 350}
                 height={400}
                 previewConfig={{ showPreview: false }}
                 skinTonesDisabled={false}
@@ -273,7 +275,7 @@ export default function ChatInput({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute bottom-full mb-2 left-8 z-[100]"
+            className="absolute bottom-full mb-2 left-0 sm:left-8 z-[100] max-w-[calc(100vw-1.5rem)]"
           >
             <LocalGifPicker
               onSelect={(url) => {
@@ -294,7 +296,7 @@ export default function ChatInput({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute bottom-full mb-2 left-16 z-[100]"
+            className="absolute bottom-full mb-2 left-0 sm:left-16 z-[100] max-w-[calc(100vw-1.5rem)]"
           >
             <StickerDrawer
               onSend={(url) => {
@@ -303,6 +305,45 @@ export default function ChatInput({
               }}
               onClose={() => setShowStickerDrawer(false)}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Compact "+" menu below lg (phones, tablets, split view); separate buttons from lg up */}
+      <AnimatePresence>
+        {showMore && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.12 }}
+            className="lg:hidden absolute bottom-full mb-2 left-0 z-[100] flex gap-2 rounded-2xl border border-white/15 bg-black/85 p-2 backdrop-blur-xl"
+          >
+            <button
+              type="button"
+              className="flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+              onClick={() => { setShowMore(false); fileInputRef.current?.click(); }}
+            >
+              <Paperclip className="w-5 h-5" /> File
+            </button>
+            {onSendGif && (
+              <button
+                type="button"
+                className="flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                onClick={() => { setShowMore(false); setShowGifPicker(true); setShowEmojiPicker(false); setShowStickerDrawer(false); }}
+              >
+                <span className="h-5 text-[11px] font-black leading-5">GIF</span> GIF
+              </button>
+            )}
+            {onSendSticker && (
+              <button
+                type="button"
+                className="flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                onClick={() => { setShowMore(false); setShowStickerDrawer(true); setShowEmojiPicker(false); setShowGifPicker(false); }}
+              >
+                <span className="h-5 text-base leading-5">🎨</span> Sticker
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -319,9 +360,9 @@ export default function ChatInput({
       >
         <input {...getInputProps()} />
         
-        <div className="flex items-end gap-2 p-3">
+        <div className="flex items-end gap-1 p-1.5 sm:gap-2 sm:p-3">
           {/* LEFT ACTIONS */}
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             {/* Plus Icon - File Upload */}
             <input
               ref={fileInputRef}
@@ -337,10 +378,17 @@ export default function ChatInput({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
-                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl",
+                    showMore && "bg-white/10 text-[#00F0FF]",
+                  )}
+                  aria-label="Attach"
+                  onClick={() => {
+                    if (window.matchMedia('(min-width: 1024px)').matches) fileInputRef.current?.click();
+                    else setShowMore((v) => !v);
+                  }}
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className={cn("w-5 h-5 transition-transform", showMore && "rotate-45")} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -383,7 +431,7 @@ export default function ChatInput({
                     variant="ghost"
                     size="icon"
                     className={cn(
-                      'shrink-0 hover:bg-white/10 transition-all rounded-xl text-xs font-black px-1',
+                      'hidden lg:inline-flex shrink-0 hover:bg-white/10 transition-all rounded-xl text-xs font-black px-1',
                       showGifPicker ? 'text-[#00F0FF] bg-white/10' : 'hover:text-white text-white/60',
                     )}
                     onClick={() => {
@@ -408,7 +456,7 @@ export default function ChatInput({
                     variant="ghost"
                     size="icon"
                     className={cn(
-                      'shrink-0 hover:bg-white/10 transition-all rounded-xl text-base',
+                      'hidden lg:inline-flex shrink-0 hover:bg-white/10 transition-all rounded-xl text-base',
                       showStickerDrawer ? 'text-[#00F0FF] bg-white/10' : 'hover:text-white text-white/60',
                     )}
                     onClick={() => {
@@ -426,7 +474,7 @@ export default function ChatInput({
           </div>
 
           {/* CENTER INPUT */}
-          <div className="flex-1 relative">
+          <div className="flex-1 min-w-0 relative">
             <TextareaAutosize
               ref={textareaRef}
               value={value}
@@ -436,7 +484,7 @@ export default function ChatInput({
               disabled={disabled}
               minRows={1}
               maxRows={maxRows}
-              className="w-full bg-transparent text-white placeholder:text-white/30 resize-none outline-none border-none focus:ring-0 py-2 px-3 rounded-xl transition-all"
+              className="w-full bg-transparent text-white placeholder:text-white/30 resize-none outline-none border-none focus:ring-0 py-2 px-2 sm:px-3 rounded-xl transition-all"
               style={{
                 fontSize: '15px',
                 lineHeight: '1.5',
@@ -445,7 +493,7 @@ export default function ChatInput({
           </div>
 
           {/* RIGHT ACTIONS */}
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {/* Mic Icon - Voice Notes */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -453,7 +501,7 @@ export default function ChatInput({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
+                  className="hidden lg:inline-flex shrink-0 hover:bg-white/10 hover:text-white transition-all rounded-xl"
                   onClick={() => console.log('Voice recording feature')}
                   disabled={disabled}
                 >

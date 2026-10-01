@@ -526,7 +526,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   if (loading || status === 'loading') {
     return (
-      <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-background">
+      <div className="flex flex-col flex-1 h-full min-h-0 bg-background">
         {/* Skeleton header */}
         <div className="px-3 py-2.5 border-b border-border/40 flex items-center gap-3">
           <div className="skeleton w-9 h-9 rounded-xl md:hidden" />
@@ -558,7 +558,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen min-h-0 bg-background">
+    <div className="flex flex-col flex-1 h-full min-h-0 min-h-0 bg-background">
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -742,7 +742,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         )}
       </div>
 
-      {/* Input — extra bottom space on mobile to clear fixed nav */}
+      {/* Input — the tab bar is hidden inside a chat, so it sits at the bottom */}
       <div className="bg-background/95 backdrop-blur-sm border-t border-border/50 px-4 pt-3 pb-3 shrink-0">
         <ChatInput
           value={newMessage}

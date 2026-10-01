@@ -1,7 +1,7 @@
 // Route-level loading skeleton for /group/[groupChatId]
 export default function GroupLoading() {
   return (
-    <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen min-h-0 bg-background">
+    <div data-app-shell className="flex flex-col app-shell-h min-h-0 bg-background">
       {/* Header skeleton */}
       <div className="bg-background/95 border-b border-border/50 px-3 py-2.5 flex items-center justify-between gap-2 shadow-sm">
         <div className="flex items-center gap-2.5 flex-1">

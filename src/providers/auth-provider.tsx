@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export const AUTH_EXPIRED_EVENT = 'moswords:auth-expired';
 
 // Pages anyone can open. Signed-in users are only bounced away from /login.
-const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
+const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/download'];
 
 function FullScreenSkeleton() {
   return (

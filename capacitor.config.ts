@@ -30,6 +30,8 @@ const config: CapacitorConfig = {
   },
   android: {
     backgroundColor: '#030014',
+    // Lets the site recognise the installed app (e.g. hide "Get the app").
+    appendUserAgent: 'MoswordsApp',
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
@@ -42,11 +44,12 @@ const config: CapacitorConfig = {
     scrollEnabled: false,
   },
   plugins: {
-    // CapacitorHttp: intercepts window.fetch/XHR at the NATIVE layer.
-    // This bypasses WebView CORS and SameSite cookie restrictions so the
-    // bundled static app can talk to the API server without any CORS setup.
+    // CapacitorHttp would route every fetch/XHR through the native bridge (no
+    // HTTP/2, no browser cache, an extra hop per request) — it made the app
+    // sluggish. The WebView loads the live site, so API calls are same-origin
+    // and need none of its CORS workarounds.
     CapacitorHttp: {
-      enabled: true,
+      enabled: false,
     },
     StatusBar: {
       style: 'DARK',
@@ -54,8 +57,11 @@ const config: CapacitorConfig = {
       overlaysWebView: true,
     },
     SplashScreen: {
-      launchShowDuration: 2500,
+      // Upper bound only: the web app hides the splash as soon as it renders
+      // (components/MobileWrapper.tsx), usually well under a second.
+      launchShowDuration: 3000,
       launchAutoHide: true,
+      launchFadeOutDuration: 150,
       backgroundColor: '#030014',
       androidSplashResourceName: 'splash',
       showSpinner: false,

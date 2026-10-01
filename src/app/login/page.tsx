@@ -3,13 +3,15 @@
 import { Suspense } from "react";
 import AuthForm from "@/components/auth-form";
 import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { Smartphone } from 'lucide-react';
 import { MoswordsIcon } from '@/components/icons';
 
 export default function LoginPage() {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 p-4 relative pb-24 md:pb-0">
             {/* Animated background elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none hidden md:block">
                 <motion.div 
                     className="absolute top-20 left-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl"
                     animate={{ 
@@ -61,6 +63,12 @@ export default function LoginPage() {
                     <Suspense fallback={null}>
                         <AuthForm />
                     </Suspense>
+                    <Link
+                        href="/download"
+                        className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-primary"
+                    >
+                        <Smartphone className="w-4 h-4" /> Get the Moswords app for your phone
+                    </Link>
                 </motion.div>
             </motion.div>
         </div>

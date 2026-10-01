@@ -9,7 +9,7 @@ export default function DMInboxPage() {
   return (
     <>
       {/* Mobile: full-screen conversation list */}
-      <div className="md:hidden h-[100dvh] overflow-hidden">
+      <div className="md:hidden h-full overflow-hidden">
         <MobileOnly>
           <ConversationListPanel />
         </MobileOnly>

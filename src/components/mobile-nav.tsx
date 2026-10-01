@@ -57,8 +57,10 @@ export default function MobileNav() {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
-  // Don't render on unauthenticated pages (login, etc.)
+  // Don't render on unauthenticated pages (login, etc.), or inside a
+  // conversation, where the composer needs the bottom of the screen.
   if (!session) return null;
+  if (/^\/(dm|group)\/[^/]+/.test(pathname)) return null;
 
   return (
     <>
