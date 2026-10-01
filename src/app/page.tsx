@@ -1,18 +1,12 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-import { useEffect } from 'react';
-import { useAuth } from '@/hooks/use-auth';
-import { useRouter } from 'next/navigation';
-import LoadingScreen from '@/components/loading-screen';
+// Decide on the server: one redirect instead of three client-side loading
+// screens (auth skeleton → splash → chat list) flashing past each other.
+export const dynamic = 'force-dynamic';
 
-export default function Home() {
-  const { status } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (status === 'authenticated') router.replace('/dm');
-    else if (status === 'unauthenticated') router.replace('/login');
-  }, [status, router]);
-
-  return <LoadingScreen />;
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+  redirect(session?.user ? '/dm' : '/login');
 }

@@ -1,311 +1,151 @@
-// Service Worker for Moswords PWA — v4 (API traffic is never cached)
-// Strategy: WhatsApp-style local-first caching with aggressive version checking
-// Server version is read from /version.json on each deployment
-let APP_VERSION = 'unknown';
-let CACHE_NAME = 'moswords-cache';
-let RUNTIME_CACHE = 'moswords-runtime-cache';
-let IMAGE_CACHE = 'moswords-images-cache';
+// Moswords service worker — v5
+//
+// Deliberately small. Earlier versions caused the "stuck loading / reload loop"
+// on phones: they kept the app version in a global that resets whenever the
+// browser restarts the worker, then told every page to reload on each
+// version.json fetch; and they cached an old home page that redirected to
+// itself and served it whenever the network blipped.
+//
+// This worker never reloads pages, never caches HTML or API responses, and
+// deletes every older cache on activation. It only:
+//   • caches Next.js static assets (content-hashed, immutable) cache-first
+//   • caches icons/sounds/images stale-while-revalidate
+//   • shows a plain offline page (no redirect) when a page can't load
+//   • shows push notifications and focuses the app when one is tapped
 
-const urlsToCache = [
-  '/',
-  '/dm',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
-];
+const STATIC_CACHE = 'moswords-static-v5';
+const MEDIA_CACHE = 'moswords-media-v5';
+const KEEP = new Set([STATIC_CACHE, MEDIA_CACHE]);
+const MEDIA_CACHE_LIMIT = 200;
 
-// Fetch current app version from server (always network-first)
-async function getAppVersion() {
-  try {
-    const response = await fetch('/version.json', {
-      cache: 'no-store',
-      headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' }
-    });
-    if (response.ok) {
-      const data = await response.json();
-      return data.version || 'unknown';
-    }
-  } catch (err) {
-    console.error('Failed to fetch version:', err);
-  }
-  return 'unknown';
-}
-
-// Initialize version on first run
-async function initializeVersion() {
-  const version = await getAppVersion();
-  APP_VERSION = version;
-  CACHE_NAME = `moswords-v${version}`;
-  RUNTIME_CACHE = `moswords-runtime-v${version}`;
-  IMAGE_CACHE = `moswords-images-v${version}`;
-}
-
-// Install event - cache resources
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    initializeVersion().then(() => {
-      return caches.open(CACHE_NAME)
-        .then((cache) => {
-          console.log(`Installed cache: ${CACHE_NAME}`);
-          return cache.addAll(urlsToCache);
-        })
-        .catch((err) => {
-          console.error('Cache installation failed:', err);
-        });
-    })
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches and check for version updates
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    initializeVersion().then(() => {
-      const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
-      return caches.keys().then((cacheNames) => {
-        console.log(`Activating with caches: ${currentCaches.join(', ')}`);
-        console.log(`Old caches to delete: ${cacheNames.filter((n) => !currentCaches.includes(n)).join(', ')}`);
-        return Promise.all(
-          cacheNames
-            .filter((n) => !currentCaches.includes(n))
-            .map((n) => {
-              console.log(`Deleting old cache: ${n}`);
-              return caches.delete(n);
-            })
-        );
-      });
-    })
-  );
-  self.clients.claim();
-});
-
-// Fetch event - smart caching strategy
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  // Skip chrome-extension and other non-http(s) requests
-  // Only same-origin GETs are handled; uploads (PUT/POST) and third-party
-  // requests go straight to the network.
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  if (!event.request.url.startsWith('http')) {
-    return;
-  }
-
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // ── Version check endpoint: always fresh ────────────────────────────────────
-  // Never cache version.json - always fetch from server
-  if (url.pathname === '/version.json') {
-    event.respondWith(
-      fetch(request, {
-        cache: 'no-store',
-        headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' }
-      })
-        .then((response) => {
-          if (response.ok) {
-            response.clone().json().then((data) => {
-              const newVersion = data.version;
-              if (newVersion !== APP_VERSION) {
-                console.log(`🔄 New version detected: ${APP_VERSION} → ${newVersion}`);
-                // Notify all clients about the update
-                self.clients.matchAll().then((clients) => {
-                  clients.forEach((client) => {
-                    client.postMessage({
-                      type: 'UPDATE_AVAILABLE',
-                      oldVersion: APP_VERSION,
-                      newVersion: newVersion
-                    });
-                  });
-                });
-                // Clear all caches for new version
-                caches.keys().then((names) => {
-                  names.forEach((name) => caches.delete(name));
-                });
-              }
-            });
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // ── HTML documents: always fetch fresh, cache as fallback ──────────────────
-  // This ensures UI updates (like purple → blue) are always shown
-  if (request.destination === 'document' || 
-      url.pathname === '/' || 
-      url.pathname === '/dm' || 
-      url.pathname.endsWith('.html')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request);
-        })
-    );
-    return;
-  }
-
-  // ── API: never touched by the service worker ─────────────────────────────
-  // API responses are private and per-user. Caching them here (keyed only by
-  // URL) could show one user's chats to the next person on a shared device.
-  // The app keeps its own per-user cache in IndexedDB instead.
-  if (url.pathname.startsWith('/api/')) {
-    return;
-  }
-
-  // Images - cache first, fallback to network
-  if (request.destination === 'image') {
-    event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(request).then((response) => {
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(IMAGE_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        });
-      })
-    );
-    return;
-  }
-
-  // All other requests - network first, fallback to cache
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const responseClone = response.clone();
-        if (response.status === 200) {
-          caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseClone);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(request);
-      })
+    caches
+      .keys()
+      .then((names) => Promise.all(names.filter((n) => !KEEP.has(n)).map((n) => caches.delete(n))))
+      .then(() => self.clients.claim()),
   );
 });
 
-// Push notification event
-self.addEventListener('push', (event) => {
-  console.log('Push received:', event);
-  
-  let notificationData = {
-    title: 'New Message',
-    body: 'You have a new message',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: 'message-notification',
-    requireInteraction: false,
-    vibrate: [200, 100, 200],
-  };
+const OFFLINE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:#0B0F19;color:#e9edf2;font-family:system-ui,sans-serif;text-align:center;padding:24px}
+button{margin-top:16px;padding:10px 20px;border:0;border-radius:999px;background:#00F0FF;color:#0B0F19;font-weight:600}</style>
+</head><body><div><h1 style="font-size:20px">You're offline</h1>
+<p style="opacity:.7">Moswords will reconnect when your connection is back.</p>
+<button onclick="location.reload()">Try again</button></div></body></html>`;
 
-  try {
-    if (event.data) {
-      const data = event.data.json();
-      notificationData = {
-        ...notificationData,
-        ...data,
-        title: data.title || notificationData.title,
-        body: data.body || data.message || notificationData.body,
-        icon: data.icon || notificationData.icon,
-        tag: data.tag || notificationData.tag,
-        data: data.url ? { url: data.url } : undefined,
-      };
-    }
-  } catch (e) {
-    console.error('Error parsing push data:', e);
-  }
-
-  event.waitUntil(
-    self.registration.showNotification(notificationData.title, notificationData)
-  );
-});
-
-// Notification click event
-self.addEventListener('notificationclick', (event) => {
-  console.log('Notification clicked:', event);
-  event.notification.close();
-
-  const urlToOpen = event.notification.data?.url || '/';
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((windowClients) => {
-        // Check if there's already a window open
-        for (const client of windowClients) {
-          if (client.url === urlToOpen && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        // If no window is open, open a new one
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
-  );
-});
-
-// Background sync for offline messages
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-messages') {
-    event.waitUntil(syncMessages());
-  }
-});
-
-async function syncMessages() {
-  try {
-    // Retrieve pending messages from IndexedDB or cache
-    const cache = await caches.open('pending-messages');
-    const requests = await cache.keys();
-    
-    for (const request of requests) {
-      try {
-        await fetch(request);
-        await cache.delete(request);
-      } catch (error) {
-        console.error('Failed to sync message:', error);
-      }
-    }
-  } catch (error) {
-    console.error('Sync failed:', error);
-  }
+async function trimCache(name, max) {
+  const cache = await caches.open(name);
+  const keys = await cache.keys();
+  for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
-// Message event - for communication with the app
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  // API, auth, version and the worker itself always go straight to the network.
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname === '/version.json' ||
+    url.pathname === '/sw.js' ||
+    url.pathname.startsWith('/_next/data/')
+  ) {
+    return;
   }
-  
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
-    event.waitUntil(
-      caches.keys().then((names) => {
-        return Promise.all(names.map((name) => caches.delete(name)));
-      })
+
+  // Pages: network only; a friendly offline page instead of a stale (or looping) copy.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(
+        () => new Response(OFFLINE_HTML, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }),
+      ),
     );
+    return;
+  }
+
+  // Next.js build assets are content-hashed: safe to serve from cache forever.
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        const hit = await cache.match(request);
+        if (hit) return hit;
+        const res = await fetch(request);
+        if (res.ok) cache.put(request, res.clone());
+        return res;
+      }),
+    );
+    return;
+  }
+
+  // Icons, sounds, images: fast from cache, refreshed in the background.
+  if (/\.(png|jpg|jpeg|gif|webp|svg|ico|mp3|wav|ogg|woff2?)$/i.test(url.pathname)) {
+    event.respondWith(
+      caches.open(MEDIA_CACHE).then(async (cache) => {
+        const hit = await cache.match(request);
+        const network = fetch(request)
+          .then((res) => {
+            if (res.ok) {
+              cache.put(request, res.clone());
+              trimCache(MEDIA_CACHE, MEDIA_CACHE_LIMIT);
+            }
+            return res;
+          })
+          .catch(() => hit);
+        return hit || network;
+      }),
+    );
+  }
+  // Everything else: default browser behaviour.
+});
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'New message';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || data.message || 'You have a new message',
+      icon: data.icon || '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag || 'message-notification',
+      data: { url: data.url || '/' },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if ('focus' in client) {
+          // Reuse an open app window and move it to the conversation.
+          if ('navigate' in client && client.url !== target) client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(target) : undefined;
+    }),
+  );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'CLEAR_CACHE') {
+    event.waitUntil(caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))));
   }
 });

@@ -267,8 +267,13 @@ export default function ConversationListPanel({ compact = false }: ConversationL
     }
     if (status === 'authenticated') {
       load(true);
+      // Returning to the app refreshes the list at most every 15 s; the sync
+      // loop keeps it current in between.
+      let lastLoad = Date.now();
       const onVisibility = () => {
-        if (!document.hidden) load(false);
+        if (document.hidden || Date.now() - lastLoad < 15_000) return;
+        lastLoad = Date.now();
+        load(false);
       };
       document.addEventListener('visibilitychange', onVisibility);
       return () => document.removeEventListener('visibilitychange', onVisibility);
