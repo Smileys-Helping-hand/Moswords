@@ -1,86 +1,100 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+
+const CHECK_EVERY_MS = 10 * 60 * 1000;
+
+async function fetchVersion(): Promise<string | null> {
+  try {
+    const res = await fetch('/version.json', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.version === 'string' ? data.version : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
- * UpdateChecker: Polls version.json and forces a page reload on version changes
- * Ensures users always see the latest UI (no stale cache issues on mobile)
+ * Tells the user when a new version has been deployed — it never reloads the
+ * page on its own. (Automatic reloads, combined with the old service worker,
+ * caused the app to get stuck in a reload loop, especially on phones.)
+ *
+ * The only automatic refresh is a quiet one when the app has been in the
+ * background for a while: nobody is mid-message then.
  */
 export default function UpdateChecker() {
+  const { toast } = useToast();
+  const loadedVersion = useRef<string | null>(null);
+  const pending = useRef(false);
+  const lastCheck = useRef(0);
+  const hiddenAt = useRef<number | null>(null);
+
   useEffect(() => {
-    let isMounted = true;
-    let checkInterval: NodeJS.Timeout | null = null;
+    let cancelled = false;
 
-    // Initial version stored in sessionStorage
-    const getInitialVersion = async () => {
-      try {
-        const response = await fetch('/version.json', {
-          cache: 'no-store',
-          headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          return data.version;
-        }
-      } catch (err) {
-        console.error('Failed to fetch initial version:', err);
+    const check = async () => {
+      lastCheck.current = Date.now();
+      const latest = await fetchVersion();
+      if (cancelled || !latest) return;
+      if (!loadedVersion.current) {
+        loadedVersion.current = latest;
+        return;
       }
-      return null;
-    };
-
-    const checkForUpdates = async () => {
-      try {
-        const response = await fetch('/version.json', {
-          cache: 'no-store',
-          headers: { 'pragma': 'no-cache', 'cache-control': 'no-cache' }
+      if (latest !== loadedVersion.current && !pending.current) {
+        pending.current = true;
+        toast({
+          title: 'A new version of Moswords is ready',
+          description: 'Refresh when you are ready — nothing you have sent will be lost.',
+          duration: 1000 * 60 * 60,
+          action: (
+            <ToastAction altText="Refresh now" onClick={() => window.location.reload()}>
+              Refresh
+            </ToastAction>
+          ),
         });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const currentVersion = sessionStorage.getItem('app-version');
-          const newVersion = data.version;
-
-          if (currentVersion && currentVersion !== newVersion) {
-            console.log(`📦 Update detected: ${currentVersion} → ${newVersion}. Reloading...`);
-            // Force hard refresh to clear caches and get new version
-            window.location.reload();
-          }
-        }
-      } catch (err) {
-        console.error('Version check error:', err);
       }
     };
 
-    // Initialize version on first load
-    getInitialVersion().then((version) => {
-      if (isMounted && version) {
-        sessionStorage.setItem('app-version', version);
-        console.log(`✅ App initialized at version: ${version}`);
-
-        // Check for a new deploy every 10 minutes while visible
-        checkInterval = setInterval(() => {
-          if (!document.hidden) checkForUpdates();
-        }, 10 * 60 * 1000);
+    const onVisibility = () => {
+      if (document.hidden) {
+        hiddenAt.current = Date.now();
+        return;
       }
-    });
+      const away = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
+      hiddenAt.current = null;
+      // Back after 10+ minutes away with an update waiting: refresh quietly.
+      if (pending.current && away > CHECK_EVERY_MS) {
+        window.location.reload();
+        return;
+      }
+      if (Date.now() - lastCheck.current > CHECK_EVERY_MS) check();
+    };
 
-    // Listen for service worker update messages
+    // Register/refresh the service worker on every page (not only after sign-in),
+    // so anyone still running an old worker — including on the login screen —
+    // switches to the current one on their next visit.
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.type === 'UPDATE_AVAILABLE') {
-          console.log(`🔄 Service worker detected update. Reloading...`);
-          window.location.reload();
-        }
-      });
+      navigator.serviceWorker
+        .register('/sw.js', { scope: '/', updateViaCache: 'none' })
+        .then((registration) => registration.update())
+        .catch(() => {});
     }
 
-    return () => {
-      isMounted = false;
-      if (checkInterval) {
-        clearInterval(checkInterval);
-      }
-    };
-  }, []);
+    check();
+    const timer = setInterval(() => {
+      if (!document.hidden) check();
+    }, CHECK_EVERY_MS);
+    document.addEventListener('visibilitychange', onVisibility);
 
-  return null; // This is a non-visual component
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [toast]);
+
+  return null;
 }

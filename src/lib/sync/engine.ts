@@ -237,6 +237,10 @@ class SyncEngine {
         credentials: 'same-origin',
         signal: controller.signal,
       });
+      if (res.status === 401) {
+        // Let the auth layer confirm with the server before signing anyone out.
+        window.dispatchEvent(new Event('moswords:auth-expired'));
+      }
       if (!res.ok) throw new Error(`sync ${res.status}`);
       const raw = (await res.json()) as SyncBatch;
 

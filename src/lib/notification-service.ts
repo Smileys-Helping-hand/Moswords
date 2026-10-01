@@ -86,11 +86,14 @@ export class NotificationService {
 
     try {
       // Register service worker
+      // updateViaCache 'none' + update(): phones still running an older worker
+      // pick up the new one on the next launch instead of whenever the HTTP
+      // cache expires.
       this.registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
+        updateViaCache: 'none',
       });
-
-      console.log('Service Worker registered:', this.registration);
+      this.registration.update().catch(() => {});
 
       // Request notification permission
       const permission = await this.requestPermission();

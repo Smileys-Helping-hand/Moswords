@@ -12,12 +12,8 @@ export default function DashboardPage() {
   const { status } = useAuth();
   const router = useRouter();
 
-  if (status === 'unauthenticated') {
-    router.replace('/login');
-    return <LoadingScreen />;
-  }
-
-  if (status === 'loading') {
+  // Signed-out visitors are redirected by AuthProvider; never navigate during render.
+  if (status !== 'authenticated') {
     return <LoadingScreen />;
   }
 
