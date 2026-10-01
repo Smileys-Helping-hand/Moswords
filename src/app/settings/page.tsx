@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { motion } from 'framer-motion';
@@ -17,6 +18,7 @@ import {
   LogOut,
   HardDrive,
   Palette,
+  LayoutDashboard,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -41,6 +43,14 @@ const sections = [
 export default function SettingsPage() {
   const router = useRouter();
   const { session } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIsAdmin(!!d?.isAdmin))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -72,6 +82,22 @@ export default function SettingsPage() {
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
         </button>
+
+        {isAdmin && (
+          <button
+            onClick={() => router.push('/admin')}
+            className="w-full glass-card rounded-2xl border border-primary/30 p-4 flex items-center gap-4 hover:bg-primary/5 transition-colors"
+          >
+            <span className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+              <LayoutDashboard className="w-5 h-5 text-primary" />
+            </span>
+            <span className="flex-1 text-left">
+              <span className="block font-semibold">Admin dashboard</span>
+              <span className="block text-sm text-muted-foreground">Users, sign-ups and activity</span>
+            </span>
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+          </button>
+        )}
 
         {sections.map((section, si) => (
           <div key={si} className="glass-card rounded-2xl border border-white/10 px-1 divide-y divide-white/10">

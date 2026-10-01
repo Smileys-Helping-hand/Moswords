@@ -47,7 +47,7 @@ Schema changes go in `scripts/migrations.ts` — additive and idempotent only. T
 build runs `scripts/migrate.ts`, which applies them and prints a drift report (tables/columns
 the code expects that the database lacks).
 
-End-to-end check (60 assertions over the whole user journey, local only):
+End-to-end check (72 assertions over the whole user journey, local only):
 `npm run build && npm start -- -p 3100`, then
 `DATABASE_URL=<local test db> node scripts/e2e.mjs http://localhost:3100`.
 

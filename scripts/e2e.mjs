@@ -1,4 +1,4 @@
-// End-to-end journey test (60 assertions): sign up → find & add each other → DMs → groups →
+// End-to-end journey test (72 assertions): sign up → find & add each other → DMs → groups →
 // archive / folders / pin → search, plus the checks that outsiders are kept out.
 //
 // Creates throwaway accounts, so it only runs against a LOCAL server backed by a
@@ -228,6 +228,37 @@ if (process.env.DATABASE_URL && /localhost|127\.0\.0\.1/.test(process.env.DATABA
   };
   check('signs in with the new password', (await signInAs(newPassword)) === A.id);
   check('the old password no longer works', !(await signInAs(PASSWORD)));
+
+  console.log('\n9. Admin dashboard');
+  const notAdmin = await B.req('GET', '/api/admin/overview');
+  check('a normal user is refused the admin dashboard', notAdmin.status === 403);
+  // Make D an ordinary admin (not the owner) through the test DB.
+  await pool.query('INSERT INTO admin_users (user_id, email, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [D.id, D.email.toLowerCase(), 'admin']);
+  const me = await D.req('GET', '/api/admin/me');
+  check('/api/admin/me recognises the admin', me.data.isAdmin === true && me.data.isSuperAdmin === false);
+  const overview = await D.req('GET', '/api/admin/overview');
+  check('admin sees the overview numbers', overview.status === 200 && overview.data.stats.users >= 4 && overview.data.signups.length === 14, JSON.stringify(overview.data).slice(0, 200));
+  const list = await D.req('GET', `/api/admin/accounts?q=${encodeURIComponent(run)}`);
+  const rowB = list.data.accounts?.find((a) => a.id === B.id);
+  check('admin can search accounts with activity counts', !!rowB && rowB.friends >= 1 && typeof rowB.messages === 'number', JSON.stringify(rowB));
+  const sus = await D.req('PATCH', `/api/admin/accounts/${B.id}`, { action: 'suspend', reason: 'e2e test' });
+  check('admin suspends a user', sus.status === 200);
+  const bAfter = await B.req('GET', '/api/sync');
+  check('…whose session stops working', bAfter.status === 401, String(bAfter.status));
+  const bLogin = new Client('b-again'); bLogin.email = B.email;
+  const bc = await bLogin.req('GET', '/api/auth/csrf');
+  await bLogin.req('POST', '/api/auth/callback/credentials', new URLSearchParams({ csrfToken: bc.data.csrfToken, email: B.email, password: PASSWORD, json: 'true' }));
+  check('…and cannot sign in again', !(await bLogin.req('GET', '/api/auth/session')).data?.user);
+  const unsus = await D.req('PATCH', `/api/admin/accounts/${B.id}`, { action: 'unsuspend' });
+  check('admin unsuspends them', unsus.status === 200 && (await B.req('GET', '/api/sync')).status === 200);
+  const link = await D.req('POST', `/api/admin/accounts/${C.id}/reset-link`);
+  check('admin creates a one-time reset link', link.status === 200 && /\/reset-password\?token=/.test(link.data.link));
+  const grant = await D.req('PATCH', `/api/admin/accounts/${C.id}`, { action: 'make_admin' });
+  check('only the owner can grant admin', grant.status === 403);
+  const del = await D.req('DELETE', `/api/admin/accounts/${C.id}`, { confirmEmail: C.email });
+  check('only the owner can delete accounts', del.status === 403);
+  const self = await D.req('PATCH', `/api/admin/accounts/${D.id}`, { action: 'suspend' });
+  check('an admin cannot suspend themselves', self.status === 400);
   await pool.end();
 } else {
   console.log('  (token checks skipped: set DATABASE_URL to the local test database)');

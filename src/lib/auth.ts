@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { normalizeEmail } from './validate';
 import { rateLimit, clientIp } from './rate-limit';
 import bcrypt from 'bcryptjs';
+import { isAccountBlocked } from './account-status';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const useSecureCookies = isProduction;
@@ -46,6 +47,7 @@ const providers: any[] = [
             displayName: users.displayName,
             image: users.image,
             photoURL: users.photoURL,
+            suspendedAt: users.suspendedAt,
           })
           .from(users)
           .where(sql`lower(${users.email}) = ${email}`)
@@ -53,6 +55,7 @@ const providers: any[] = [
 
         if (!user?.password) return null;
         if (!(await bcrypt.compare(password, user.password))) return null;
+        if (user.suspendedAt) throw new Error('This account has been suspended. Contact support if you think this is a mistake.');
 
         return {
           id: user.id,
@@ -62,7 +65,7 @@ const providers: any[] = [
         };
       } catch (error) {
         // Rate-limit errors surface to the login form; everything else is a plain failure.
-        if (error instanceof Error && error.message.startsWith('Too many')) throw error;
+        if (error instanceof Error && /^(Too many|This account has been suspended)/.test(error.message)) throw error;
         console.error('Authorization error:', (error as Error).message);
         return null;
       }
@@ -132,6 +135,11 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // Suspended or deleted accounts lose their session on the next request
+      // (checked at most once a minute per server instance).
+      if (token.id && (await isAccountBlocked(token.id as string))) {
+        return { expires: session.expires };
+      }
       if (session.user) {
         (session.user as any).id = token.id;
       }

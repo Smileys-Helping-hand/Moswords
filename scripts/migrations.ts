@@ -284,4 +284,15 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id)`,
     ],
   },
+  {
+    // Admins can suspend accounts: blocks sign-in and every API call.
+    id: '2026-10-01-account-suspension',
+    statements: [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at timestamp`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason text`,
+      `CREATE INDEX IF NOT EXISTS users_created_idx ON users (created_at)`,
+      `CREATE INDEX IF NOT EXISTS users_last_seen_idx ON users (last_seen)`,
+      `CREATE INDEX IF NOT EXISTS audit_logs_created_idx ON audit_logs (created_at)`,
+    ],
+  },
 ];

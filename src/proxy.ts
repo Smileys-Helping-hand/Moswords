@@ -27,7 +27,7 @@ const UUID_RE = new RegExp(`^${UUID}$`);
 
 // Collections whose next path segment is an id. Literal sub-routes that are not
 // ids (e.g. /api/users/search, /api/contacts/sync) are listed as exceptions.
-const ID_COLLECTION = /^\/api\/(group-chats|servers|channels|messages|statuses|direct-messages|approvals|conversations|friends|users|contacts|chats\/folders|v1\/contacts|ecosystem\/keys|keys\/api-keys)\/([^/]+)/;
+const ID_COLLECTION = /^\/api\/(group-chats|servers|channels|messages|statuses|direct-messages|approvals|conversations|friends|users|contacts|chats\/folders|v1\/contacts|ecosystem\/keys|keys\/api-keys|admin\/accounts)\/([^/]+)/;
 const NOT_IDS = new Set(['search', 'sync', 'encrypt']);
 const NESTED_ID = /\/(messages|members)\/([^/]+)\/?$/;
 
