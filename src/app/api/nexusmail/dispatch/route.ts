@@ -63,8 +63,12 @@ export async function POST(request: NextRequest) {
     }
 
     // A leaked app key must not become an unlimited spam relay.
-    const limit = await rateLimit(`nexusmail:${app.id}`, 300, 60 * 60);
-    if (!limit.allowed) return tooManyRequests(3600);
+    const [hourly, daily] = await Promise.all([
+      rateLimit(`nexusmail:${app.id}`, 60, 60 * 60),
+      rateLimit(`nexusmail:day:${app.id}`, 200, 24 * 60 * 60),
+    ]);
+    if (!hourly.allowed) return tooManyRequests(3600);
+    if (!daily.allowed) return tooManyRequests(24 * 3600);
 
     // Send email via AWS SES
     let emailStatus = 'sent';

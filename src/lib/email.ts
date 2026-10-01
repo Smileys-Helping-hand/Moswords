@@ -18,6 +18,31 @@ export interface EmailOptions {
   subject: string;
   htmlBody: string;
   textBody?: string;
+  /** Overrides the default sender, e.g. "Moswords Support <support@awehchat.co.za>". Resend only. */
+  from?: string;
+  replyTo?: string;
+  /** Extra headers such as In-Reply-To / References for threading. Resend only. */
+  headers?: Record<string, string>;
+}
+
+/** Escape text for HTML email bodies (names, subjects and messages come from users). */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
+/** Plain text typed by an admin → simple HTML email body. */
+export function textToHtml(text: string): string {
+  return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55;white-space:pre-wrap">${escapeHtml(text)}</div>`;
+}
+
+/** Default sender for app mail. */
+export function defaultFromAddress(): string {
+  return (
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.SES_FROM_EMAIL ||
+    process.env.AWS_SES_FROM_EMAIL ||
+    'Moswords <noreply@awehchat.co.za>'
+  );
 }
 
 /**
@@ -27,12 +52,8 @@ export interface EmailOptions {
  * SES. SES only delivers to verified addresses until AWS grants production
  * access, so Resend is the way to get password resets working immediately.
  */
-export async function sendEmail({ to, subject, htmlBody, textBody }: EmailOptions): Promise<void> {
-  const fromEmail =
-    process.env.RESEND_FROM_EMAIL ||
-    process.env.SES_FROM_EMAIL ||
-    process.env.AWS_SES_FROM_EMAIL ||
-    'Moswords <noreply@awehchat.co.za>';
+export async function sendEmail({ to, subject, htmlBody, textBody, from, replyTo, headers }: EmailOptions): Promise<{ id?: string }> {
+  const fromEmail = defaultFromAddress();
 
   if (process.env.RESEND_API_KEY) {
     const res = await fetch('https://api.resend.com/emails', {
@@ -41,14 +62,23 @@ export async function sendEmail({ to, subject, htmlBody, textBody }: EmailOption
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: fromEmail, to: [to], subject, html: htmlBody, text: textBody }),
+      body: JSON.stringify({
+        from: from || fromEmail,
+        to: [to],
+        subject,
+        html: htmlBody,
+        text: textBody,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(headers ? { headers } : {}),
+      }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       console.error('Resend rejected email:', res.status, (await res.text()).slice(0, 300));
       throw new Error('Failed to send email');
     }
-    return;
+    const sent = (await res.json().catch(() => ({}))) as { id?: string };
+    return { id: sent.id };
   }
 
   try {
@@ -77,7 +107,8 @@ export async function sendEmail({ to, subject, htmlBody, textBody }: EmailOption
       },
     });
 
-    await sesClient.send(command);
+    const out = await sesClient.send(command);
+    return { id: out.MessageId };
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error('Failed to send email');
@@ -157,7 +188,10 @@ export interface FriendRequestEmailParams {
   declineLink: string;
 }
 
-export function generateFriendRequestEmailHtml(params: FriendRequestEmailParams): string {
+export function generateFriendRequestEmailHtml(raw: FriendRequestEmailParams): string {
+  const params = Object.fromEntries(
+    Object.entries(raw).map(([k, v]) => [k, escapeHtml(v)]),
+  ) as unknown as FriendRequestEmailParams;
   return `
     <!DOCTYPE html>
     <html>

@@ -5,7 +5,7 @@ import { db } from './db';
 import { users } from './schema';
 import { sql } from 'drizzle-orm';
 import { normalizeEmail } from './validate';
-import { rateLimit, clientIp } from './rate-limit';
+import { rateLimit, rateLimitCount, clearRateLimit, clientIp } from './rate-limit';
 import bcrypt from 'bcryptjs';
 import { isAccountBlocked } from './account-status';
 
@@ -14,23 +14,28 @@ const useSecureCookies = isProduction;
 const sameSitePolicy = isProduction ? 'none' : 'lax';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 
+const DAY = 24 * 60 * 60;
+const MAX_DAILY_FAILURES = 20;
+
 const providers: any[] = [
   CredentialsProvider({
     name: 'credentials',
     credentials: {
-      email: { label: 'Email', type: 'email' },
+      email: { label: 'Email or username', type: 'text' },
       password: { label: 'Password', type: 'password' },
     },
     async authorize(credentials, req) {
       try {
-        const email = normalizeEmail(credentials?.email);
+        // The "email" field also accepts a username (e.g. the owner's "mraaziqp").
+        const identifier = normalizeEmail(credentials?.email).replace(/^@(?=[^@]+$)/, '');
         const password = credentials?.password;
-        if (!email || !password) return null;
+        if (!identifier || !password || identifier.length > 254) return null;
+        const byUsername = !identifier.includes('@');
 
         // Throttle guessing per account and per client IP.
         const ip = clientIp(new Headers((req?.headers as Record<string, string>) || {}));
         const [perAccount, perIp] = await Promise.all([
-          rateLimit(`login:acct:${email}`, 10, 15 * 60),
+          rateLimit(`login:acct:${identifier}`, 10, 15 * 60),
           rateLimit(`login:ip:${ip}`, 50, 15 * 60),
         ]);
         if (!perAccount.allowed || !perIp.allowed) {
@@ -50,11 +55,23 @@ const providers: any[] = [
             suspendedAt: users.suspendedAt,
           })
           .from(users)
-          .where(sql`lower(${users.email}) = ${email}`)
+          .where(byUsername ? sql`lower(${users.username}) = ${identifier}` : sql`lower(${users.email}) = ${identifier}`)
           .limit(1);
 
         if (!user?.password) return null;
-        if (!(await bcrypt.compare(password, user.password))) return null;
+
+        // Wrong passwords per account per day are capped (on top of the 15-minute
+        // limit), so even a short password can't be brute-forced. A password
+        // reset clears the counter.
+        const failKey = `login:fail:${user.id}`;
+        if ((await rateLimitCount(failKey, DAY)) >= MAX_DAILY_FAILURES) {
+          throw new Error('Too many sign-in attempts on this account today. Reset your password to unlock it.');
+        }
+        if (!(await bcrypt.compare(password, user.password))) {
+          await rateLimit(failKey, MAX_DAILY_FAILURES, DAY);
+          return null;
+        }
+        void clearRateLimit(failKey);
         if (user.suspendedAt) throw new Error('This account has been suspended. Contact support if you think this is a mistake.');
 
         return {
@@ -128,6 +145,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
+        token.authAt = Date.now(); // compared with users.password_changed_at
       }
       if (account) {
         token.provider = account.provider;
@@ -135,9 +153,9 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Suspended or deleted accounts lose their session on the next request
-      // (checked at most once a minute per server instance).
-      if (token.id && (await isAccountBlocked(token.id as string))) {
+      // Suspended or deleted accounts, and sessions older than the last password
+      // change, end on the next request (checked at most once a minute per instance).
+      if (token.id && (await isAccountBlocked(token.id as string, Number(token.authAt) || 0))) {
         return { expires: session.expires };
       }
       if (session.user) {

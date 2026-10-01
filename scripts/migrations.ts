@@ -295,4 +295,35 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS audit_logs_created_idx ON audit_logs (created_at)`,
     ],
   },
+  {
+    // Usernames (sign in with email or username), session cut-off on password
+    // change, and the inbound mail box. The owner gets the "mraaziqp" handle.
+    id: '2026-10-01-usernames-inbound-mail',
+    statements: [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS username text`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at timestamp`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (lower(username))`,
+      `UPDATE users SET username = 'mraaziqp'
+         WHERE lower(email) = 'mraaziqp@gmail.com' AND username IS NULL
+           AND NOT EXISTS (SELECT 1 FROM users WHERE lower(username) = 'mraaziqp')`,
+      `CREATE TABLE IF NOT EXISTS inbound_emails (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        resend_id text NOT NULL UNIQUE,
+        from_address text NOT NULL,
+        to_addresses jsonb NOT NULL,
+        cc jsonb,
+        subject text,
+        text_body text,
+        html_body text,
+        message_id text,
+        attachments jsonb,
+        authentication jsonb,
+        received_at timestamp NOT NULL DEFAULT now(),
+        read_at timestamp,
+        replied_at timestamp,
+        archived_at timestamp
+      )`,
+      `CREATE INDEX IF NOT EXISTS inbound_emails_received_idx ON inbound_emails (received_at DESC)`,
+    ],
+  },
 ];

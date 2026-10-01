@@ -7,7 +7,7 @@ export interface AdminContext {
   id: string;
   email: string;
   isSuperAdmin: boolean;
-  audit: (action: string, targetId: string, details?: Record<string, unknown>) => Promise<void>;
+  audit: (action: string, targetId: string, details?: Record<string, unknown>, resource?: string) => Promise<void>;
 }
 
 /** requireAdmin + who the admin is + an audit-log shortcut. */
@@ -20,8 +20,8 @@ export async function adminContext(): Promise<{ admin: AdminContext; response?: 
       id: auth.user.id,
       email,
       isSuperAdmin: isSuperAdmin(email),
-      audit: (action, targetId, details) =>
-        logAdminAction({ userId: auth.user.id, email, action, resource: 'user', resourceId: targetId, details }),
+      audit: (action, targetId, details, resource = 'user') =>
+        logAdminAction({ userId: auth.user.id, email, action, resource, resourceId: targetId, details }),
     },
   };
 }

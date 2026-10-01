@@ -1,4 +1,4 @@
-// End-to-end journey test (72 assertions): sign up → find & add each other → DMs → groups →
+// End-to-end journey test (94 assertions): sign up → find & add each other → DMs → groups →
 // archive / folders / pin → search, plus the checks that outsiders are kept out.
 //
 // Creates throwaway accounts, so it only runs against a LOCAL server backed by a
@@ -259,6 +259,84 @@ if (process.env.DATABASE_URL && /localhost|127\.0\.0\.1/.test(process.env.DATABA
   check('only the owner can delete accounts', del.status === 403);
   const self = await D.req('PATCH', `/api/admin/accounts/${D.id}`, { action: 'suspend' });
   check('an admin cannot suspend themselves', self.status === 400);
+
+  console.log('\n10. Sessions, usernames, lockout, admin limits, mail');
+  check("Amara's old session ended when her password was reset", (await A.req('GET', '/api/sync')).status === 401);
+
+  const signIn = async (identifier, password) => {
+    const c = new Client('id');
+    const t = await c.req('GET', '/api/auth/csrf');
+    await c.req('POST', '/api/auth/callback/credentials', new URLSearchParams({ csrfToken: t.data.csrfToken, email: identifier, password, json: 'true' }));
+    return (await c.req('GET', '/api/auth/session')).data?.user?.id;
+  };
+  const uname = `user${run}`;
+  await pool.query('UPDATE users SET username = $1 WHERE id = $2', [uname, B.id]);
+  check('signs in with a username (any case)', (await signIn(uname.toUpperCase(), PASSWORD)) === B.id);
+  check('…or with @username', (await signIn(`@${uname}`, PASSWORD)) === B.id);
+  check('a wrong password with a username fails', !(await signIn(uname, 'Wrong-password-1')));
+  const fails = await pool.query('SELECT count FROM rate_limits WHERE key = $1', [`login:fail:${B.id}`]);
+  check('wrong passwords are counted per account', Number(fails.rows[0]?.count) >= 1);
+
+  await pool.query(
+    "INSERT INTO rate_limits (key, window_start, count) VALUES ($1, now(), 20) ON CONFLICT (key) DO UPDATE SET count = 20, window_start = now()",
+    [`login:fail:${C.id}`],
+  );
+  check('after 20 wrong passwords in a day the account is locked', !(await signIn(C.email, PASSWORD)));
+  await pool.query('DELETE FROM rate_limits WHERE key = $1', [`login:fail:${C.id}`]);
+  check('…until the lock is lifted', (await signIn(C.email, PASSWORD)) === C.id);
+
+  // Two ordinary admins can't act against each other.
+  await pool.query('INSERT INTO admin_users (user_id, email, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [C.id, C.email.toLowerCase(), 'admin']);
+  const susAdmin = await D.req('PATCH', `/api/admin/accounts/${C.id}`, { action: 'suspend' });
+  check('an admin cannot suspend another admin', susAdmin.status === 403);
+  const linkAdmin = await D.req('POST', `/api/admin/accounts/${C.id}/reset-link`);
+  check('an admin cannot make a reset link for another admin', linkAdmin.status === 403);
+  await pool.query('DELETE FROM admin_users WHERE user_id = $1', [C.id]);
+  const key = await D.req('POST', '/api/ecosystem/keys', { appName: 'e2e', scopes: ['contacts:read'] });
+  check('only the owner can create ecosystem API keys', key.status === 403, String(key.status));
+  const pct = await D.req('GET', '/api/admin/accounts?q=%25');
+  check('a % in admin search is matched literally', pct.status === 200 && pct.data.total === 0, JSON.stringify(pct.data).slice(0, 120));
+  const byUsername = await D.req('GET', `/api/admin/accounts?q=${uname}`);
+  check('admin search finds usernames', byUsername.data.accounts?.[0]?.username === uname);
+
+  // Inbound mail webhook (Resend/Svix signature).
+  const secret = process.env.E2E_WEBHOOK_SECRET;
+  if (secret) {
+    const sign = (body, key = secret, ts = Math.floor(Date.now() / 1000)) => {
+      const id = `msg_${crypto.randomBytes(6).toString('hex')}`;
+      const sig = crypto.createHmac('sha256', Buffer.from(key.replace(/^whsec_/, ''), 'base64')).update(`${id}.${ts}.${body}`).digest('base64');
+      return { 'svix-id': id, 'svix-timestamp': String(ts), 'svix-signature': `v1,${sig}` };
+    };
+    const hook = async (event, headers) =>
+      (await fetch(`${BASE}/api/email/inbound`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: event })).status;
+    const evt = JSON.stringify({ type: 'email.sent', data: { email_id: 'x' } });
+    check('inbound webhook rejects unsigned calls', (await hook(evt, {})) === 401);
+    check('…and a wrong secret', (await hook(evt, sign(evt, 'whsec_d3Jvbmctc2VjcmV0'))) === 401);
+    check('…and a stale timestamp', (await hook(evt, sign(evt, secret, Math.floor(Date.now() / 1000) - 3600))) === 401);
+    check('…and accepts a correctly signed event', (await hook(evt, sign(evt))) === 200);
+  } else {
+    console.log('  (webhook checks skipped: set E2E_WEBHOOK_SECRET to the server\'s RESEND_WEBHOOK_SECRET)');
+  }
+
+  const mail = await pool.query(
+    `INSERT INTO inbound_emails (resend_id, from_address, to_addresses, subject, text_body)
+     VALUES ($1, 'Thandi <thandi@example.test>', '["support@awehchat.co.za"]', 'Help with my account', 'Hi, I cannot log in.') RETURNING id`,
+    [`e2e-${run}`],
+  );
+  const mailId = mail.rows[0].id;
+  check('a normal user cannot read the inbox', (await B.req('GET', '/api/admin/inbox')).status === 403);
+  const inbox = await D.req('GET', '/api/admin/inbox');
+  check('admin inbox lists received mail as unread', inbox.status === 200 && inbox.data.unread >= 1 && inbox.data.emails.some((e) => e.id === mailId), JSON.stringify(inbox.data).slice(0, 160));
+  const opened = await D.req('GET', `/api/admin/inbox/${mailId}`);
+  check('opening an email shows it and marks it read', opened.status === 200 && opened.data.email.text === 'Hi, I cannot log in.');
+  const arch = await D.req('PATCH', `/api/admin/inbox/${mailId}`, { action: 'archive' });
+  const archived = await D.req('GET', '/api/admin/inbox?view=archived');
+  check('archiving moves it to Archived', arch.status === 200 && archived.data.emails.some((e) => e.id === mailId));
+  const emptyReply = await D.req('POST', `/api/admin/inbox/${mailId}/reply`, { text: '  ' });
+  check('an empty reply is refused', emptyReply.status === 400);
+  const badCompose = await D.req('POST', '/api/admin/inbox', { to: 'nope', subject: 'x', text: 'y' });
+  check('compose validates the recipient', badCompose.status === 400);
+  await pool.query('DELETE FROM inbound_emails WHERE id = $1', [mailId]);
   await pool.end();
 } else {
   console.log('  (token checks skipped: set DATABASE_URL to the local test database)');

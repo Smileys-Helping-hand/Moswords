@@ -54,6 +54,8 @@ async function main() {
     }
   }
 
+  if (!reportOnly) await bootstrapOwnerPassword(sql);
+
   // ── Drift report ─────────────────────────────────────────────────────────
   const rows = (await sql.query(
     `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`,
@@ -85,6 +87,35 @@ async function main() {
     console.warn(`[migrate] schema drift: missing tables: ${missingTables.join(', ') || 'none'}`);
     console.warn(`[migrate] schema drift: missing columns: ${missingColumns.join(', ') || 'none'}`);
   }
+}
+
+/**
+ * One-off owner password set: when the build has OWNER_BOOTSTRAP_PASSWORD, the
+ * owner account (mraaziqp@gmail.com) gets that password, and its existing
+ * sessions are signed out. Skipped when the password already matches, so it is
+ * safe across rebuilds. Remove the variable from Amplify once it has run.
+ */
+async function bootstrapOwnerPassword(sql: { query: (text: string, params?: unknown[]) => Promise<any[]> }) {
+  const password = process.env.OWNER_BOOTSTRAP_PASSWORD;
+  if (!password) return;
+  const bcrypt = (await import('bcryptjs')).default;
+  const [owner] = await sql.query(
+    `SELECT id, password FROM users WHERE lower(email) = 'mraaziqp@gmail.com' LIMIT 1`,
+  );
+  if (!owner) {
+    console.warn('[owner] owner account not found — password not set');
+    return;
+  }
+  if (owner.password && (await bcrypt.compare(password, owner.password))) {
+    console.log('[owner] password already up to date');
+    return;
+  }
+  await sql.query(
+    `UPDATE users SET password = $1, password_changed_at = now() WHERE id = $2`,
+    [await bcrypt.hash(password, 12), owner.id],
+  );
+  await sql.query(`DELETE FROM rate_limits WHERE key = $1 OR key LIKE 'login:acct:%mraaziqp%'`, [`login:fail:${owner.id}`]);
+  console.log('[owner] password updated; older sessions signed out');
 }
 
 /** Neon over HTTP in production; node-postgres for a local database. Both return row arrays. */

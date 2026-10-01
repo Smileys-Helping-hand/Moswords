@@ -4,9 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { enforceSuperAdminAccess } from '@/lib/admin';
 import { db } from '@/lib/db';
 import { adminUsers, users } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { logAdminAction } from '@/lib/audit';
-import { DEFAULT_FEATURES } from '@/lib/features';
+import { DEFAULT_FEATURES, validateFeatures } from '@/lib/features';
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,7 +68,9 @@ export async function POST(req: NextRequest) {
     enforceSuperAdminAccess(userEmail);
 
     const body = await req.json();
-    const { email: newAdminEmail, role = 'admin', features } = body;
+    const { email: rawEmail, features } = body;
+    const newAdminEmail = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+    const role = 'admin'; // the owner is defined in code, never via this table
 
     if (!newAdminEmail) {
       return NextResponse.json(
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
     const userExists = await db
       .select()
       .from(users)
-      .where(eq(users.email, newAdminEmail.toLowerCase()))
+      .where(sql`lower(${users.email}) = ${newAdminEmail}`)
       .limit(1);
 
     if (!userExists[0]) {
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create new admin user
-    const featuresToSet = features || DEFAULT_FEATURES;
+    const featuresToSet = Array.isArray(features) ? validateFeatures(features) : DEFAULT_FEATURES;
 
     const newAdmin = await db
       .insert(adminUsers)

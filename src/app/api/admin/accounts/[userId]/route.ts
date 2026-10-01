@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminUsers, users } from '@/lib/schema';
 import { adminContext } from '@/lib/admin-context';
-import { isSuperAdmin } from '@/lib/admin';
+import { isAdminUserId, isSuperAdmin } from '@/lib/admin';
 import { forgetAccountStatus } from '@/lib/account-status';
 
 export const runtime = 'nodejs';
@@ -38,10 +38,17 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
   const { action, reason } = await request.json().catch(() => ({}));
 
+  // Admins can't act against each other; only the owner manages admins.
+  if (!admin.isSuperAdmin && (await isAdminUserId(target.id))) {
+    return NextResponse.json({ error: 'Only the owner can change another admin' }, { status: 403 });
+  }
+
   switch (action) {
     case 'suspend': {
       const why = typeof reason === 'string' ? reason.trim().slice(0, 300) || null : null;
       await db.update(users).set({ suspendedAt: new Date(), suspendedReason: why }).where(eq(users.id, target.id));
+      // A suspended admin loses admin access too.
+      await db.delete(adminUsers).where(eq(adminUsers.userId, target.id));
       forgetAccountStatus(target.id);
       await admin.audit('suspended_user', target.id, { email: target.email, reason: why });
       return NextResponse.json({ success: true });

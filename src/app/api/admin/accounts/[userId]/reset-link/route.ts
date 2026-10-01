@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { passwordResets, users } from '@/lib/schema';
 import { adminContext } from '@/lib/admin-context';
-import { isSuperAdmin } from '@/lib/admin';
+import { isAdminUserId, isSuperAdmin } from '@/lib/admin';
 import { SITE_URL } from '@/lib/site';
 
 export const runtime = 'nodejs';
@@ -23,7 +23,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const [target] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
   if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  if (target.id === admin.id || (isSuperAdmin(target.email) && !admin.isSuperAdmin)) {
+  // A reset link is a key to the account, so: never the owner's or your own,
+  // and only the owner may create one for another admin.
+  if (target.id === admin.id || isSuperAdmin(target.email) || (!admin.isSuperAdmin && (await isAdminUserId(target.id)))) {
     return NextResponse.json({ error: 'Not allowed for this account' }, { status: 403 });
   }
 
