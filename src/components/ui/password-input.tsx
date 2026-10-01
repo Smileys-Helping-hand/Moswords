@@ -15,18 +15,16 @@ interface ValidationRule {
   test: (password: string) => boolean;
 }
 
+// Length beats symbol rules (NIST 800-63B); a special-character requirement
+// mostly made people give up on sign-up.
 const validationRules: ValidationRule[] = [
   {
     label: "At least 8 characters",
     test: (password) => password.length >= 8,
   },
   {
-    label: "Contains a number",
-    test: (password) => /\d/.test(password),
-  },
-  {
-    label: "Contains a special character",
-    test: (password) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    label: "Contains a letter and a number",
+    test: (password) => /[A-Za-z]/.test(password) && /\d/.test(password),
   },
 ];
 

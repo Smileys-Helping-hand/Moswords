@@ -270,4 +270,18 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS messages_content_trgm_idx ON messages USING gin (content gin_trgm_ops) WHERE is_encrypted = false`,
     ],
   },
+  {
+    // Password reset: single-use, 1-hour tokens, stored only as SHA-256 hashes.
+    id: '2026-10-01-password-resets',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS password_resets (
+        token_hash text PRIMARY KEY,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at timestamp NOT NULL,
+        used_at timestamp,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id)`,
+    ],
+  },
 ];

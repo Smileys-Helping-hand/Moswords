@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getProviders, signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -140,12 +141,13 @@ export default function AuthForm() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">Email</Label>
-                  <Input id="signin-email" type="email" autoComplete="email" placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+                  <Input id="signin-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
-                  <PasswordInput 
-                    id="signin-password" 
+                  <PasswordInput
+                    id="signin-password"
+                    autoComplete="current-password"
                     required 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
@@ -156,6 +158,9 @@ export default function AuthForm() {
               </CardContent>
               <CardFooter className="flex-col gap-4">
                 <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Signing In...' : 'Sign In'}</Button>
+                <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground">
+                  Forgot your password?
+                </Link>
               </CardFooter>
             </form>
           </Card>
@@ -183,18 +188,19 @@ export default function AuthForm() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
-                  <Input id="signup-email" type="email" autoComplete="email" placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+                  <Input id="signup-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <PasswordInput 
-                    id="signup-password" 
+                  <PasswordInput
+                    id="signup-password"
+                    autoComplete="new-password"
                     required 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     disabled={loading}
                     showValidation={true}
-                    placeholder="Create a strong password"
+                    placeholder="At least 8 characters"
                   />
                 </div>
               </CardContent>

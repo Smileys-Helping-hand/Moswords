@@ -1,11 +1,11 @@
-// End-to-end journey test (51 assertions): sign up → find & add each other → DMs → groups →
+// End-to-end journey test (60 assertions): sign up → find & add each other → DMs → groups →
 // archive / folders / pin → search, plus the checks that outsiders are kept out.
 //
 // Creates throwaway accounts, so it only runs against a LOCAL server backed by a
 // throwaway database (see README → Develop).
 //
 //   npm run build && npm start -- -p 3100      (with .env.local → local Postgres)
-//   node scripts/e2e.mjs http://localhost:3100
+//   DATABASE_URL=<local test db> node scripts/e2e.mjs http://localhost:3100
 import crypto from 'node:crypto';
 
 const BASE = process.argv[2] || 'http://localhost:3100';
@@ -185,6 +185,53 @@ const contacts = await A.req('GET', '/api/contacts');
 check('contact book saves and lists contacts', contact.status === 201 && contacts.data.contacts?.some((c) => c.name === 'Thandi'));
 const h = await A.req('GET', '/api/health');
 check('health reports ok', h.data.status === 'ok', JSON.stringify(h.data));
+
+console.log('\n8. Forgot / reset password');
+const fpKnown = await new Client('x').req('POST', '/api/auth/forgot-password', { email: A.email });
+const fpUnknown = await new Client('y').req('POST', '/api/auth/forgot-password', { email: `nobody-${run}@example.test` });
+check(
+  'forgot-password answers the same for known and unknown emails',
+  fpKnown.status === 200 && fpUnknown.status === 200 && fpKnown.data.message === fpUnknown.data.message,
+);
+const fpBad = await new Client('z').req('POST', '/api/auth/forgot-password', { email: 'not-an-email' });
+check('…and rejects a malformed email', fpBad.status === 400);
+
+if (process.env.DATABASE_URL && /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL)) {
+  // Plant our own tokens in the throwaway DB (real tokens are only ever emailed).
+  const { default: pg } = await import('pg');
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, options: '-c timezone=UTC' });
+  const token = crypto.randomBytes(32).toString('base64url');
+  const expiredToken = crypto.randomBytes(32).toString('base64url');
+  const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
+  await pool.query(
+    "INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '1 hour'), ($3, $2, now() - interval '1 minute')",
+    [sha(token), A.id, sha(expiredToken)],
+  );
+  const created = await pool.query('SELECT count(*)::int AS n FROM password_resets WHERE user_id = $1', [A.id]);
+  check('forgot-password created a reset token for the real account', created.rows[0].n >= 3, String(created.rows[0].n));
+
+  const newPassword = `N3w!${crypto.randomBytes(6).toString('hex')}`;
+  const short = await new Client('r').req('POST', '/api/auth/reset-password', { token, password: 'short' });
+  check('reset rejects a short password (link not used up)', short.status === 400);
+  const ok = await new Client('r').req('POST', '/api/auth/reset-password', { token, password: newPassword });
+  check('reset with a valid link works', ok.status === 200 && ok.data.email === A.email, JSON.stringify(ok.data));
+  const again = await new Client('r').req('POST', '/api/auth/reset-password', { token, password: newPassword });
+  check('the same link cannot be used twice', again.status === 400);
+  const expired = await new Client('r').req('POST', '/api/auth/reset-password', { token: expiredToken, password: newPassword });
+  check('an expired link is rejected', expired.status === 400);
+
+  const signInAs = async (password) => {
+    const c = new Client('again');
+    const t = await c.req('GET', '/api/auth/csrf');
+    await c.req('POST', '/api/auth/callback/credentials', new URLSearchParams({ csrfToken: t.data.csrfToken, email: A.email, password, json: 'true' }));
+    return (await c.req('GET', '/api/auth/session')).data?.user?.id;
+  };
+  check('signs in with the new password', (await signInAs(newPassword)) === A.id);
+  check('the old password no longer works', !(await signInAs(PASSWORD)));
+  await pool.end();
+} else {
+  console.log('  (token checks skipped: set DATABASE_URL to the local test database)');
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

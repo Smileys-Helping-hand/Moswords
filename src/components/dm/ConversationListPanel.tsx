@@ -5,6 +5,8 @@ import { isOnline } from '@/lib/presence';
 import { useAuth } from '@/hooks/use-auth';
 import { useSyncBatches } from '@/providers/sync-provider';
 import { openMessageSearch } from '@/components/message-search';
+import { shareInvite } from '@/lib/invite';
+import { useToast } from '@/hooks/use-toast';
 import { useRouter, usePathname } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -31,6 +33,7 @@ import {
   ArrowLeft,
   Pencil,
   ChevronRight,
+  Share2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CreateGroupChatDialog from '@/components/create-group-chat-dialog';
@@ -174,6 +177,7 @@ export default function ConversationListPanel({ compact = false }: ConversationL
   const router = useRouter();
   const pathname = usePathname();
   const { haptic } = useMobileFeatures();
+  const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -548,9 +552,22 @@ export default function ConversationListPanel({ compact = false }: ConversationL
                 <>
                   <p className="font-medium mb-1">No conversations yet</p>
                   <p className="text-xs mb-4">Add people by name or email, or share your QR code.</p>
-                  <Button size="sm" onClick={() => setShowAddSheet(true)}>
-                    <Plus className="w-4 h-4 mr-1" /> Add someone
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button size="sm" onClick={() => setShowAddSheet(true)}>
+                      <Plus className="w-4 h-4 mr-1" /> Add someone
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        if (!currentUserId) return;
+                        const how = await shareInvite(currentUserId, session?.user?.name);
+                        if (how === 'copied') toast({ title: 'Invite link copied', description: 'Send it to friends on WhatsApp, SMS or email.' });
+                      }}
+                    >
+                      <Share2 className="w-4 h-4 mr-1" /> Invite friends
+                    </Button>
+                  </div>
                 </>
               )}
             </div>

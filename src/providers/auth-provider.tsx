@@ -9,7 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 /** Fired by the sync loop when the server says our session is no longer valid. */
 export const AUTH_EXPIRED_EVENT = 'moswords:auth-expired';
 
-const PUBLIC_PATHS = ['/login'];
+// Pages anyone can open. Signed-in users are only bounced away from /login.
+const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
 
 function FullScreenSkeleton() {
   return (
@@ -53,7 +54,7 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
       // Remember where they were going (e.g. an invite link) so sign-in returns there.
       const target = pathname !== '/' ? `?callbackUrl=${encodeURIComponent(pathname)}` : '';
       router.replace(`/login${target}`);
-    } else if (status === 'authenticated' && isPublic) {
+    } else if (status === 'authenticated' && pathname === '/login') {
       const next = new URLSearchParams(window.location.search).get('callbackUrl') || '/';
       router.replace(next.startsWith('/') && !next.startsWith('//') ? next : '/');
     }
@@ -81,7 +82,7 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
 
   if (status === 'loading' && !wasAuthenticated.current) return <FullScreenSkeleton />;
   if (status === 'unauthenticated' && !isPublic) return <FullScreenSkeleton />;
-  if (status === 'authenticated' && isPublic) return <FullScreenSkeleton />;
+  if (status === 'authenticated' && pathname === '/login') return <FullScreenSkeleton />;
 
   return <>{children}</>;
 }

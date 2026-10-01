@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Loader2, X, ArrowLeft } from 'lucide-react';
+import { Search, Loader2, X, ArrowLeft, Share2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { shareInvite } from '@/lib/invite';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { Input } from './ui/input';
@@ -36,6 +38,15 @@ export default function AddContactSheet({ open, onOpenChange, onFriendAdded }: A
   const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
   const { toast } = useToast();
   const { haptic } = useMobileFeatures();
+  const { data: session } = useSession();
+
+  const inviteFriend = async () => {
+    const me = session?.user as { id?: string; name?: string | null } | undefined;
+    if (!me?.id) return;
+    const how = await shareInvite(me.id, me.name);
+    if (how === 'copied') toast({ title: 'Invite link copied', description: 'Paste it into WhatsApp, SMS or email.' });
+    if (how === 'failed') toast({ variant: 'destructive', title: 'Could not share the link' });
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim() || searchQuery.trim().length < 2) {
@@ -275,9 +286,14 @@ export default function AddContactSheet({ open, onOpenChange, onFriendAdded }: A
               )}
 
               {!searching && searchResults.length === 0 && searchQuery && (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-                  <p className="text-muted-foreground">No results found</p>
-                  <p className="text-xs text-muted-foreground">Try a different search</p>
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+                  <p className="text-muted-foreground">No one found for &ldquo;{searchQuery}&rdquo;</p>
+                  <p className="text-xs text-muted-foreground">
+                    Search by their name or full email address — or invite them. When they join through your link, you can add each other in one tap.
+                  </p>
+                  <Button onClick={inviteFriend} className="mt-1">
+                    <Share2 className="w-4 h-4 mr-2" /> Invite to Moswords
+                  </Button>
                 </div>
               )}
 
