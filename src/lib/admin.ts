@@ -20,7 +20,17 @@ export class AdminError extends Error {
  * Check if user email is superadmin
  */
 export function isSuperAdmin(email?: string): boolean {
-  return email?.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase();
+  if (!email) return false;
+  return superAdminEmails().includes(email.toLowerCase());
+}
+
+/** The built-in owner plus anyone listed in SUPERADMIN_EMAILS (comma separated). */
+export function superAdminEmails(): string[] {
+  const extra = (process.env.SUPERADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return Array.from(new Set([SUPERADMIN_EMAIL.toLowerCase(), ...extra]));
 }
 
 /**

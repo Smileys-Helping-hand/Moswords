@@ -46,7 +46,7 @@ export default function AuthForm() {
     const result = await signIn('credentials', { email, password, redirect: false });
     if (!result || result.error) {
       const message =
-        result?.error && result.error.startsWith('Too many')
+        result?.error && /^(Too many|This account has been suspended)/.test(result.error)
           ? result.error
           : 'Incorrect email or password.';
       throw new Error(message);

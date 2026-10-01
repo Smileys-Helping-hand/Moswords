@@ -26,6 +26,9 @@ export const users = pgTable('users', {
     statusVisibility?: 'everyone' | 'contacts' | 'nobody';
   }>(),
   appearance: jsonb('appearance').$type<Record<string, unknown>>(),
+  // Set by an admin: blocks sign-in and API access until cleared.
+  suspendedAt: timestamp('suspended_at'),
+  suspendedReason: text('suspended_reason'),
 });
 
 // Accounts table for OAuth providers
