@@ -221,3 +221,18 @@ Check the HTML version of this email to accept or decline the request, or visit 
 © 2026 Moswords. All rights reserved.
   `.trim();
 }
+
+/** Password reset email. `link` contains the one-time token. */
+export function generatePasswordResetEmail(name: string, link: string): { html: string; text: string } {
+  const safeName = name.replace(/[<>&"]/g, '');
+  return {
+    html: `<!doctype html><html><body style="margin:0;background:#0B0F19;font-family:system-ui,-apple-system,sans-serif;color:#e9edf2">
+  <div style="max-width:480px;margin:0 auto;padding:32px 24px">
+    <h1 style="font-size:20px;margin:0 0 16px">Reset your Moswords password</h1>
+    <p style="line-height:1.5;opacity:.85">Hi ${safeName}, someone (hopefully you) asked to reset the password for this account.</p>
+    <p style="margin:28px 0"><a href="${link}" style="background:#00F0FF;color:#0B0F19;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600">Choose a new password</a></p>
+    <p style="line-height:1.5;opacity:.7;font-size:13px">The link works once and expires in 1 hour. If you didn't ask for this, you can ignore this email — your password stays the same.</p>
+  </div></body></html>`,
+    text: `Hi ${safeName},\n\nReset your Moswords password here (works once, expires in 1 hour):\n${link}\n\nIf you didn't ask for this, ignore this email — your password stays the same.\n`,
+  };
+}
