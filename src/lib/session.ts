@@ -33,8 +33,18 @@ export async function requireAdmin(): Promise<
 > {
   const auth = await requireUser();
   if (auth.response) return auth;
-  const { isAdmin, isSuperAdmin } = await import('./admin');
-  const email = auth.user.email ?? undefined;
-  if (isSuperAdmin(email) || (await isAdmin(email))) return auth;
+  const { isAdminUserId, isSuperAdmin } = await import('./admin');
+  if (isSuperAdmin(auth.user.email ?? undefined) || (await isAdminUserId(auth.user.id))) return auth;
   return { response: NextResponse.json({ error: 'Admin access required' }, { status: 403 }) };
+}
+
+/** Owner-only actions: API keys, integrations, admin roles, deleting accounts. */
+export async function requireSuperAdmin(): Promise<
+  { user: SessionUser; response?: undefined } | { user?: undefined; response: NextResponse }
+> {
+  const auth = await requireUser();
+  if (auth.response) return auth;
+  const { isSuperAdmin } = await import('./admin');
+  if (isSuperAdmin(auth.user.email ?? undefined)) return auth;
+  return { response: NextResponse.json({ error: 'Only the owner can do this' }, { status: 403 }) };
 }

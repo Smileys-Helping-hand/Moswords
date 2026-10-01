@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.moswords.app",
+      "sha256_cert_fingerprints": ["21:DD:61:35:C8:E3:99:AA:34:A0:B9:02:F0:94:5D:46:CC:B9:CB:78:9F:1B:AA:0C:6B:33:6C:23:61:5D:89:A4"]
+    }
+  }
+]

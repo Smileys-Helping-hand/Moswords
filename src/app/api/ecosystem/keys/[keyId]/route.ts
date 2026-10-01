@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ALL_SCOPES, hashApiKey, type EcosystemScope } from '@/lib/ecosystem-auth';
-import { requireAdmin } from '@/lib/session';
+import { requireAdmin, requireSuperAdmin } from '@/lib/session';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -76,7 +76,7 @@ export async function PATCH(
 ) {
   const params = await paramsPromise;
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -159,7 +159,7 @@ export async function DELETE(
 ) {
   const params = await paramsPromise;
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) {

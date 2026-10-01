@@ -1,6 +1,12 @@
 'use client';
 
-import sodium from 'libsodium-wrappers';
+import type Sodium from 'libsodium-wrappers';
+
+// libsodium is ~900 KB (WASM inlined as base64). Importing it statically put it
+// in the first bundle of every chat screen, which made the app slow to open on
+// phones. It now loads on first use; every export below awaits initSodium().
+let sodium: typeof Sodium;
+let loading: Promise<void> | null = null;
 
 export interface E2EKeyPair {
   publicKey: string;
@@ -13,7 +19,17 @@ export interface EncryptedPayload {
 }
 
 export async function initSodium(): Promise<void> {
-  await sodium.ready;
+  loading ??= import('libsodium-wrappers')
+    .then(async (mod) => {
+      const lib = ((mod as { default?: typeof Sodium }).default ?? mod) as typeof Sodium;
+      await lib.ready;
+      sodium = lib;
+    })
+    .catch((error) => {
+      loading = null; // let the next call retry (e.g. after a network blip)
+      throw error;
+    });
+  await loading;
 }
 
 export function encodeBase64(data: Uint8Array): string {

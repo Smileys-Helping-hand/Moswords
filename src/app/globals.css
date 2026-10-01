@@ -210,6 +210,39 @@ body {
   height: 100%;
 }
 
+/* ===== FULL-SCREEN APP VIEWS =====
+   Screens that manage their own scrolling (chat list, a chat, AI, updates…)
+   mark their root with data-app-shell and size themselves with these classes.
+   The body's bottom padding for the tab bar (pb-20) would otherwise make them
+   taller than the screen, so the page scrolled and hid the chat header. */
+body:has([data-app-shell]) {
+  padding-bottom: env(safe-area-inset-bottom) !important;
+}
+/* No tab bar (inside a conversation). */
+.app-shell-h {
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+/* Tab bar visible on phones (h-16 = 4rem); full height from md up. */
+.app-shell-h-nav {
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 4rem);
+}
+@media (min-width: 768px) {
+  .app-shell-h-nav {
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
+/* Frosted-glass blur is one of the most expensive things a phone WebView can
+   draw, and it repaints on every scroll frame. Touch devices get flat surfaces
+   (they are already 80–95% opaque), which keeps lists and chats smooth. */
+@media (pointer: coarse) {
+  .backdrop-blur-sm, .backdrop-blur, .backdrop-blur-md, .backdrop-blur-lg,
+  .backdrop-blur-xl, .backdrop-blur-2xl, .backdrop-blur-3xl {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
 /* Main app container with proper scrolling */
 #__next {
   height: 100%;

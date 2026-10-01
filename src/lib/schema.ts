@@ -29,6 +29,10 @@ export const users = pgTable('users', {
   // Set by an admin: blocks sign-in and API access until cleared.
   suspendedAt: timestamp('suspended_at'),
   suspendedReason: text('suspended_reason'),
+  // Optional sign-in handle (unique, case-insensitive) — e.g. the owner signs in as "mraaziqp".
+  username: text('username'),
+  // Sessions that started before this moment are signed out (set on password change/reset).
+  passwordChangedAt: timestamp('password_changed_at'),
 });
 
 // Accounts table for OAuth providers
@@ -797,4 +801,23 @@ export const passwordResets = pgTable('password_resets', {
   expiresAt: timestamp('expires_at').notNull(),
   usedAt: timestamp('used_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/** Mail received at @awehchat.co.za through Resend inbound; read in the admin dashboard. */
+export const inboundEmails = pgTable('inbound_emails', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  resendId: text('resend_id').notNull().unique(),
+  fromAddress: text('from_address').notNull(),
+  toAddresses: jsonb('to_addresses').$type<string[]>().notNull(),
+  cc: jsonb('cc').$type<string[]>(),
+  subject: text('subject'),
+  textBody: text('text_body'),
+  htmlBody: text('html_body'),
+  messageId: text('message_id'),
+  attachments: jsonb('attachments').$type<{ id: string; filename: string; contentType: string; size?: number }[]>(),
+  authentication: jsonb('authentication').$type<Record<string, string>>(),
+  receivedAt: timestamp('received_at').notNull().defaultNow(),
+  readAt: timestamp('read_at'),
+  repliedAt: timestamp('replied_at'),
+  archivedAt: timestamp('archived_at'),
 });

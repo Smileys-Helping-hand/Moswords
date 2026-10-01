@@ -101,7 +101,7 @@ export default function ServersPage() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 overflow-x-hidden">
+    <div data-app-shell className="app-shell-h-nav w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 overflow-x-hidden">
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}

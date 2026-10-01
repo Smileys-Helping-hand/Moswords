@@ -54,14 +54,29 @@ export async function isAdmin(email?: string): Promise<boolean> {
 }
 
 /**
- * Enforce admin access - throw error if user is not admin
+ * Is this user id in admin_users? Matched on the id rather than the email, so
+ * an admin row can never be picked up by a different account.
+ */
+export async function isAdminUserId(userId?: string | null): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const rows = await db.select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.userId, userId)).limit(1);
+    return rows.length > 0;
+  } catch (error) {
+    console.error('Error checking admin status:', (error as Error).message);
+    return false;
+  }
+}
+
+/**
+ * Enforce admin access - throw error if user is not admin (the owner always is)
  */
 export async function enforceAdminAccess(email?: string): Promise<void> {
   if (!email) {
     throw new AdminError('User not authenticated');
   }
 
-  const isUserAdmin = await isAdmin(email);
+  const isUserAdmin = isSuperAdmin(email) || (await isAdmin(email));
   if (!isUserAdmin) {
     throw new AdminError(`Access denied. User ${email} is not an admin.`);
   }

@@ -19,6 +19,7 @@ import {
   HardDrive,
   Palette,
   LayoutDashboard,
+  Smartphone,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -44,6 +45,9 @@ export default function SettingsPage() {
   const router = useRouter();
   const { session } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  // Inside the Android app (capacitor.config appendUserAgent) there's no need to offer it.
+  const [inApp, setInApp] = useState(true);
+  useEffect(() => setInApp(/MoswordsApp/.test(navigator.userAgent)), []);
 
   useEffect(() => {
     fetch('/api/admin/me')
@@ -94,6 +98,22 @@ export default function SettingsPage() {
             <span className="flex-1 text-left">
               <span className="block font-semibold">Admin dashboard</span>
               <span className="block text-sm text-muted-foreground">Users, sign-ups and activity</span>
+            </span>
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+          </button>
+        )}
+
+        {!inApp && (
+          <button
+            onClick={() => router.push('/download')}
+            className="w-full flex items-center gap-4 rounded-2xl border border-white/10 glass-card px-4 py-4 hover:bg-white/5 transition-colors"
+          >
+            <span className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <Smartphone className="w-5 h-5 text-primary" />
+            </span>
+            <span className="flex-1 text-left">
+              <span className="block font-semibold">Get the phone app</span>
+              <span className="block text-sm text-muted-foreground">Faster, full-screen, with its own icon</span>
             </span>
             <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
           </button>

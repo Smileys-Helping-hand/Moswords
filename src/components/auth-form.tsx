@@ -48,7 +48,7 @@ export default function AuthForm() {
       const message =
         result?.error && /^(Too many|This account has been suspended)/.test(result.error)
           ? result.error
-          : 'Incorrect email or password.';
+          : 'Incorrect email, username or password.';
       throw new Error(message);
     }
     router.replace(callbackUrl);
@@ -140,8 +140,8 @@ export default function AuthForm() {
             <form onSubmit={handleSignIn}>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
-                  <Input id="signin-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+                  <Label htmlFor="signin-email">Email or username</Label>
+                  <Input id="signin-email" type="text" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>

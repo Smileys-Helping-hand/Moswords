@@ -7,7 +7,9 @@ import {
   ArrowLeft,
   Ban,
   Copy,
+  Inbox,
   KeyRound,
+  Mail,
   Loader2,
   MoreVertical,
   RotateCcw,
@@ -37,6 +39,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { isOnline } from '@/lib/presence';
+import AdminInbox from '@/components/admin/AdminInbox';
 
 type Stats = Record<
   | 'users' | 'new_today' | 'new_week' | 'active_today' | 'online_now' | 'suspended'
@@ -47,6 +50,7 @@ type Stats = Record<
 interface Account {
   id: string;
   email: string;
+  username: string | null;
   name: string;
   photoURL: string | null;
   createdAt: string | null;
@@ -91,6 +95,25 @@ export default function AdminDashboard() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [resetLink, setResetLink] = useState<{ who: string; link: string } | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [tab, setTab] = useState<'users' | 'inbox'>('users');
+  const [unreadMail, setUnreadMail] = useState(0);
+  const [composeTo, setComposeTo] = useState<string | null>(null);
+  const clearCompose = useCallback(() => setComposeTo(null), []);
+
+  // /admin?tab=inbox (links in forwarded emails)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'inbox') setTab('inbox');
+  }, []);
+
+  // Unread count for the tab badge, without opening the inbox.
+  useEffect(() => {
+    if (state !== 'ready') return;
+    fetch('/api/admin/inbox', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setUnreadMail(d.unread))
+      .catch(() => {});
+  }, [state]);
 
   const loadOverview = useCallback(async () => {
     const res = await fetch('/api/admin/overview', { cache: 'no-store' });
@@ -259,7 +282,33 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <section aria-label="Users" className="space-y-3">
+        <div className="flex gap-1 rounded-full bg-muted/50 p-1" role="tablist" aria-label="Dashboard sections">
+          {([
+            { id: 'users', label: 'Users', icon: Users },
+            { id: 'inbox', label: 'Email', icon: Inbox },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full h-9 text-sm font-medium ${
+                tab === t.id ? 'bg-background shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              <t.icon className="w-4 h-4" /> {t.label}
+              {t.id === 'inbox' && unreadMail > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">{unreadMail}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'inbox' && (
+          <AdminInbox composeTo={composeTo} onComposeHandled={clearCompose} onUnreadChange={setUnreadMail} />
+        )}
+
+        <section aria-label="Users" className={`space-y-3 ${tab === 'users' ? '' : 'hidden'}`}>
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
             <h2 className="font-semibold">Users</h2>
@@ -268,7 +317,7 @@ export default function AdminDashboard() {
 
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Search by name or email" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input className="pl-9" placeholder="Search by name, username or email" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
 
           <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="tablist" aria-label="User filters">
@@ -301,13 +350,13 @@ export default function AdminDashboard() {
                     {!a.isSuperAdmin && a.isAdmin && <span className="rounded bg-primary/15 px-1.5 text-[10px] text-primary">Admin</span>}
                     {a.suspendedAt && <span className="rounded bg-destructive/15 px-1.5 text-[10px] text-destructive">Suspended</span>}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">{a.email}</p>
+                  <p className="truncate text-xs text-muted-foreground">{a.username ? `@${a.username} · ` : ''}{a.email}</p>
                   <p className="text-[11px] text-muted-foreground">
                     Joined {ago(a.createdAt)} · seen {ago(a.lastSeen)} · {a.friends} friends · {a.messages} messages
                   </p>
                   {a.suspendedReason && <p className="text-[11px] text-destructive">Reason: {a.suspendedReason}</p>}
                 </div>
-                {!a.isSuperAdmin && a.email !== you?.email && (
+                {!a.isSuperAdmin && a.email !== you?.email && (you?.isSuperAdmin || !a.isAdmin) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" disabled={busy} aria-label={`Actions for ${a.name}`}>
@@ -315,6 +364,9 @@ export default function AdminDashboard() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => { setComposeTo(a.email); setTab('inbox'); }}>
+                        <Mail className="w-4 h-4 mr-2" /> Send email…
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => createResetLink(a)}>
                         <RotateCcw className="w-4 h-4 mr-2" /> Password reset link
                       </DropdownMenuItem>

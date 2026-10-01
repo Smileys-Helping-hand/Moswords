@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { passwordResets, users } from '@/lib/schema';
-import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
+import { clearRateLimit, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
+import { forgetAccountStatus } from '@/lib/account-status';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,10 @@ export async function POST(request: NextRequest) {
   }
 
   const hashed = await bcrypt.hash(password, 12);
-  await db.update(users).set({ password: hashed }).where(eq(users.id, claimed.userId));
+  // Signs out every existing session and lifts any wrong-password lockout.
+  await db.update(users).set({ password: hashed, passwordChangedAt: new Date() }).where(eq(users.id, claimed.userId));
+  forgetAccountStatus(claimed.userId);
+  await clearRateLimit(`login:fail:${claimed.userId}`);
   await db
     .update(passwordResets)
     .set({ usedAt: sql`now()` })

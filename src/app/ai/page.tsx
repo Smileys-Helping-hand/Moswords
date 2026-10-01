@@ -154,7 +154,7 @@ export default function AiPage() {
   if (status === 'loading') return null;
 
   return (
-    <div className="flex flex-col h-[calc(100svh-4rem)] md:h-screen bg-background">
+    <div data-app-shell className="flex flex-col app-shell-h-nav bg-background">
       {/* Header */}
       <div className="sticky top-0 z-20 glass-panel border-b border-border/40 flex items-center gap-3 px-4 py-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Back">

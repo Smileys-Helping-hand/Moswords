@@ -36,6 +36,27 @@ export async function rateLimit(
   }
 }
 
+/** How many hits `key` has in its current window (0 if none or on error). Does not count as a hit. */
+export async function rateLimitCount(key: string, windowSeconds: number): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      SELECT count FROM rate_limits
+      WHERE key = ${key} AND window_start >= now() - make_interval(secs => ${windowSeconds})
+    `);
+    return Number((result as any).rows?.[0]?.count ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function clearRateLimit(key: string): Promise<void> {
+  try {
+    await db.execute(sql`DELETE FROM rate_limits WHERE key = ${key}`);
+  } catch {
+    /* best effort */
+  }
+}
+
 export function clientIp(headers: Headers): string {
   return (
     headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

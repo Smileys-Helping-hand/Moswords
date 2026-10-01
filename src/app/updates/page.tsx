@@ -211,7 +211,7 @@ function StatusViewer({
 
       {/* Caption */}
       {currentStatus.caption && currentStatus.mediaType !== 'text' && (
-        <div className="absolute bottom-16 left-4 right-4 text-white text-sm bg-black/40 rounded-xl p-3 backdrop-blur-sm">
+        <div className="absolute bottom-16 left-4 right-4 text-white text-sm bg-black/60 rounded-xl p-3 backdrop-blur-sm">
           {currentStatus.caption}
         </div>
       )}
@@ -390,7 +390,7 @@ export default function UpdatesPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-[calc(100svh-4rem)] md:h-screen bg-background">
+      <div data-app-shell className="flex flex-col app-shell-h-nav bg-background">
         <div className="sticky top-0 z-10 px-4 py-3 border-b border-border/40 flex items-center justify-between">
           <h1 className="text-xl font-bold">Updates</h1>
         </div>
@@ -411,7 +411,7 @@ export default function UpdatesPage() {
 
   return (
     <>
-      <div className="flex flex-col h-[calc(100svh-4rem)] md:h-screen bg-background">
+      <div data-app-shell className="flex flex-col app-shell-h-nav bg-background">
         {/* Header */}
         <div className="sticky top-0 z-10 px-4 py-3 border-b border-border/40 glass-panel flex items-center gap-2">
           <Button

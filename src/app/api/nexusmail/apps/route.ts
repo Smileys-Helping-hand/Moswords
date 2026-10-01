@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/session';
+import { requireAdmin, requireSuperAdmin } from '@/lib/session';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -50,7 +50,7 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
 
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (admin.response) return admin.response;
     const session = await getServerSession(authOptions);
 

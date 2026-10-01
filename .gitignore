@@ -44,3 +44,5 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+# Built APKs are published to S3 (downloads/android/), not committed
+/apk/

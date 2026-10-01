@@ -2,7 +2,7 @@
 // Next.js App Router shows this automatically while the page is loading.
 export default function DmLoading() {
   return (
-    <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen min-h-0 bg-background">
+    <div className="flex flex-col flex-1 h-full min-h-0 min-h-0 bg-background">
       {/* Header skeleton */}
       <div className="bg-background/95 border-b border-border/50 px-3 py-2.5 flex items-center justify-between gap-2 shadow-sm">
         <div className="flex items-center gap-2.5 flex-1">

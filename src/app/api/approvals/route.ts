@@ -19,9 +19,8 @@ export async function GET(request: NextRequest) {
   const currentUserId = (session.user as any).id;
 
   // Non-admins only ever see approvals assigned to them.
-  const { isAdmin, isSuperAdmin } = await import('@/lib/admin');
-  const email = session.user.email ?? undefined;
-  const admin = isSuperAdmin(email) || (await isAdmin(email));
+  const { isAdminUserId, isSuperAdmin } = await import('@/lib/admin');
+  const admin = isSuperAdmin(session.user.email ?? undefined) || (await isAdminUserId(currentUserId));
   const conditions = assigned || !admin ? [eq(approvals.assignedToId, currentUserId)] : [];
   if (status) conditions.push(eq(approvals.status, status));
 

@@ -21,12 +21,12 @@ export async function GET(request: NextRequest) {
   const q = (params.get('q') || '').trim().slice(0, 100);
   const filter = params.get('filter') || 'all';
   const page = Math.max(0, Math.min(1000, parseInt(params.get('page') || '0', 10) || 0));
-  const like = `%${q.replace(/[\%_]/g, (c) => `\${c}`)}%`;
+  const like = `%${q.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
 
   const where = sql.join(
     [
       sql`true`,
-      q ? sql`(u.email ILIKE ${like} OR u.display_name ILIKE ${like} OR u.name ILIKE ${like})` : sql`true`,
+      q ? sql`(u.email ILIKE ${like} OR u.display_name ILIKE ${like} OR u.name ILIKE ${like} OR u.username ILIKE ${like})` : sql`true`,
       filter === 'suspended' ? sql`u.suspended_at IS NOT NULL` : sql`true`,
       filter === 'admins' ? sql`au.id IS NOT NULL` : sql`true`,
       filter === 'new' ? sql`u.created_at > now() - interval '7 days'` : sql`true`,
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
   const [list, total] = await runBatch([
     db.execute(sql`
-      SELECT u.id, u.email, u.display_name, u.name, u.photo_url, u.created_at, u.last_seen,
+      SELECT u.id, u.email, u.username, u.display_name, u.name, u.photo_url, u.created_at, u.last_seen,
              u.suspended_at, u.suspended_reason, (au.id IS NOT NULL) AS is_admin,
              (SELECT count(DISTINCT CASE WHEN f.user_id = u.id THEN f.friend_id ELSE f.user_id END)
                 FROM friends f WHERE (f.user_id = u.id OR f.friend_id = u.id) AND f.status = 'accepted')::int AS friends,
@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
     accounts: rows.map((r) => ({
       id: r.id,
       email: r.email,
+      username: r.username,
       name: r.display_name || r.name || r.email.split('@')[0],
       photoURL: r.photo_url,
       createdAt: iso(r.created_at),
