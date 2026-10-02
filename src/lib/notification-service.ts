@@ -32,44 +32,77 @@ export class NotificationService {
           return false;
         }
 
-        if (!this.nativePushInitialized) {
-          this.nativePushInitialized = true;
-          await PushNotifications.requestPermissions();
-          await PushNotifications.register();
-
-          PushNotifications.addListener('registration', (token) => {
-            console.log('FCM registration token received');
-            try {
-              localStorage.setItem('moswords_fcm_token', token.value);
-            } catch {
-              // Ignore storage failures; token still exists in runtime.
-            }
+        // Create high-importance Android channel for banner popups and alerts
+        try {
+          await LocalNotifications.createChannel({
+            id: 'moswords_messages',
+            name: 'Messages',
+            description: 'Direct messages and group chats',
+            importance: 5, // High importance (heads-up popup)
+            visibility: 1, // Public on lockscreen
+            vibration: true,
+            lights: true,
+            lightColor: '#00F0FF',
           });
+        } catch (chanErr) {
+          console.warn('Could not create notification channel:', chanErr);
+        }
 
-          PushNotifications.addListener('registrationError', (error) => {
-            console.error('FCM registration error:', error);
-          });
-
-          PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-            try {
-              await this.showNotification(
-                notification.title || 'Moswords',
-                {
-                  body: notification.body || '',
-                  data: notification.data,
-                }
-              );
-            } catch (error) {
-              console.error('Error handling received push notification:', error);
-            }
-          });
-
-          PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-            const targetUrl = (action.notification.data as any)?.url;
+        // Tap listener: deep link into conversation
+        try {
+          await LocalNotifications.removeAllListeners();
+          await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+            const targetUrl = (action.notification.extra as { url?: string } | undefined)?.url;
             if (typeof window !== 'undefined' && targetUrl) {
               window.location.href = targetUrl;
             }
           });
+        } catch (listenErr) {
+          console.warn('Could not attach local notification listener:', listenErr);
+        }
+
+        if (!this.nativePushInitialized) {
+          this.nativePushInitialized = true;
+          try {
+            await PushNotifications.requestPermissions();
+            await PushNotifications.register();
+
+            PushNotifications.addListener('registration', (token) => {
+              console.log('FCM registration token received');
+              try {
+                localStorage.setItem('moswords_fcm_token', token.value);
+              } catch {
+                // Ignore storage failures; token still exists in runtime.
+              }
+            });
+
+            PushNotifications.addListener('registrationError', (error) => {
+              console.error('FCM registration error:', error);
+            });
+
+            PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+              try {
+                await this.showNotification(
+                  notification.title || 'Moswords',
+                  {
+                    body: notification.body || '',
+                    data: notification.data,
+                  }
+                );
+              } catch (error) {
+                console.error('Error handling received push notification:', error);
+              }
+            });
+
+            PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+              const targetUrl = (action.notification.data as any)?.url;
+              if (typeof window !== 'undefined' && targetUrl) {
+                window.location.href = targetUrl;
+              }
+            });
+          } catch (pushErr) {
+            console.warn('Native push registration skipped or unavailable:', pushErr);
+          }
         }
 
         return true;
@@ -105,9 +138,38 @@ export class NotificationService {
   }
 
   /**
-   * Request notification permission from user
+   * Check current notification permission across native and web
+   */
+  async checkPermission(): Promise<NotificationPermission> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const res = await LocalNotifications.checkPermissions();
+        return res.display === 'granted' ? 'granted' : res.display === 'denied' ? 'denied' : 'default';
+      } catch {
+        return 'default';
+      }
+    }
+
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return 'denied';
+    }
+
+    return Notification.permission;
+  }
+
+  /**
+   * Request notification permission from user across native and web
    */
   async requestPermission(): Promise<NotificationPermission> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const res = await LocalNotifications.requestPermissions();
+        return res.display === 'granted' ? 'granted' : 'denied';
+      } catch {
+        return 'denied';
+      }
+    }
+
     if (typeof window === 'undefined' || !('Notification' in window)) {
       return 'denied';
     }
@@ -154,7 +216,10 @@ export class NotificationService {
               title,
               body,
               extra,
-              schedule: { at: new Date(Date.now() + 200) },
+              channelId: 'moswords_messages',
+              smallIcon: 'ic_stat_notify',
+              iconColor: '#00F0FF',
+              schedule: { at: new Date(Date.now() + 100) },
             },
           ],
         });

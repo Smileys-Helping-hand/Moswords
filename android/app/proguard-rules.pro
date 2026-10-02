@@ -5,8 +5,11 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Keep Capacitor plugins
+# Keep Capacitor plugins and core
 -keep class com.getcapacitor.** { *; }
+-keep interface com.getcapacitor.** { *; }
+-keep class com.capacitorjs.plugins.** { *; }
+-keep interface com.capacitorjs.plugins.** { *; }
 -keep @com.getcapacitor.PluginMethod class * {
     @com.getcapacitor.PluginMethod <methods>;
 }

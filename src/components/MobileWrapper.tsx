@@ -19,13 +19,18 @@ export default function MobileWrapper() {
         import('@capacitor/keyboard'),
       ]);
 
-      // The app has rendered: drop the splash now instead of waiting out its
-      // maximum duration (capacitor.config launchShowDuration).
-      SplashScreen.hide({ fadeOutDuration: 150 }).catch(() => {});
+      try {
+        await SplashScreen.hide({ fadeOutDuration: 150 });
+      } catch {}
 
-      await StatusBar.setOverlaysWebView({ overlay: true });
-      await StatusBar.setStyle({ style: Style.Dark });
-      Keyboard.setAccessoryBarVisible({ isVisible: false });
+      try {
+        await StatusBar.setOverlaysWebView({ overlay: true });
+        await StatusBar.setStyle({ style: Style.Dark });
+      } catch {}
+
+      try {
+        await Keyboard.setAccessoryBarVisible({ isVisible: false });
+      } catch {}
     })().catch(() => {});
   }, []);
 

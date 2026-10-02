@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Bell, MessageSquare, Users, Phone, Volume2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { notificationService } from '@/lib/notification-service';
 
 const PREFS_KEY = 'mw_notification_prefs';
 
@@ -65,28 +66,30 @@ export default function NotificationsPage() {
       if (raw) setPrefs({ ...defaults, ...JSON.parse(raw) });
     } catch {}
 
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPermission(Notification.permission);
-    }
+    notificationService.checkPermission().then(setPermission).catch(() => {});
   }, []);
 
   const update = (patch: Partial<NotifPrefs>) => {
     const next = { ...prefs, ...patch };
     setPrefs(next);
-    try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch {}
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event('storage'));
+    } catch {}
   };
 
   const requestPermission = async () => {
-    if (!('Notification' in window)) {
-      toast({ variant: 'destructive', title: 'Not supported', description: 'Notifications are not supported in this browser.' });
-      return;
-    }
-    const result = await Notification.requestPermission();
-    setPermission(result);
-    if (result === 'granted') {
-      toast({ title: 'Notifications enabled', description: 'You will receive push notifications.' });
-    } else {
-      toast({ variant: 'destructive', title: 'Permission denied', description: 'Enable notifications in your browser settings.' });
+    try {
+      const result = await notificationService.requestPermission();
+      setPermission(result);
+      if (result === 'granted') {
+        await notificationService.initialize();
+        toast({ title: 'Notifications enabled', description: 'You will receive alerts for new messages.' });
+      } else {
+        toast({ variant: 'destructive', title: 'Permission denied', description: 'Enable notifications in your device or browser settings.' });
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not request notification permissions.' });
     }
   };
 

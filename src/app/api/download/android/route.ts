@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/download/android        → 302 to a short-lived link for the latest APK
+ * GET /api/download/android        → 302 to a link for the latest APK (S3 presigned or direct local)
  * GET /api/download/android?info=1 → { release } (version, size, checksum, notes)
  * Public: anyone may download the app.
  */
@@ -21,7 +21,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return NextResponse.redirect(await androidDownloadUrl(release), {
+    const downloadTarget = await androidDownloadUrl(release);
+    const destination = downloadTarget.startsWith('/')
+      ? new URL(downloadTarget, request.nextUrl.origin).toString()
+      : downloadTarget;
+
+    return NextResponse.redirect(destination, {
       status: 302,
       headers: { 'Cache-Control': 'no-store' },
     });

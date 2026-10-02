@@ -1,0 +1,16 @@
+{
+  "versionName": "1.2.0",
+  "versionCode": 3,
+  "fileName": "Moswords.apk",
+  "size": 6786014,
+  "sha256": "84611144c32ccb17e4f8a51fd38cc9492f5424dd493ec1ae3af91d7a821eabc8",
+  "minAndroid": "7.0 (Nougat)",
+  "releasedAt": "2026-10-03T00:00:00.000Z",
+  "notes": [
+    "Second Brain Ecosystem neon branding & monogram logo",
+    "High-importance mobile notification channel for DMs and groups",
+    "Notification settings integration with full on/off toggles",
+    "Samsung One UI & Android system WebView stability fixes",
+    "Fixed loading screen loops and offline retry recovery"
+  ]
+}
