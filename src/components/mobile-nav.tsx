@@ -80,13 +80,13 @@ export default function MobileNav() {
                 {active && (
                   <motion.div
                     layoutId="nav-active-pill"
-                    className="absolute inset-x-1 inset-y-1 rounded-xl bg-primary/15 border border-primary/25"
+                    className="absolute inset-x-1 inset-y-1 rounded-xl bg-gradient-to-r from-cyan-500/15 to-violet-600/15 border border-cyan-400/30 shadow-[0_0_12px_rgba(0,240,255,0.2)]"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                   />
                 )}
                 <item.icon
                   className={`w-5 h-5 mb-0.5 relative z-10 transition-all duration-150 ${
-                    active ? 'text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]' : 'text-muted-foreground'
+                    active ? 'text-cyan-400 scale-110 drop-shadow-[0_0_8px_rgba(0,240,255,0.7)]' : 'text-muted-foreground'
                   }`}
                 />
                 {/* Pending requests badge for People tab */}
@@ -94,14 +94,14 @@ export default function MobileNav() {
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute top-0 right-1 w-4 h-4 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center z-20"
+                    className="absolute top-0 right-1 w-4 h-4 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center z-20 shadow-sm"
                   >
                     {pendingRequestCount > 9 ? '9+' : pendingRequestCount}
                   </motion.span>
                 )}
                 <span
                   className={`text-[10px] font-semibold relative z-10 transition-colors duration-150 ${
-                    active ? 'text-primary' : 'text-muted-foreground'
+                    active ? 'text-cyan-300' : 'text-muted-foreground'
                   }`}
                 >
                   {item.label}
@@ -110,7 +110,7 @@ export default function MobileNav() {
                 {active && (
                   <motion.span
                     layoutId="nav-active-dot"
-                    className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
+                    className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-cyan-400 shadow-[0_0_4px_#00F0FF]"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                   />
                 )}

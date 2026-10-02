@@ -2,56 +2,44 @@
 
 import { Wifi, WifiOff } from 'lucide-react';
 import { useMobileFeatures } from '@/hooks/use-mobile-features';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 /**
- * Network status indicator that appears when the device goes offline
- * Automatically shows/hides based on connection state
+ * Top-level network alert is centralized in OfflineBanner.
+ * Default export returns null to prevent duplicate stacked banners.
  */
 export default function NetworkStatus() {
-  const { networkStatus, isNative } = useMobileFeatures();
-
-  // Only show if offline
-  if (networkStatus.connected) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: -100, opacity: 0 }}
-        className="fixed top-0 left-0 right-0 z-50 safe-area-top"
-      >
-        <div className="bg-destructive text-destructive-foreground px-4 py-3 shadow-lg">
-          <div className="flex items-center justify-center gap-2 text-sm font-medium">
-            <WifiOff className="w-4 h-4" />
-            <span>No Internet Connection</span>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  );
+  return null;
 }
 
 /**
- * Simple inline network status badge
+ * Polished inline network status badge with pulse glow animation
  */
 export function NetworkBadge() {
   const { networkStatus } = useMobileFeatures();
 
   if (networkStatus.connected) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-success/10 text-success text-xs">
-        <Wifi className="w-3 h-3" />
-        <span>Online</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium backdrop-blur-md">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+        </span>
+        <Wifi className="w-3 h-3 text-emerald-400" />
+        <span>Connected</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-destructive/10 text-destructive text-xs">
-      <WifiOff className="w-3 h-3" />
+    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium backdrop-blur-md">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+      </span>
+      <WifiOff className="w-3 h-3 text-red-400" />
       <span>Offline</span>
     </div>
   );
 }
+

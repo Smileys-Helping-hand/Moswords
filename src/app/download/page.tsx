@@ -47,10 +47,17 @@ export default function DownloadPage() {
 
       <main className="mx-auto max-w-md space-y-5 px-4">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/30">
-            <MoswordsIcon className="h-11 w-11 text-white" />
+          <span className="flex h-20 w-20 items-center justify-center rounded-3xl bg-neutral-950/80 border border-white/15 shadow-[0_0_35px_rgba(0,240,255,0.35)] backdrop-blur-xl">
+            <MoswordsIcon className="h-12 w-12 text-white drop-shadow-[0_0_10px_rgba(0,240,255,0.5)]" />
           </span>
-          <h1 className="text-2xl font-bold">Moswords on your phone</h1>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[10px] font-semibold tracking-wider uppercase">
+              Second Brain Ecosystem
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white via-cyan-100 to-cyan-300 bg-clip-text text-transparent">
+              Moswords on your phone
+            </h1>
+          </div>
           <p className="text-sm text-muted-foreground">
             The app opens straight into your chats, keeps you signed in and gets its own icon on your home screen.
           </p>

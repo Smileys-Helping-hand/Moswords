@@ -37,21 +37,26 @@ export default function LoginPage() {
                 transition={{ duration: 0.5 }}
             >
                 <motion.div 
-                    className="flex flex-col items-center mb-8 gap-4"
+                    className="flex flex-col items-center mb-6 gap-3"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
                 >
                     <motion.div
-                        className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl shadow-primary/50"
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        className="relative w-20 h-20 rounded-3xl bg-neutral-950/80 border border-white/15 flex items-center justify-center shadow-[0_0_40px_rgba(0,240,255,0.35)] backdrop-blur-xl"
+                        whileHover={{ scale: 1.08 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 12 }}
                     >
-                        <MoswordsIcon className="w-12 h-12 text-white" />
+                        <MoswordsIcon className="w-13 h-13 text-white drop-shadow-[0_0_12px_rgba(0,240,255,0.5)]" />
                     </motion.div>
-                    <div className="text-center">
-                        <h1 className="text-4xl font-bold text-gradient mb-2">Welcome to Moswords</h1>
-                        <p className="text-muted-foreground">Professional team communication, reimagined.</p>
+                    <div className="text-center space-y-1">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[11px] font-medium tracking-wide uppercase">
+                            <span>Second Brain Ecosystem</span>
+                        </div>
+                        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white via-cyan-100 to-cyan-300 bg-clip-text text-transparent">
+                            Welcome to Moswords
+                        </h1>
+                        <p className="text-sm text-muted-foreground">Fast, private messaging, voice and team workspaces.</p>
                     </div>
                 </motion.div>
                 

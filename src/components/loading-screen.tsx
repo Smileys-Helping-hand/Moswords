@@ -5,76 +5,90 @@ import { MoswordsIcon } from './icons';
 
 export default function LoadingScreen() {
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5 relative overflow-hidden">
-      {/* Animated background */}
+    <div className="flex h-screen w-full items-center justify-center bg-background relative overflow-hidden">
+      {/* Animated ambient gradient backdrops */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div 
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl"
-          animate={{ 
-            scale: [1, 1.3, 1],
-            opacity: [0.3, 0.6, 0.3]
+        <motion.div
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-cyan-500/20 via-purple-600/15 to-transparent rounded-full blur-[100px]"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.4, 0.7, 0.4],
           }}
-          transition={{ duration: 3, repeat: Infinity }}
-        />
-        <motion.div 
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl"
-          animate={{ 
-            scale: [1.3, 1, 1.3],
-            opacity: [0.6, 0.3, 0.6]
-          }}
-          transition={{ duration: 3, repeat: Infinity, delay: 0.5 }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
 
       <div className="relative z-10 flex flex-col items-center gap-6">
-        <motion.div
-          className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl shadow-primary/50"
-          animate={{ 
-            rotate: [0, 360],
-            scale: [1, 1.1, 1]
-          }}
-          transition={{ 
-            rotate: { duration: 2, repeat: Infinity, ease: "linear" },
-            scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
-          }}
-        >
-          <MoswordsIcon className="w-14 h-14 text-white" />
-        </motion.div>
+        {/* Orbital glow container */}
+        <div className="relative flex items-center justify-center">
+          {/* Rotating orbital ring */}
+          <motion.div
+            className="absolute w-28 h-28 rounded-full border border-dashed border-cyan-400/40"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+          />
+          <motion.div
+            className="absolute w-32 h-32 rounded-full border border-purple-500/20"
+            animate={{ rotate: -360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+          />
 
-        <div className="text-center">
-          <motion.h2 
-            className="text-2xl font-bold text-gradient mb-2"
+          {/* Central Logo Badge */}
+          <motion.div
+            className="relative w-20 h-20 rounded-2xl bg-neutral-950/90 border border-white/10 flex items-center justify-center shadow-[0_0_35px_rgba(0,240,255,0.3)] backdrop-blur-2xl"
+            animate={{
+              scale: [0.97, 1.03, 0.97],
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+          >
+            <MoswordsIcon className="w-12 h-12 text-white drop-shadow-[0_0_12px_rgba(0,240,255,0.6)]" />
+          </motion.div>
+        </div>
+
+        <div className="text-center space-y-2">
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.15 }}
           >
-            Moswords
-          </motion.h2>
-          
-          <motion.div 
-            className="flex gap-2 justify-center items-center"
+            <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white via-cyan-100 to-cyan-300 bg-clip-text text-transparent">
+              Moswords
+            </h2>
+            <p className="text-xs text-neutral-400 font-medium tracking-wider uppercase mt-0.5">
+              Second Brain Ecosystem
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="flex gap-1.5 justify-center items-center pt-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.3 }}
           >
-            <motion.div
-              className="w-2 h-2 bg-primary rounded-full"
-              animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-            />
-            <motion.div
-              className="w-2 h-2 bg-primary rounded-full"
-              animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-            />
-            <motion.div
-              className="w-2 h-2 bg-primary rounded-full"
-              animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-            />
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-1.5 h-1.5 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full"
+                animate={{
+                  scale: [1, 1.6, 1],
+                  opacity: [0.4, 1, 0.4],
+                }}
+                transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  ease: 'easeInOut',
+                }}
+              />
+            ))}
           </motion.div>
         </div>
       </div>
     </div>
   );
 }
+

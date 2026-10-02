@@ -21,7 +21,7 @@ import { ChromeIcon } from 'lucide-react';
 import { MoswordsIcon } from './icons';
 import { PasswordInput, validationRules } from './ui/password-input';
 
-export default function AuthForm() {
+export default function AuthForm({ showBrandHeader = false }: { showBrandHeader?: boolean } = {}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -122,10 +122,14 @@ export default function AuthForm() {
   const handleGoogleSignIn = () => signIn('google', { callbackUrl });
 
   return (
-    <div className="flex flex-col items-center space-y-4">
-      <MoswordsIcon className="w-16 h-16" />
-      <h1 className="text-3xl font-bold">Welcome to Moswords</h1>
-      <p className="text-muted-foreground">Sign in or create a free account to start chatting</p>
+    <div className="flex flex-col items-center space-y-4 w-full">
+      {showBrandHeader && (
+        <div className="flex flex-col items-center space-y-2 mb-2 text-center">
+          <MoswordsIcon className="w-16 h-16" />
+          <h1 className="text-3xl font-bold">Welcome to Moswords</h1>
+          <p className="text-muted-foreground">Sign in or create a free account to start chatting</p>
+        </div>
+      )}
       <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>

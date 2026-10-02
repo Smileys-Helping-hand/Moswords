@@ -42,9 +42,14 @@ export default function UserAvatar({ src, fallback = 'U', status, imageHint }: U
         </AvatarFallback>
       </Avatar>
       {status && (
-        <span
-          className={`absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-background ${statusColor[status]}`}
-        />
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5">
+          {status === 'online' && (
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70" />
+          )}
+          <span
+            className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-background shadow-sm ${statusColor[status]}`}
+          />
+        </span>
       )}
     </div>
   );

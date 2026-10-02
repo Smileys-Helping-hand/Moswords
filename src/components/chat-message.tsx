@@ -61,7 +61,7 @@ function ReadReceiptIcon({
   if (isDelivered) {
     return (
       <CheckCheck
-        className={cn('w-3.5 h-3.5 shrink-0', isRead ? 'text-sky-300' : 'opacity-60')}
+        className={cn('w-3.5 h-3.5 shrink-0 transition-colors', isRead ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(0,240,255,0.7)]' : 'opacity-60')}
         aria-label={isRead ? 'Read' : 'Delivered'}
       />
     );

@@ -352,10 +352,10 @@ export default function ChatInput({
       <div
         {...getRootProps()}
         className={cn(
-          "relative bg-black/40 backdrop-blur-xl border-2 rounded-2xl shadow-xl overflow-hidden transition-all duration-300",
+          "relative bg-black/50 backdrop-blur-xl border rounded-2xl shadow-xl overflow-hidden transition-all duration-300",
           isDragActive
-            ? "border-[#00F0FF] shadow-[0_0_20px_rgba(0,240,255,0.5)] scale-[1.02]"
-            : "border-white/10"
+            ? "border-[#00F0FF] shadow-[0_0_25px_rgba(0,240,255,0.5)] scale-[1.01]"
+            : "border-white/10 focus-within:border-cyan-400/50 focus-within:shadow-[0_0_25px_rgba(0,240,255,0.18)]"
         )}
       >
         <input {...getInputProps()} />
