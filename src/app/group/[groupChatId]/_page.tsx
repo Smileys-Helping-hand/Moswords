@@ -91,12 +91,6 @@ interface Member {
 }
 
 export default function GroupChatPage({ params }: { params: Promise<{ groupChatId: string }> }) {
-  const isProbablyEncryptedContent = useCallback((value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length < 48) return false;
-    if (/\s/.test(trimmed)) return false;
-    return /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
-  }, []);
   const { groupChatId } = use(params);
   const { status, session } = useAuth();
   const { toast } = useToast();
@@ -183,8 +177,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     const decryptAndMigrateMsg = async (msg: Message, memberIds: string[]): Promise<Message> => {
       let content = msg.content;
       const contentNonce = msg.contentNonce || undefined;
-      const looksEncrypted = isProbablyEncryptedContent(content);
-      const isEncrypted = !!msg.isEncrypted || !!contentNonce || looksEncrypted;
+      // Only the server's flag counts: guessing from the text marked long
+      // no-space messages ("hahahaha…", IDs) as encrypted.
+      const isEncrypted = !!msg.isEncrypted || !!contentNonce;
 
       if (isEncrypted) {
         if (!contentNonce || !canDecryptRef.current) {
@@ -289,11 +284,30 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     const messageText = text || newMessage;
     if ((!messageText.trim() && (!files || files.length === 0)) || sending) return;
 
+    const plainText = messageText.trim();
+    const tempId = `temp-${Date.now()}`;
+    const me = members.find((m) => m.userId === currentUserId)?.user;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        content: plainText,
+        userId: currentUserId,
+        groupChatId,
+        createdAt: new Date(),
+        deleted: false,
+        sender: me
+          ? { id: me.id, email: me.email, name: me.name, displayName: me.displayName, photoURL: me.photoURL }
+          : undefined,
+      } as Message,
+    ]);
+    setNewMessage('');
+
     setSending(true);
     try {
       // Use cached member IDs (populated during initialLoad)
       const memberIds = memberIdsRef.current;
-      const encrypted = await encryptMessage('group', groupChatId, memberIds, messageText.trim());
+      const encrypted = await encryptMessage('group', groupChatId, memberIds, plainText);
 
       let mediaUrl: string | undefined;
       let mediaType: string | undefined;
@@ -344,9 +358,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
       if (!response.ok) throw new Error('Failed to send message');
 
       const data = await response.json();
-      setMessages((prev) => [...prev, data.message]);
-      setNewMessage('');
+      // Swap the placeholder for the stored message, keeping the text we know.
+      // (The sync loop may have delivered it already; never show it twice.)
+      setMessages((prev) => {
+        const stored = { ...data.message, content: plainText, sender: data.message.sender ?? prev.find((m) => m.id === tempId)?.sender } as Message;
+        const withoutTemp = prev.filter((m) => m.id !== tempId);
+        return withoutTemp.some((m) => m.id === stored.id)
+          ? withoutTemp.map((m) => (m.id === stored.id ? stored : m))
+          : [...withoutTemp, stored];
+      });
     } catch (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setNewMessage((current) => current || plainText); // give the text back to retry
       console.error('Error sending message:', error);
       toast({
         variant: 'destructive',
