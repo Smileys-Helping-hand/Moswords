@@ -145,14 +145,8 @@ const MEDIA_LABELS: Record<string, string> = {
 
 /** Detect if a message preview is encrypted */
 function getPreviewText(content: string, isEncrypted?: boolean | null): string {
+  // Only the server's flag counts: guessing marked long no-space messages as encrypted.
   if (isEncrypted) return '🔒 Encrypted message';
-  if (
-    content.length > 20 &&
-    /^[A-Za-z0-9+/=_-]+$/.test(content) &&
-    !/\s/.test(content)
-  ) {
-    return '🔒 Encrypted message';
-  }
   return content;
 }
 

@@ -217,16 +217,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       encryptionInitRef.current = true;
     };
 
-    const looksLikeCiphertext = (s: string) => {
-      if (!s || s.length < 20) return false;
-      const stripped = s.replace(/[\s\n\r]/g, '');
-      const b64Chars = (stripped.match(/[A-Za-z0-9+/=]/g) || []).length;
-      return b64Chars / stripped.length > 0.97 && stripped.length > 30 && !s.includes(' ');
-    };
-
     const decryptOne = async (msg: Message): Promise<Message> => {
       let content = msg.content;
-      const isEnc = msg.isEncrypted || !!msg.contentNonce || looksLikeCiphertext(msg.content);
+      // Only the server's flag counts (no guessing from the text).
+      const isEnc = msg.isEncrypted || !!msg.contentNonce;
       if (isEnc) {
         if (canDecryptRef.current && msg.contentNonce) {
           const plain = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce).catch(() => null);
