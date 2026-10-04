@@ -89,9 +89,12 @@ export async function latestAndroidRelease(): Promise<AndroidRelease | null> {
     }
   }
 
-  // Fallback to local bundled release
-  if (!release) {
-    release = getLocalRelease();
+  // The bundled copy is a fallback, but whichever release is newer wins: a
+  // newer APK committed to public/downloads must not hide behind an older S3 one
+  // (that happened with 1.2.0 vs 1.1.0).
+  const local = getLocalRelease();
+  if (!release || (local && local.versionCode > release.versionCode)) {
+    release = local ?? release;
   }
 
   cached = { at: Date.now(), release };
