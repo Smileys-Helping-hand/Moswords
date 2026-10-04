@@ -18,7 +18,6 @@ import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useMobileFeatures } from '@/hooks/use-mobile-features';
-import { encryptFile } from '@/lib/crypto/e2e-client';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 interface MediaUploadDialogProps {
@@ -166,17 +165,10 @@ export default function MediaUploadDialog({ onUploadComplete, scope, scopeId, ge
     setProgress(10);
     
     try {
-      let uploadFile = fileToUpload;
-      let mediaNonce: string | undefined;
-      let mediaEncrypted = false;
-
-      if (scope && scopeId && getRecipientUserIds) {
-        const recipients = await getRecipientUserIds();
-        const encrypted = await encryptFile(scope, scopeId, recipients, fileToUpload);
-        uploadFile = encrypted.file;
-        mediaNonce = encrypted.mediaNonce;
-        mediaEncrypted = true;
-      }
+      // Media is uploaded as-is (no end-to-end encryption; see lib/crypto/e2e-client).
+      const uploadFile = fileToUpload;
+      const mediaNonce: string | undefined = undefined;
+      const mediaEncrypted = false;
 
       const formData = new FormData();
       formData.append('file', uploadFile);
