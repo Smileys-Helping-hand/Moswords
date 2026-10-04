@@ -30,11 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  decryptMessage,
-  ensureConversationKey,
-  getDmScopeId,
-} from '@/lib/crypto/e2e-client';
+import { getDmScopeId, readableContent } from '@/lib/crypto/e2e-client';
 import { compressImage } from '@/lib/image-compress';
 import { uploadFile } from '@/lib/upload-client';
 import { useCall } from '@/providers/call-provider';
@@ -93,10 +89,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const lastMessageIdRef = useRef<string>('');
   const hasInitialLoadRef = useRef(false);
   const otherUserRef = useRef<User | null>(null);
-  const canDecryptRef = useRef(false);
-  const encryptionInitRef = useRef(false);
   const decryptRef = useRef<((msg: Message) => Promise<Message>) | null>(null);
-  const initEncryptionRef = useRef<(() => Promise<void>) | null>(null);
 
   const handleVoiceCall = useCallback(() => {
     if (!otherUser) return;
@@ -206,29 +199,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
     const scopeId = getDmScopeId(currentUserId, userId);
 
-    const initEncryption = async () => {
-      if (encryptionInitRef.current) return;
-      try {
-        await ensureConversationKey('dm', scopeId, [userId]);
-        canDecryptRef.current = true;
-      } catch {
-        canDecryptRef.current = false;
-      }
-      encryptionInitRef.current = true;
-    };
-
     const decryptOne = async (msg: Message): Promise<Message> => {
-      let content = msg.content;
-      // Only the server's flag counts (no guessing from the text).
-      const isEnc = msg.isEncrypted || !!msg.contentNonce;
-      if (isEnc) {
-        if (canDecryptRef.current && msg.contentNonce) {
-          const plain = await decryptMessage('dm', scopeId, msg.content, msg.contentNonce).catch(() => null);
-          content = plain ?? '🔒 Encrypted message';
-        } else {
-          content = '🔒 Encrypted message';
-        }
-      }
+      // Plain messages as-is; old encrypted ones open where this device has the key.
+      const content = await readableContent('dm', scopeId, msg);
       return { ...msg, content, mediaUrl: msg.mediaUrl || undefined } as Message;
     };
 
@@ -249,7 +222,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         if (!response.ok) throw new Error('Failed to fetch conversation');
         const data = await response.json();
 
-        await initEncryption();
         revokeMediaUrls();
 
         const decrypted: Message[] = await Promise.all(
@@ -278,7 +250,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     };
 
     decryptRef.current = decryptOne;
-    initEncryptionRef.current = initEncryption;
     initialLoad();
 
     return () => {
@@ -319,7 +290,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     );
     if (relevant.length === 0) return;
 
-    if (!encryptionInitRef.current) await initEncryptionRef.current?.();
     const decrypt = decryptRef.current;
     if (!decrypt) return;
     const incoming = await Promise.all(relevant.map((m) => decrypt(m as unknown as Message)));

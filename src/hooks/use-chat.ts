@@ -5,12 +5,7 @@ import { useSyncBatches } from '@/providers/sync-provider';
 import { useToast } from './use-toast';
 import { useAuth } from './use-auth';
 import { useMessageSound } from './use-sound-effect';
-import {
-  decryptFile,
-  decryptMessage,
-  encryptMessage,
-  ensureConversationKey,
-} from '@/lib/crypto/e2e-client';
+import { decryptFile, readableContent } from '@/lib/crypto/e2e-client';
 
 export interface OptimisticMessage {
   id: string;
@@ -117,38 +112,16 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
 
     const fetchMessages = async () => {
       try {
-        const memberIds = await fetchChannelMembers();
         const response = await fetch(`/api/channels/${channelId}/messages`);
         if (!response.ok) throw new Error('Failed to fetch messages');
         const data = await response.json();
 
         revokeMediaUrls();
 
-        let canDecrypt = false;
-        if (channelId && memberIds.length > 0) {
-          try {
-            await ensureConversationKey('channel', channelId, memberIds);
-            canDecrypt = true;
-          } catch (error) {
-            console.warn('Failed to ensure channel key:', error);
-          }
-        }
-
         const serverMessages: OptimisticMessage[] = await Promise.all(
           data.messages.reverse().map(async (msg: any) => {
-            let content = msg.message.content as string;
-            const contentNonce = msg.message.contentNonce as string | undefined;
-            // Only the server's flag counts (no guessing from the text).
-            const isEncrypted = !!msg.message.isEncrypted || !!contentNonce;
-
-            if (isEncrypted) {
-              if (!contentNonce || !canDecrypt) {
-                content = '[Encrypted message]';
-              } else {
-                const decrypted = await decryptMessage('channel', channelId, content, contentNonce);
-                content = decrypted ?? '[Encrypted message]';
-              }
-            }
+            // Plain messages as-is; old encrypted ones open where this device has the key.
+            const content = await readableContent('channel', channelId, msg.message);
 
             let mediaUrl = msg.message.mediaUrl || undefined;
             if (msg.message.mediaEncrypted && msg.message.mediaNonce && mediaUrl) {
@@ -281,16 +254,11 @@ export function useChat({ channelId, enabled = true }: UseChatOptions) {
     setTimeout(() => scrollToBottom(true), 50);
 
     try {
-      const memberIds = await fetchChannelMembers();
-      const encrypted = await encryptMessage('channel', channelId, memberIds, content.trim());
-
       const response = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          content: encrypted.ciphertext,
-          contentNonce: encrypted.nonce,
-          isEncrypted: true,
+          content: content.trim(),
           ...(mediaUrl && { mediaUrl }),
           ...(mediaType && { mediaType }),
           ...(mediaEncrypted && { mediaEncrypted }),

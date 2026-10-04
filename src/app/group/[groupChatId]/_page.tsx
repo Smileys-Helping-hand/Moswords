@@ -36,13 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  decryptFile,
-  decryptMessage,
-  encryptFile,
-  encryptMessage,
-  ensureConversationKey,
-} from '@/lib/crypto/e2e-client';
+import { decryptFile, readableContent } from '@/lib/crypto/e2e-client';
 
 interface Message {
   id: string;
@@ -118,8 +112,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
   // Incremental poll refs (avoid stale closures + prevent infinite re-renders)
   const lastMessageIdRef = useRef<string>('');
   const hasInitialLoadRef = useRef(false);
-  const canDecryptRef = useRef(false);
-  const encryptionInitRef = useRef(false);
   const groupNameRef = useRef<string>(''); // for toast without state dep
   const decryptRef = useRef<((msg: Message, memberIds: string[]) => Promise<Message>) | null>(null);
 
@@ -163,32 +155,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
     }
     if (status !== 'authenticated') return;
 
-    const initEncryption = async (memberIds: string[]) => {
-      if (encryptionInitRef.current) return;
-      try {
-        await ensureConversationKey('group', groupChatId, memberIds);
-        canDecryptRef.current = true;
-      } catch {
-        canDecryptRef.current = false;
-      }
-      encryptionInitRef.current = true;
-    };
-
     const decryptAndMigrateMsg = async (msg: Message, memberIds: string[]): Promise<Message> => {
-      let content = msg.content;
-      const contentNonce = msg.contentNonce || undefined;
-      // Only the server's flag counts: guessing from the text marked long
-      // no-space messages ("hahahaha…", IDs) as encrypted.
-      const isEncrypted = !!msg.isEncrypted || !!contentNonce;
-
-      if (isEncrypted) {
-        if (!contentNonce || !canDecryptRef.current) {
-          content = '[Encrypted message]';
-        } else {
-          const decrypted = await decryptMessage('group', groupChatId, msg.content, contentNonce);
-          content = decrypted ?? '[Encrypted message]';
-        }
-      }
+      // New messages are plain; old encrypted ones open where this device has the key.
+      const content = await readableContent('group', groupChatId, msg);
 
       let mediaUrl = msg.mediaUrl || undefined;
       if (msg.mediaEncrypted && msg.mediaNonce && mediaUrl) {
@@ -224,8 +193,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
 
         const memberIds = (detailsData.members as Member[]).map((m) => m.userId);
         memberIdsRef.current = memberIds;
-
-        await initEncryption(memberIds);
 
         if (!messagesRes.ok) throw new Error('Failed to fetch messages');
         const messagesData = await messagesRes.json();
@@ -305,20 +272,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
 
     setSending(true);
     try {
-      // Use cached member IDs (populated during initialLoad)
-      const memberIds = memberIdsRef.current;
-      const encrypted = await encryptMessage('group', groupChatId, memberIds, plainText);
-
       let mediaUrl: string | undefined;
       let mediaType: string | undefined;
-      let mediaEncrypted: boolean | undefined;
-      let mediaNonce: string | undefined;
 
       if (files && files.length > 0) {
         const file = files[0];
-        const encryptedFile = await encryptFile('group', groupChatId, memberIds, file);
         const formData = new FormData();
-        formData.append('file', encryptedFile.file);
+        formData.append('file', file);
         const uploadRes = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
@@ -335,8 +295,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
             : file.type.startsWith('audio/')
               ? 'audio'
               : 'file';
-        mediaEncrypted = true;
-        mediaNonce = encryptedFile.mediaNonce;
       }
 
       const response = await fetch(`/api/group-chats/${groupChatId}/messages`, {
@@ -345,13 +303,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ groupChatI
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: encrypted.ciphertext,
-          contentNonce: encrypted.nonce,
-          isEncrypted: true,
+          content: plainText,
           ...(mediaUrl && { mediaUrl }),
           ...(mediaType && { mediaType }),
-          ...(mediaEncrypted && { mediaEncrypted }),
-          ...(mediaNonce && { mediaNonce }),
         }),
       });
 

@@ -12,7 +12,6 @@ import { usePathname } from 'next/navigation';
 import { useChatContext } from '@/providers/chat-provider';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
-import { encryptFile } from '@/lib/crypto/e2e-client';
 import { compressImage } from '@/lib/image-compress';
 
 interface ImagePreview {
@@ -134,20 +133,13 @@ export default function ChatInput() {
   const uploadImageToServer = useCallback(async (file: File): Promise<{ url: string; mediaNonce?: string; mediaEncrypted?: boolean } | null> => {
     try {
       let uploadFile = file;
-      let mediaNonce: string | undefined;
-      let mediaEncrypted = false;
+      // Media is uploaded as-is (no end-to-end encryption; see lib/crypto/e2e-client).
+      const mediaNonce: string | undefined = undefined;
+      const mediaEncrypted = false;
 
-      // Compress images before encryption & upload (saves data on mobile)
+      // Compress images before upload (saves data on mobile)
       if (file.type.startsWith('image/')) {
         uploadFile = await compressImage(file);
-      }
-
-      if (activeChannelId) {
-        const memberIds = await ensureChannelMembers();
-        const encrypted = await encryptFile('channel', activeChannelId, memberIds, file);
-        uploadFile = encrypted.file;
-        mediaNonce = encrypted.mediaNonce;
-        mediaEncrypted = true;
       }
 
       const formData = new FormData();
